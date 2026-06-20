@@ -238,10 +238,10 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของคุณเอนิส',role:'เจ้าของร้าน',pin:'6326',protected:true},
-  {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'1221',protected:false},
-  {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'1331',protected:false},
-  {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'1441',protected:false}
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
+  {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
+  {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
+  {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
 ];
 
 const STATUSES_LDR=['รับผ้ารอส่งซัก','ระหว่างการซัก','ผ้าพร้อมส่ง (รับเอง)','ผ้าพร้อมส่ง (Delivery)','จัดส่งแล้ว','เสร็จสิ้น','ยกเลิก'];
@@ -736,6 +736,7 @@ function orderCardHTML(o){
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="openEditOrder(\''+o.id+'\')">✏️ แก้ไข</button>';
   actions+='<button class="btn btn-out btn-sm" onclick="showBill(\''+o.id+'\')">🧾 บิล</button>';
   actions+='<button class="btn btn-out btn-sm" onclick="showLinePreview(\''+o.id+'\')">📱 LINE</button>';
+  if(!paid) actions+='<button class="btn btn-out btn-sm" onclick="sendBillCollect(\''+o.id+'\')" style="color:var(--am)">📱 เรียกเก็บเงิน</button>';
   actions+='<button class="btn btn-out btn-sm" onclick="showOrderDetail(\''+o.id+'\')">👁️ ดู</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="duplicateOrder(\''+o.id+'\')">📋 ซ้ำ</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="openCancelModal(\''+o.id+'\')" style="color:var(--rd)">❌ ยกเลิก</button>';
@@ -1570,13 +1571,45 @@ function exportMembers(){
 function renderCRMPage(c){
   const levels={ทั่วไป:0,Silver:0,Gold:0,VIP:0};
   DB.members.forEach(m=>{if(levels[m.level]!==undefined)levels[m.level]++});
+  const s=getShopSettings();const crm=s.crm||{ptsRate:100,redeemRate:1,vipThreshold:10000,welcomePts:50,silverMin:3000,goldMin:6000};
   c.innerHTML='<div class="grid g4" style="margin-bottom:16px">'+
     Object.entries(levels).map(([k,v])=>'<div class="kpi"><div class="kpi-lbl">'+k+'</div><div class="kpi-val">'+v+'</div></div>').join('')+'</div>'+
-    '<div class="card"><div class="card-title">⭐ CRM — ระบบแต้มสะสม</div>'+
-    '<table><tr><th>การตั้งค่า</th><th>ค่าปัจจุบัน</th></tr>'+
-    '<tr><td>อัตราสะสม</td><td>ทุก '+(getShopSettings().ptsRate||100)+'฿ = 1 แต้ม</td></tr>'+
-    '<tr><td>อัตราแลก</td><td>1 แต้ม = 1฿</td></tr>'+
-    '<tr><td>แต้มต้อนรับ</td><td>'+(getShopSettings().welcomePts||50)+' แต้ม</td></tr></table></div>';
+    '<div class="grid g2">'+
+    '<div class="card"><div class="card-title">⭐ ตั้งค่า CRM — แต้มสะสม</div>'+
+    '<div class="form-group"><label class="form-label">อัตราสะสม: ทุกกี่บาท = 1 แต้ม</label><input id="crm-rate" type="number" value="'+(crm.ptsRate||100)+'"></div>'+
+    '<div class="form-group"><label class="form-label">อัตราแลก: 1 แต้ม = กี่บาท</label><input id="crm-redeem" type="number" value="'+(crm.redeemRate||1)+'"></div>'+
+    '<div class="form-group"><label class="form-label">แต้มต้อนรับ (สมัครใหม่)</label><input id="crm-welcome" type="number" value="'+(crm.welcomePts||50)+'"></div>'+
+    '<hr style="margin:12px 0"><div class="card-title" style="font-size:13px">🏅 เกณฑ์ระดับสมาชิก (ยอดซื้อสะสม ฿)</div>'+
+    '<div class="form-group"><label class="form-label">Silver ขั้นต่ำ</label><input id="crm-silver" type="number" value="'+(crm.silverMin||3000)+'"></div>'+
+    '<div class="form-group"><label class="form-label">Gold ขั้นต่ำ</label><input id="crm-gold" type="number" value="'+(crm.goldMin||6000)+'"></div>'+
+    '<div class="form-group"><label class="form-label">VIP ขั้นต่ำ</label><input id="crm-vip" type="number" value="'+(crm.vipThreshold||10000)+'"></div>'+
+    '<button class="btn btn-pr" onclick="saveCRMSettings()">💾 บันทึกตั้งค่า CRM</button></div>'+
+    '<div class="card"><div class="card-title">👥 สมาชิกแยกตามระดับ</div>'+
+    '<table><tr><th>ระดับ</th><th>จำนวน</th><th>เกณฑ์</th></tr>'+
+    '<tr><td>ทั่วไป</td><td><strong>'+levels['ทั่วไป']+'</strong></td><td>ทุกคน</td></tr>'+
+    '<tr><td><span class="badge bg-pr">Silver</span></td><td><strong>'+levels.Silver+'</strong></td><td>ยอดซื้อ ≥ '+thb(crm.silverMin||3000)+'</td></tr>'+
+    '<tr><td><span class="badge bg-am">Gold</span></td><td><strong>'+levels.Gold+'</strong></td><td>ยอดซื้อ ≥ '+thb(crm.goldMin||6000)+'</td></tr>'+
+    '<tr><td><span class="badge bg-pp">VIP</span></td><td><strong>'+levels.VIP+'</strong></td><td>ยอดซื้อ ≥ '+thb(crm.vipThreshold||10000)+'</td></tr></table>'+
+    '<hr style="margin:12px 0"><button class="btn btn-out" onclick="autoUpdateLevels()">🔄 อัปเดตระดับอัตโนมัติ (ตามยอดซื้อ)</button></div></div>';
+}
+function saveCRMSettings(){
+  var s=getShopSettings();
+  s.crm={ptsRate:parseInt($('crm-rate').value)||100,redeemRate:parseInt($('crm-redeem').value)||1,vipThreshold:parseInt($('crm-vip').value)||10000,welcomePts:parseInt($('crm-welcome').value)||50,silverMin:parseInt($('crm-silver').value)||3000,goldMin:parseInt($('crm-gold').value)||6000};
+  s.ptsRate=s.crm.ptsRate;s.welcomePts=s.crm.welcomePts;
+  saveDB();logAction('CHANGE_SETTINGS','อัปเดต CRM');toast('บันทึกตั้งค่า CRM สำเร็จ ✅');
+}
+function autoUpdateLevels(){
+  var s=getShopSettings();var crm=s.crm||{silverMin:3000,goldMin:6000,vipThreshold:10000};
+  var updated=0;
+  DB.members.forEach(function(m){
+    var oldLv=m.level;
+    if(m.spend>=crm.vipThreshold) m.level='VIP';
+    else if(m.spend>=crm.goldMin) m.level='Gold';
+    else if(m.spend>=crm.silverMin) m.level='Silver';
+    else m.level='ทั่วไป';
+    if(m.level!==oldLv) updated++;
+  });
+  saveDB();toast('อัปเดตระดับสำเร็จ ✅ เปลี่ยน '+updated+' คน');renderPage('crm');
 }
 
 // ═══ PROMOTIONS PAGE ═══
@@ -1629,20 +1662,107 @@ function renderReportPage(c){
   const unpaidAmt=unpaid.reduce((s,o)=>s+remaining(o),0);
   c.innerHTML='<div class="grid g4" style="margin-bottom:16px">'+
     '<div class="kpi"><div class="kpi-lbl">รายรับรวม</div><div class="kpi-val">'+thb(totalRevenue)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-lbl">ต้นทุนรวม</div><div class="kpi-val" style="color:var(--am)">'+thb(totalCost)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">ต้นทุน</div><div class="kpi-val" style="color:var(--am)">'+thb(totalCost)+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">กำไร</div><div class="kpi-val" style="color:var(--gn)">'+thb(profit)+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">ค้างชำระ</div><div class="kpi-val" style="color:var(--rd)">'+thb(unpaidAmt)+'</div></div></div>'+
-    '<div class="tabs" style="margin-bottom:0"><div class="tab act" onclick="showReportTab(this,\'sku\')">📊 แยก SKU</div><div class="tab" onclick="showReportTab(this,\'unpaid\')">❌ ค้างชำระ</div><div class="tab" onclick="showReportTab(this,\'member\')">👥 ตามสมาชิก</div><div class="tab" onclick="showReportTab(this,\'staff\')">👤 พนักงาน</div></div>'+
-    '<div class="card" id="reportContent" style="border-radius:0 0 var(--r) var(--r)">'+renderSKUReport()+'</div>';
+    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">'+
+    '<button class="btn btn-sm btn-pr" onclick="showRpt(\'sku\')">📊 SKU</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'daily\')">📅 ประจำวัน</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'monthly\')">📆 ประจำเดือน</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'order\')">📋 ตามออเดอร์</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'unpaid\')">❌ ค้างชำระ</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'member\')">👥 สมาชิก</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'staff\')">👤 พนักงาน</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'financial\')">💰 การเงิน</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'quota\')">📦 โควต้า</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'cleaning\')">🧹 Cleaning</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'laundry\')">👕 ซักรีด</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'bedset\')">🛏️ เครื่องนอน</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'delivery\')">🚗 Delivery</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'promo\')">🎁 โปรโมชั่น</button>'+
+    '<button class="btn btn-sm btn-out" onclick="showRpt(\'top\')">🏆 Top Customer</button>'+
+    '</div><div class="card" id="reportContent">'+renderSKUReport()+'</div>';
 }
-function showReportTab(el,tab){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));el.classList.add('act');
-  const rc=$('reportContent');
-  if(tab==='sku') rc.innerHTML=renderSKUReport();
-  else if(tab==='unpaid') rc.innerHTML=renderUnpaidReport();
-  else if(tab==='member') rc.innerHTML=renderMemberReport();
-  else if(tab==='staff') rc.innerHTML=renderStaffReport();
+function showRpt(tab){
+  var rc=$('reportContent');
+  var rpts={sku:renderSKUReport,unpaid:renderUnpaidReport,member:renderMemberReport,staff:renderStaffReport,daily:rptDaily,monthly:rptMonthly,order:rptOrder,financial:rptFinancial,quota:rptQuota,cleaning:rptCleaning,laundry:rptLaundry,bedset:rptBedset,delivery:rptDelivery,promo:rptPromo,top:rptTopCustomer};
+  rc.innerHTML=(rpts[tab]||renderSKUReport)();
 }
+function rptDaily(){
+  var today=todayStr();var orders=DB.orders.filter(function(o){return o.createdAt&&o.createdAt.includes(fmtDate())&&o.status!=='ยกเลิก'});
+  var revenue=orders.reduce(function(s,o){return s+netOf(o)},0);
+  var cost=orders.reduce(function(s,o){return s+(o.cost||0)},0);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">📅 รายงานประจำวัน — '+fmtDate()+'</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'daily\')">📤 Export</button></div>'+
+    '<div class="grid g4" style="margin:12px 0">'+
+    '<div class="kpi"><div class="kpi-lbl">ยอดขาย</div><div class="kpi-val">'+thb(revenue)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">ออเดอร์</div><div class="kpi-val">'+orders.length+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">เฉลี่ย/บิล</div><div class="kpi-val">'+thb(orders.length?Math.round(revenue/orders.length):0)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">กำไร</div><div class="kpi-val" style="color:var(--gn)">'+thb(revenue-cost)+'</div></div></div>'+
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>ยอด</th><th>ชำระ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td>'+(isPaidCheck(o)?'<span class="badge bg-gn">ชำระแล้ว</span>':'<span class="badge bg-rd">ค้าง</span>')+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์วันนี้</div></div>');
+}
+function rptMonthly(){
+  var now=new Date();var y=now.getFullYear();var m=now.getMonth();
+  var orders=DB.orders.filter(function(o){if(!o.createdAt||o.status==='ยกเลิก')return false;var p=o.createdAt.split('/');return p.length>=3&&parseInt(p[1])===m+1});
+  var revenue=orders.reduce(function(s,o){return s+netOf(o)},0);
+  var cost=orders.reduce(function(s,o){return s+(o.cost||0)},0);
+  var monthNames=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">📆 '+monthNames[m]+' '+(y+543)+'</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'monthly\')">📤 Export</button></div>'+
+    '<div class="grid g4" style="margin:12px 0"><div class="kpi"><div class="kpi-lbl">ยอดขายเดือนนี้</div><div class="kpi-val">'+thb(revenue)+'</div></div><div class="kpi"><div class="kpi-lbl">ออเดอร์</div><div class="kpi-val">'+orders.length+'</div></div><div class="kpi"><div class="kpi-lbl">ต้นทุน</div><div class="kpi-val" style="color:var(--am)">'+thb(cost)+'</div></div><div class="kpi"><div class="kpi-lbl">กำไร</div><div class="kpi-val" style="color:var(--gn)">'+thb(revenue-cost)+'</div></div></div>';
+}
+function rptOrder(){
+  var orders=DB.orders.filter(function(o){return o.status!=='ยกเลิก'}).reverse().slice(0,50);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">📋 ตามออเดอร์ (50 ล่าสุด)</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'order\')">📤 Export</button></div>'+
+    '<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>ยอด</th><th>ชำระ</th><th>สถานะ</th><th>โดย</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td>'+(isPaidCheck(o)?'✅':'❌')+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td>'+o.by+'</td></tr>'}).join('')+'</table>';
+}
+function rptFinancial(){
+  var all=DB.orders.filter(function(o){return o.status!=='ยกเลิก'});
+  var revenue=all.filter(function(o){return isPaidCheck(o)}).reduce(function(s,o){return s+netOf(o)},0);
+  var cost=all.reduce(function(s,o){return s+(o.cost||0)},0);
+  var expenses=(DB.expenses||[]).reduce(function(s,e){return s+e.amount},0);
+  var payMethods={};all.forEach(function(o){(o.payHist||[]).forEach(function(p){if(!payMethods[p.method])payMethods[p.method]=0;payMethods[p.method]+=p.amt})});
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">💰 การเงิน</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'financial\')">📤 Export</button></div>'+
+    '<div class="grid g4" style="margin:12px 0"><div class="kpi"><div class="kpi-lbl">รายรับ</div><div class="kpi-val">'+thb(revenue)+'</div></div><div class="kpi"><div class="kpi-lbl">ต้นทุนสินค้า</div><div class="kpi-val" style="color:var(--am)">'+thb(cost)+'</div></div><div class="kpi"><div class="kpi-lbl">ค่าใช้จ่าย</div><div class="kpi-val" style="color:var(--rd)">'+thb(expenses)+'</div></div><div class="kpi"><div class="kpi-lbl">กำไรสุทธิ</div><div class="kpi-val" style="color:var(--gn)">'+thb(revenue-cost-expenses)+'</div></div></div>'+
+    '<div class="card-title" style="font-size:13px">แยกตามวิธีชำระ</div><table><tr><th>วิธี</th><th>ยอดรวม</th></tr>'+Object.entries(payMethods).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+thb(e[1])+'</td></tr>'}).join('')+'</table>';
+}
+function rptQuota(){
+  var quotas=DB.quotas||[];
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">📦 โควต้า Package ('+quotas.length+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'quota\')">📤 Export</button></div>'+
+    (quotas.length?'<table><tr><th>สมาชิก</th><th>Package</th><th>ใช้แล้ว</th><th>คงเหลือ</th><th>ซื้อเมื่อ</th><th>หมดอายุ</th></tr>'+quotas.map(function(q){var m=gM(q.mid);return '<tr><td>'+(m?m.name:q.mid)+'</td><td>'+q.pkgName+'</td><td>'+q.used+'</td><td><strong>'+q.remain+'</strong></td><td>'+q.buyDate+'</td><td>'+q.exp+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีโควต้า</div></div>');
+}
+function rptCleaning(){
+  var orders=DB.orders.filter(function(o){return o.type==='cleaning'}).reverse();
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🧹 Cleaning ('+orders.length+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'cleaning\')">📤 Export</button></div>'+
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>วันนัด</th><th>ยอด</th><th>สถานะ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+(o.items[0]?o.items[0].t:'')+'</td><td>'+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์</div></div>');
+}
+function rptLaundry(){
+  var orders=DB.orders.filter(function(o){return o.type==='laundry'}).reverse();
+  var totalItems=orders.reduce(function(s,o){return s+(o.items||[]).reduce(function(ss,it){return ss+it.qty},0)},0);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">👕 ซักรีด ('+orders.length+' ออเดอร์ · '+totalItems+' ชิ้น)</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'laundry\')">📤 Export</button></div>'+
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ชิ้น</th><th>ยอด</th><th>รับผ้า</th><th>สถานะ</th></tr>'+orders.slice(0,50).map(function(o){var qty=(o.items||[]).reduce(function(s,it){return s+it.qty},0);return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+qty+'</td><td>'+thb(o.net)+'</td><td>'+(o.delivery==='delivery'?'🚗':'🏪')+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'');
+}
+function rptBedset(){
+  var orders=DB.orders.filter(function(o){return o.type==='bedset'}).reverse();
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🛏️ เครื่องนอน ('+orders.length+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'bedset\')">📤 Export</button></div>'+
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ขนาด</th><th>ยอด</th><th>สถานะ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+(o.items[0]?o.items[0].t:'')+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์</div></div>');
+}
+function rptDelivery(){
+  var orders=DB.orders.filter(function(o){return o.delivery==='delivery'&&o.status!=='ยกเลิก'}).reverse();
+  var totalDel=orders.reduce(function(s,o){return s+(o.delCost||0)},0);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🚗 Delivery ('+orders.length+' · ค่าส่งรวม '+thb(totalDel)+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'delivery\')">📤 Export</button></div>'+
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ที่อยู่</th><th>ค่าส่ง</th><th>ยอด</th><th>สถานะ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">'+(o.deliveryAddr||'-')+'</td><td>'+thb(o.delCost)+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'');
+}
+function rptPromo(){
+  var promoMap={};DB.orders.filter(function(o){return o.promo&&o.status!=='ยกเลิก'}).forEach(function(o){if(!promoMap[o.promo])promoMap[o.promo]={name:o.promo,count:0,totalDisc:0,totalRev:0};promoMap[o.promo].count++;promoMap[o.promo].totalDisc+=(o.disc||0);promoMap[o.promo].totalRev+=netOf(o)});
+  var promos=Object.values(promoMap).sort(function(a,b){return b.count-a.count});
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🎁 โปรโมชั่น</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'promo\')">📤 Export</button></div>'+
+    (promos.length?'<table><tr><th>โปร</th><th>ใช้(ครั้ง)</th><th>ส่วนลดรวม</th><th>ยอดขายรวม</th></tr>'+promos.map(function(p){return '<tr><td><strong>'+p.name+'</strong></td><td>'+p.count+'</td><td style="color:var(--rd)">'+thb(p.totalDisc)+'</td><td>'+thb(p.totalRev)+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีการใช้โปร</div></div>');
+}
+function rptTopCustomer(){
+  var stats=DB.members.map(function(m){var ords=DB.orders.filter(function(o){return o.mid===m.id&&o.status!=='ยกเลิก'});return{name:m.name,id:m.id,level:m.level,pts:m.pts,count:ords.length,spend:ords.reduce(function(s,o){return s+netOf(o)},0)}}).sort(function(a,b){return b.spend-a.spend}).slice(0,20);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🏆 Top Customer (20 อันดับ)</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'top\')">📤 Export</button></div>'+
+    '<table><tr><th>#</th><th>ลูกค้า</th><th>ระดับ</th><th>ออเดอร์</th><th>ยอดซื้อ</th><th>แต้ม</th></tr>'+stats.map(function(m,i){return '<tr><td>'+(i+1)+'</td><td><strong>'+m.name+'</strong></td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':'gr')+'">'+m.level+'</span></td><td>'+m.count+'</td><td>'+thb(m.spend)+'</td><td>'+m.pts+'</td></tr>'}).join('')+'</table>';
+}
+function showReportTab(el,tab){showRpt(tab)}
 function renderUnpaidReport(){
   const unpaid=DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status));
   if(!unpaid.length) return '<div class="empty-state"><div class="es-icon">✅</div><div class="es-text">ไม่มียอดค้างชำระ</div></div>';
@@ -1705,6 +1825,28 @@ function exportReportCSV(type){
     csv='พนักงาน,จำนวนออเดอร์,ยอดขายรวม,เฉลี่ย/บิล\n';
     const sm={};DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{const b=o.by||'-';if(!sm[b])sm[b]={n:b,c:0,r:0};sm[b].c++;sm[b].r+=netOf(o)});
     Object.values(sm).forEach(s=>{csv+=s.n+','+s.c+','+s.r+','+(s.c?Math.round(s.r/s.c):0)+'\n'});
+  }else if(type==='daily'||type==='order'){
+    csv='เลข,ลูกค้า,ประเภท,ยอด,ต้นทุน,ชำระ,สถานะ,โดย,วันที่\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+o.type+','+o.net+','+(o.cost||0)+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
+  }else if(type==='financial'){
+    csv='รายการ,ยอด\n';var allO=DB.orders.filter(o=>o.status!=='ยกเลิก');
+    csv+='รายรับ,'+allO.filter(o=>isPaidCheck(o)).reduce((s,o)=>s+netOf(o),0)+'\nต้นทุน,'+allO.reduce((s,o)=>s+(o.cost||0),0)+'\nค่าใช้จ่าย,'+(DB.expenses||[]).reduce((s,e)=>s+e.amount,0)+'\n';
+  }else if(type==='quota'){
+    csv='สมาชิก,Package,ใช้แล้ว,คงเหลือ,ซื้อเมื่อ,หมดอายุ\n';
+    (DB.quotas||[]).forEach(q=>{var m=gM(q.mid);csv+=(m?m.name:q.mid)+','+q.pkgName+','+q.used+','+q.remain+','+q.buyDate+','+q.exp+'\n'});
+  }else if(type==='cleaning'||type==='laundry'||type==='bedset'){
+    csv='เลข,ลูกค้า,ประเภท,ยอด,สถานะ,วันที่\n';
+    DB.orders.filter(o=>o.type===(type==='laundry'?'laundry':type)).forEach(o=>{csv+=o.id+','+o.mname+','+(o.items[0]?o.items[0].t:'')+','+o.net+','+o.status+','+o.createdAt+'\n'});
+  }else if(type==='delivery'){
+    csv='เลข,ลูกค้า,ที่อยู่,ค่าส่ง,ยอด,สถานะ\n';
+    DB.orders.filter(o=>o.delivery==='delivery'&&o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+(o.deliveryAddr||'')+','+o.delCost+','+o.net+','+o.status+'\n'});
+  }else if(type==='promo'){
+    csv='โปร,ใช้(ครั้ง),ส่วนลดรวม,ยอดขายรวม\n';
+    var pm2={};DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{if(!pm2[o.promo])pm2[o.promo]={n:o.promo,c:0,d:0,r:0};pm2[o.promo].c++;pm2[o.promo].d+=(o.disc||0);pm2[o.promo].r+=netOf(o)});
+    Object.values(pm2).forEach(p=>{csv+=p.n+','+p.c+','+p.d+','+p.r+'\n'});
+  }else if(type==='top'||type==='monthly'){
+    csv='ลูกค้า,ระดับ,ออเดอร์,ยอดซื้อ,แต้ม\n';
+    DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{csv+=m.name+','+m.level+','+(DB.orders.filter(o=>o.mid===m.id).length)+','+m.spend+','+m.pts+'\n'});
   }
   if(csv){
     const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
@@ -1715,20 +1857,43 @@ function exportReportCSV(type){
 
 // ═══ PRICELIST PAGE ═══
 function renderPricelistPage(c){
-  c.innerHTML='<div class="card"><div class="card-title">💰 ตารางราคา ('+CAT.length+' รายการ)</div>'+
-    '<div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหาบริการ..." oninput="filterPricelist()"></div>'+
-    '<div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
+  '<div class="card" id="priceContent"><div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหาบริการ..." oninput="filterPricelist()"></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
+}
+function showPriceTab(el,tab){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
+  var rc=$('priceContent');
+  if(tab==='cat') rc.innerHTML='<div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
+  else if(tab==='bed') rc.innerHTML=renderBedPriceTable();
+  else if(tab==='cln') rc.innerHTML=renderClnPriceTable();
+  else if(tab==='pkg') rc.innerHTML=renderPkgPriceTable();
 }
 function renderPriceTable(list){
   return '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+
-    list.map((it,i)=>{
-      const idx=CAT.indexOf(it);const profit=it.p-it.k;
-      return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td><strong>'+thb(it.p)+'</strong></td><td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(profit)+'</td><td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td></tr>';
-    }).join('')+'</table>';
+    list.map(function(it){var idx=CAT.indexOf(it);return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td><strong>'+thb(it.p)+'</strong></td><td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(it.p-it.k)+'</td><td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td></tr>'}).join('')+'</table>';
+}
+function renderBedPriceTable(){return '<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong></td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td><td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
+function renderClnPriceTable(){return '<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong></td><td><strong>'+thb(s.minPrice)+'</strong></td><td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
+function renderPkgPriceTable(){return '<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th>อายุ</th><th></th></tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong></td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td><td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td><td>'+p.expDays+' วัน</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
+function openSvcPriceEdit(type,i){
+  var label='',price=0,cost=0,expDays=0;
+  if(type==='bed'){label=BED_SETS[i].label;price=BED_SETS[i].price;cost=BED_SETS[i].cost}
+  else if(type==='cln'){label=CLN_SVCS[i].label;price=CLN_SVCS[i].minPrice;cost=CLN_SVCS[i].cost}
+  else if(type==='pkg'){label=PKGS[i].type+' '+PKGS[i].qty;price=PKGS[i].price;cost=PKGS[i].cost;expDays=PKGS[i].expDays}
+  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="sp-d" type="number" value="'+expDays+'"></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveSvcPrice(type,i){
+  var p=parseFloat($('sp-p').value)||0,k=parseFloat($('sp-k').value)||0;
+  if(type==='bed'){BED_SETS[i].price=p;BED_SETS[i].cost=k}
+  else if(type==='cln'){CLN_SVCS[i].minPrice=p;CLN_SVCS[i].cost=k}
+  else if(type==='pkg'){PKGS[i].price=p;PKGS[i].cost=k;PKGS[i].expDays=parseInt($('sp-d').value)||90}
+  toast('บันทึกสำเร็จ ✅');logAction('EDIT_PRICE',type+' idx:'+i);
+  var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
 }
 function filterPricelist(){
-  const q=($('priceSearch')?$('priceSearch').value:'').toLowerCase();
-  const list=CAT.filter(it=>it.c.toLowerCase().includes(q)||it.t.toLowerCase().includes(q)||(it.o||'').toLowerCase().includes(q));
+  var q=($('priceSearch')?$('priceSearch').value:'').toLowerCase();
+  var list=CAT.filter(function(it){return it.c.toLowerCase().includes(q)||it.t.toLowerCase().includes(q)||(it.o||'').toLowerCase().includes(q)});
   $('priceList').innerHTML=renderPriceTable(list);
 }
 
@@ -1738,7 +1903,7 @@ function renderSettingsPage(c){
   const tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
   const methods=s.paymentMethods||PAY_METHODS_DEFAULT;
   const autoLock=s.autoLockMin||0;
-  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'line\')">📱 LINE</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
   '<div id="settingsContent">'+renderSettingsShop(s)+'</div>';
 }
 function showSettingsTab(el,tab){
@@ -1748,6 +1913,7 @@ function showSettingsTab(el,tab){
   else if(tab==='delivery') rc.innerHTML=renderSettingsDelivery(s);
   else if(tab==='payment') rc.innerHTML=renderSettingsPayment(s);
   else if(tab==='users') rc.innerHTML=renderSettingsUsers();
+  else if(tab==='line') rc.innerHTML=renderLineTemplates();
   else if(tab==='backup') rc.innerHTML=renderSettingsBackup();
   else if(tab==='audit') rc.innerHTML=renderAuditLog();
 }
@@ -2419,6 +2585,34 @@ function initErrorHandler(){
 function checkStorageUsage(){
   var used=JSON.stringify(DB).length;var pct=Math.round(used/1024/5000*100);
   if(pct>80){toast('⚠️ พื้นที่ข้อมูลใช้ '+pct+'% — แนะนำ Export Backup','warn')}
+}
+
+// ═══ LINE BILL COLLECTION ═══
+function sendBillCollect(oid){
+  var o=gO(oid);if(!o) return;
+  var s=getShopSettings();var tpl=s.lineTemplates||{};
+  var msg=(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\n\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\n\nกรุณาชำระเงินด้วยนะคะ 🙏\nขอบคุณค่ะ 💙')
+    .replace('{name}',o.mname).replace('{shop}',s.shopName).replace('{id}',o.id).replace('{amount}',thb(remaining(o)));
+  var h='<div class="modal-overlay show" id="moLineBill"><div class="modal"><div class="modal-head"><h3>📱 ส่งบิลเรียกเก็บเงิน</h3><button class="modal-close" onclick="document.getElementById(\'moLineBill\').remove()">&times;</button></div>'+
+    '<div class="modal-body"><div style="background:#7BC67E;border-radius:16px;padding:14px 16px;max-width:320px;margin:0 auto;color:#fff;font-size:13px;white-space:pre-line;line-height:1.6">'+msg+'</div></div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="navigator.clipboard.writeText(\''+msg.replace(/'/g,"\\'")+'\');toast(\'Copy สำเร็จ ✅\')">📋 Copy</button><button class="btn btn-gn" onclick="toast(\'Phase 2: ส่ง LINE จริง\',\'info\')">📱 ส่ง LINE</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+
+// ═══ LINE TEMPLATE SETTINGS ═══
+function renderLineTemplates(){
+  var s=getShopSettings();var tpl=s.lineTemplates||{};
+  return '<div class="card"><div class="card-title">📱 LINE Message Templates</div>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date}</p>'+
+    '<div class="form-group"><label class="form-label">แจ้งสถานะ</label><textarea id="lt-status" rows="3" style="font-size:12px">'+(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
+    '<div class="form-group"><label class="form-label">เรียกเก็บเงิน</label><textarea id="lt-bill" rows="3" style="font-size:12px">'+(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏')+'</textarea></div>'+
+    '<div class="form-group"><label class="form-label">ผ้าพร้อมส่ง</label><textarea id="lt-ready" rows="3" style="font-size:12px">'+(tpl.ready||'สวัสดีค่ะ {name} 🫧\nผ้าของคุณพร้อมส่งแล้วค่ะ!\nออเดอร์: {id}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
+    '<button class="btn btn-pr" onclick="saveLineTemplates()">💾 บันทึก Templates</button></div>';
+}
+function saveLineTemplates(){
+  var s=getShopSettings();
+  s.lineTemplates={statusUpdate:$('lt-status')?$('lt-status').value:'',billCollect:$('lt-bill')?$('lt-bill').value:'',ready:$('lt-ready')?$('lt-ready').value:''};
+  saveDB();toast('บันทึก LINE Templates สำเร็จ ✅');
 }
 
 // ═══ BOOTSTRAP ═══
