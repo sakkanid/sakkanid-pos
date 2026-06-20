@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -1287,11 +1287,12 @@ function cancelOrder(oid){
 // ═══ ORDERS PAGE ═══
 function renderOrdersPage(c){
   const all=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
+  const allStatuses=[...new Set(all.map(o=>o.status))];
   c.innerHTML='<div class="filter-bar">'+
     '<div class="filter-chip act" onclick="filterOrders(this,\'all\')">ทั้งหมด ('+all.length+')</div>'+
-    STATUSES_LDR.slice(0,-1).map(st=>{
+    allStatuses.map(st=>{
       const cnt=all.filter(o=>o.status===st).length;
-      return cnt?'<div class="filter-chip" onclick="filterOrders(this,\''+st+'\')">'+st+' ('+cnt+')</div>':'';
+      return '<div class="filter-chip" onclick="filterOrders(this,\''+st+'\')">'+st+' ('+cnt+')</div>';
     }).join('')+'</div>'+
     '<div id="ordersContainer">'+all.reverse().map(o=>orderCardHTML(o)).join('')+'</div>';
   if(!all.length) $('ordersContainer').innerHTML='<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
@@ -1712,7 +1713,16 @@ function rptMonthly(){
 function rptOrder(){
   var orders=DB.orders.filter(function(o){return o.status!=='ยกเลิก'}).reverse().slice(0,50);
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">📋 ตามออเดอร์ (50 ล่าสุด)</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'order\')">📤 Export</button></div>'+
-    '<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>ยอด</th><th>ชำระ</th><th>สถานะ</th><th>โดย</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td>'+(isPaidCheck(o)?'✅':'❌')+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td>'+o.by+'</td></tr>'}).join('')+'</table>';
+    orders.map(function(o){
+      return '<div class="o-card '+getOCardClass(o.status)+'" style="margin-bottom:8px">'+
+        '<div class="o-head"><span class="o-id">'+o.id+'</span><span class="badge bg-gr">'+o.type+'</span><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span><span class="o-date">'+o.createdAt+'</span></div>'+
+        '<div style="font-size:12px;font-weight:600">'+o.mname+' · โดย: '+o.by+' · '+(isPaidCheck(o)?'<span style="color:var(--gn)">✅ ชำระแล้ว</span>':'<span style="color:var(--rd)">❌ ค้าง '+thb(remaining(o))+'</span>')+'</div>'+
+        '<table style="font-size:11px;margin-top:4px"><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา/ชิ้น</th><th>จำนวน</th><th>รวม</th></tr>'+
+        (o.items||[]).map(function(it){return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td>'+thb(it.p)+'</td><td>'+it.qty+'</td><td>'+thb(it.p*it.qty)+'</td></tr>'}).join('')+
+        '</table>'+
+        (o.extras&&o.extras.length?'<div style="font-size:10px;color:var(--am);margin-top:2px">เสริม: '+(o.extras||[]).map(function(e){return e.name+' '+thb(e.price)}).join(', ')+'</div>':'')+
+        '<div style="text-align:right;font-weight:700;margin-top:4px">ยอดสุทธิ: '+thb(o.net)+(o.disc?' (ลด '+thb(o.disc)+')':'')+'</div></div>';
+    }).join('');
 }
 function rptFinancial(){
   var all=DB.orders.filter(function(o){return o.status!=='ยกเลิก'});
@@ -1795,16 +1805,17 @@ function renderSKUReport(){
   const skuMap={};
   DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{
     (o.items||[]).forEach(it=>{
-      const key=it.c+' · '+it.t;
-      if(!skuMap[key]) skuMap[key]={cat:it.c,type:it.t,qty:0,revenue:0,cost:0};
+      const key=it.c+' · '+it.t+(it.o?' · '+it.o:'');
+      if(!skuMap[key]) skuMap[key]={cat:it.c,type:it.t,opt:it.o||'',qty:0,revenue:0,cost:0,orderIds:[]};
       skuMap[key].qty+=it.qty;skuMap[key].revenue+=it.p*it.qty;skuMap[key].cost+=it.k*it.qty;
+      if(!skuMap[key].orderIds.includes(o.id)) skuMap[key].orderIds.push(o.id);
     })
   });
   const skus=Object.values(skuMap).sort((a,b)=>b.revenue-a.revenue);
   if(!skus.length) return '<div class="empty-state"><div class="es-text">ยังไม่มีข้อมูล</div></div>';
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="font-size:13px;margin:0">📊 แยกตาม SKU</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'sku\')">📤 Export</button></div>'+
-    '<table><tr><th>รายการ</th><th>จำนวน</th><th>รายได้</th><th>ต้นทุน</th><th>กำไร</th><th>Margin</th></tr>'+
-    skus.map(s=>'<tr><td>'+s.cat+' · '+s.type+'</td><td>'+s.qty+'</td><td>'+thb(s.revenue)+'</td><td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.revenue-s.cost)+'</td><td>'+Math.round((s.revenue-s.cost)/(s.revenue||1)*100)+'%</td></tr>').join('')+'</table>';
+    '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>จำนวน</th><th>รายได้</th><th>ต้นทุน</th><th>กำไร</th><th>ออเดอร์</th></tr>'+
+    skus.map(s=>'<tr><td>'+s.cat+'</td><td>'+s.type+'</td><td>'+(s.opt||'-')+'</td><td>'+s.qty+'</td><td>'+thb(s.revenue)+'</td><td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.revenue-s.cost)+'</td><td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="'+s.orderIds.join(', ')+'">'+s.orderIds.slice(0,3).join(', ')+(s.orderIds.length>3?' +อีก'+(s.orderIds.length-3):'')+'</td></tr>').join('')+'</table>';
 }
 
 // ═══ EXPORT REPORT CSV ═══
@@ -1863,7 +1874,7 @@ function renderPricelistPage(c){
 function showPriceTab(el,tab){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
   var rc=$('priceContent');
-  if(tab==='cat') rc.innerHTML='<div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
+  if(tab==='cat') rc.innerHTML='<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
   else if(tab==='bed') rc.innerHTML=renderBedPriceTable();
   else if(tab==='cln') rc.innerHTML=renderClnPriceTable();
   else if(tab==='pkg') rc.innerHTML=renderPkgPriceTable();
@@ -1895,6 +1906,32 @@ function filterPricelist(){
   var q=($('priceSearch')?$('priceSearch').value:'').toLowerCase();
   var list=CAT.filter(function(it){return it.c.toLowerCase().includes(q)||it.t.toLowerCase().includes(q)||(it.o||'').toLowerCase().includes(q)});
   $('priceList').innerHTML=renderPriceTable(list);
+}
+function openAddPriceItem(){
+  var h='<div class="modal-overlay show" id="moAddPrice"><div class="modal"><div class="modal-head"><h3>➕ เพิ่มรายการราคาใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddPrice\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="form-group"><label class="form-label">หมวดบริการ</label><select id="ap-cat"><option value="">— เลือกหรือพิมพ์ใหม่ —</option>'+CATS_UNIQUE.map(function(c){return '<option>'+c+'</option>'}).join('')+'</select></div>'+
+    '<div class="form-group"><label class="form-label">หรือพิมพ์หมวดใหม่</label><input id="ap-cat-new" placeholder="เช่น ซักพรม"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทผ้า/สินค้า *</label><input id="ap-type" placeholder="เช่น เสื้อยืด"></div>'+
+    '<div class="form-group"><label class="form-label">ตัวเลือก</label><input id="ap-opt" placeholder="เช่น ตัวสั้น (ไม่บังคับ)"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขาย (฿) *</label><input id="ap-price" type="number"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="ap-cost" type="number" value="0"></div></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moAddPrice\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveAddPriceItem()">💾 เพิ่มรายการ</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveAddPriceItem(){
+  var cat=$('ap-cat-new')&&$('ap-cat-new').value.trim()?$('ap-cat-new').value.trim():($('ap-cat')?$('ap-cat').value:'');
+  var type=$('ap-type')?$('ap-type').value.trim():'';
+  var opt=$('ap-opt')?$('ap-opt').value.trim():'';
+  var price=parseFloat($('ap-price')?$('ap-price').value:0)||0;
+  var cost=parseFloat($('ap-cost')?$('ap-cost').value:0)||0;
+  if(!cat||!type||!price){toast('กรอกหมวด ประเภท และราคา','err');return}
+  CAT.push({c:cat,t:type,o:opt,p:price,k:cost,pt:'fixed'});
+  // Update CATS_UNIQUE
+  if(!CATS_UNIQUE.includes(cat)) CATS_UNIQUE.push(cat);
+  logAction('ADD_PRICE',cat+' '+type+' '+thb(price));
+  toast('เพิ่มรายการสำเร็จ ✅ '+type+' '+thb(price));
+  var mo=$('moAddPrice');if(mo)mo.remove();renderPage('pricelist');
 }
 
 // ═══ SETTINGS PAGE — COMPREHENSIVE ═══
