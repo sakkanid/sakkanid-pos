@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -627,13 +627,14 @@ function renderPage(page){
     case 'settings':renderSettingsPage(c);break;
     default:c.innerHTML='<div class="empty-state"><div class="es-icon">🔧</div><div class="es-text">หน้านี้กำลังพัฒนา</div></div>';
   }
-  // Check if URL has ?page=register (public access)
-  if(location.search.includes('page=register')&&!curUser){renderPublicRegister()}
 }
 
 // ═══ PUBLIC REGISTER PAGE ═══
 function renderPublicRegister(){
-  document.body.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
+  $('lockScreen').style.display='none';$('app').style.display='none';
+  var s=getShopSettings();
+  var regDiv=document.createElement('div');regDiv.id='publicRegPage';
+  regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
     '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+getShopSettings().shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
     '<div class="card"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone"></div>'+
@@ -644,6 +645,7 @@ function renderPublicRegister(){
     '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room"></div></div>'+
     '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px"><input type="checkbox" id="pr-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคล ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
     '<button class="btn btn-pr btn-lg" onclick="savePublicRegister()" style="width:100%;justify-content:center;margin-top:12px">📝 สมัครสมาชิก</button></div></div>';
+  document.body.appendChild(regDiv);
 }
 function savePublicRegister(){
   var name=$('pr-name')?$('pr-name').value.trim():'';
@@ -658,7 +660,8 @@ function savePublicRegister(){
     room:$('pr-room')?$('pr-room').value.trim():'',village:'',houseNo:'',
     lineId:$('pr-line')?$('pr-line').value.trim():'',pts:welcomePts,spend:0,level:'ทั่วไป',joinDate:fmtDate(),pdpaConsent:true};
   DB.members.push(m);saveDB();
-  document.body.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)">'+
+  var el=$('publicRegPage');
+  if(el) el.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)">'+
     '<div style="font-size:64px;margin-bottom:12px">✅</div>'+
     '<div style="font-size:22px;font-weight:800;color:#0D8A6A">สมัครสมาชิกสำเร็จ!</div>'+
     '<div style="margin:16px 0;padding:16px;background:#E0F5EF;border-radius:12px">'+
@@ -2814,7 +2817,14 @@ function calcClnNet(){
 }
 
 // ═══ BOOTSTRAP ═══
-loadDB();initDarkMode();initLockScreen();initShortcuts();initErrorHandler();
+loadDB();initDarkMode();
+// Check public register page BEFORE login
+if(location.search.includes('page=register')){
+  renderPublicRegister();
+}else{
+  initLockScreen();
+}
+initShortcuts();initErrorHandler();
 document.addEventListener('click',resetIdleTimer);
 document.addEventListener('keydown',resetIdleTimer);
 document.addEventListener('touchstart',resetIdleTimer);
