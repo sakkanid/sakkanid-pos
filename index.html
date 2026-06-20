@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -635,7 +635,7 @@ function renderPublicRegister(){
   var s=getShopSettings();
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
-    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+getShopSettings().shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
+    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+s.shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
     '<div class="card"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick"></div>'+
@@ -652,23 +652,44 @@ function savePublicRegister(){
   var phone=$('pr-phone')?$('pr-phone').value.trim():'';
   if(!name||!phone){toast('กรุณากรอกชื่อและเบอร์โทร','err');return}
   if(!$('pr-pdpa')||!$('pr-pdpa').checked){toast('กรุณายินยอม PDPA','err');return}
-  var dup=DB.members.find(function(m){return m.phone===phone});
-  if(dup){toast('เบอร์โทรนี้มีในระบบแล้ว','warn');return}
-  var welcomePts=getShopSettings().welcomePts||50;
-  var m={id:genId('MBR'),name:name,nick:$('pr-nick')?$('pr-nick').value.trim():'',phone:phone,
-    addrType:$('pr-addr')?$('pr-addr').value:'condo',proj:$('pr-proj')?$('pr-proj').value.trim():'',
-    room:$('pr-room')?$('pr-room').value.trim():'',village:'',houseNo:'',
-    lineId:$('pr-line')?$('pr-line').value.trim():'',pts:welcomePts,spend:0,level:'ทั่วไป',joinDate:fmtDate(),pdpaConsent:true};
-  DB.members.push(m);saveDB();
+  var nick=$('pr-nick')?$('pr-nick').value.trim():'';
+  var lineId=$('pr-line')?$('pr-line').value.trim():'';
+  var addrType=$('pr-addr')?$('pr-addr').value:'condo';
+  var proj=$('pr-proj')?$('pr-proj').value.trim():'';
+  var room=$('pr-room')?$('pr-room').value.trim():'';
+  var s=getShopSettings();
+  // Build message for shop
+  var msg='🫧 สมัครสมาชิกใหม่\nร้าน '+s.shopName+'\n\n👤 ชื่อ: '+name+'\n📱 เบอร์: '+phone+(nick?'\n😊 ชื่อเล่น: '+nick:'')+(lineId?'\nLINE: '+lineId:'')+'\n🏠 ที่อยู่: '+(addrType==='condo'?'คอนโด '+proj+' ห้อง '+room:'บ้าน '+proj+' '+room)+'\n✅ ยินยอม PDPA\n\n📋 รหัสนำเข้า:\n##REG##'+btoa(JSON.stringify({name:name,nick:nick,phone:phone,lineId:lineId,addrType:addrType,proj:proj,room:room}))+'##END##';
   var el=$('publicRegPage');
-  if(el) el.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)">'+
-    '<div style="font-size:64px;margin-bottom:12px">✅</div>'+
-    '<div style="font-size:22px;font-weight:800;color:#0D8A6A">สมัครสมาชิกสำเร็จ!</div>'+
-    '<div style="margin:16px 0;padding:16px;background:#E0F5EF;border-radius:12px">'+
-    '<div style="font-size:14px;font-weight:700">'+m.name+'</div>'+
-    '<div style="font-family:var(--fm);font-size:18px;font-weight:800;color:#006F98;margin:8px 0">'+m.id+'</div>'+
-    '<div style="font-size:13px;color:#6B7A88">ได้รับ '+welcomePts+' แต้มต้อนรับ 🎉</div></div>'+
-    '<div style="font-size:13px;color:#6B7A88">ขอบคุณที่สมัครสมาชิกค่ะ 🫧</div></div>';
+  if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
+    '<div style="font-size:48px;margin-bottom:8px">✅</div>'+
+    '<div style="font-size:20px;font-weight:800;color:#0D8A6A;margin-bottom:16px">ลงทะเบียนเรียบร้อย!</div>'+
+    '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
+    '<div style="font-weight:700;font-size:15px">'+name+'</div>'+
+    '<div style="font-size:13px;color:#6B7A88">'+phone+(nick?' · '+nick:'')+'</div></div>'+
+    '<div style="background:#FEF3C7;border-radius:12px;padding:14px;text-align:left;margin-bottom:16px;font-size:13px">'+
+    '<div style="font-weight:700;color:#92400E;margin-bottom:6px">📱 ขั้นตอนถัดไป</div>'+
+    '<div style="color:#92400E">1. กดปุ่ม "ส่งข้อมูลให้ร้าน" ด้านล่าง<br>2. ส่งข้อความให้ร้านผ่าน LINE<br>3. ร้านจะนำเข้าข้อมูลให้อัตโนมัติ<br>4. เริ่มสะสมแต้มได้ทันที!</div></div>'+
+    '<button onclick="prCopyMsg()" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-bottom:8px">📱 ส่งข้อมูลให้ร้านผ่าน LINE</button>'+
+    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ</button>'+
+    '<div style="margin-top:16px;font-size:12px;color:#999">ขอบคุณที่สมัครสมาชิกค่ะ 🫧</div></div>';
+  window._regMsg=msg;
+  window._regLineOA=s.lineOA||'';
+}
+function prCopyMsg(){
+  var lineOA=window._regLineOA||'';
+  var msg=window._regMsg||'';
+  navigator.clipboard.writeText(msg).then(function(){
+    toast('Copy สำเร็จ ✅ เปิด LINE ส่งให้ร้าน');
+    if(lineOA){setTimeout(function(){window.open('https://line.me/R/ti/p/'+lineOA.replace('@','%40'),'_blank')},500)}
+  }).catch(function(){
+    var ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+    toast('Copy สำเร็จ ✅');
+  });
+}
+function prCopyText(){
+  var msg=window._regMsg||'';
+  navigator.clipboard.writeText(msg).then(function(){toast('Copy สำเร็จ ✅')}).catch(function(){toast('กดค้างที่ข้อความแล้ว Copy','info')});
 }
 
 // ═══ DASHBOARD ═══
@@ -704,6 +725,7 @@ function renderDashboard(c){
         '<button class="btn btn-gn" onclick="openShift()" style="margin-top:8px">🔓 เปิดกะ</button>';
     })()+
     '</div>'+
+    '<div class="card"><div class="card-title">🕐 ประวัติกะล่าสุด</div>'+renderShiftHistory()+'</div>'+
     '</div>';
 }
 function renderRecentOrders(){
@@ -1551,7 +1573,7 @@ function showCalDay(dateStr){
 function renderMembersPage(c){
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
     '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
 }
 function renderMemberTable(list){
@@ -1733,9 +1755,19 @@ function rptFinancial(){
   var cost=all.reduce(function(s,o){return s+(o.cost||0)},0);
   var expenses=(DB.expenses||[]).reduce(function(s,e){return s+e.amount},0);
   var payMethods={};all.forEach(function(o){(o.payHist||[]).forEach(function(p){if(!payMethods[p.method])payMethods[p.method]=0;payMethods[p.method]+=p.amt})});
-  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">💰 การเงิน</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'financial\')">📤 Export</button></div>'+
+  // Expense by category
+  var expCat={};(DB.expenses||[]).forEach(function(e){if(!expCat[e.category])expCat[e.category]=0;expCat[e.category]+=e.amount});
+  // Shift summary
+  var shifts=DB.shifts||[];var closedShifts=shifts.filter(function(s){return s.closedAt});
+  var totalDiff=closedShifts.reduce(function(s,sh){return s+sh.diff},0);
+  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">💰 รายงานการเงิน</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'financial\')">📤 Export</button></div>'+
     '<div class="grid g4" style="margin:12px 0"><div class="kpi"><div class="kpi-lbl">รายรับ</div><div class="kpi-val">'+thb(revenue)+'</div></div><div class="kpi"><div class="kpi-lbl">ต้นทุนสินค้า</div><div class="kpi-val" style="color:var(--am)">'+thb(cost)+'</div></div><div class="kpi"><div class="kpi-lbl">ค่าใช้จ่าย</div><div class="kpi-val" style="color:var(--rd)">'+thb(expenses)+'</div></div><div class="kpi"><div class="kpi-lbl">กำไรสุทธิ</div><div class="kpi-val" style="color:var(--gn)">'+thb(revenue-cost-expenses)+'</div></div></div>'+
-    '<div class="card-title" style="font-size:13px">แยกตามวิธีชำระ</div><table><tr><th>วิธี</th><th>ยอดรวม</th></tr>'+Object.entries(payMethods).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+thb(e[1])+'</td></tr>'}).join('')+'</table>';
+    '<div class="grid g2">'+
+    '<div><div class="card-title" style="font-size:13px">💳 แยกตามวิธีชำระ</div><table><tr><th>วิธี</th><th>ยอดรวม</th></tr>'+Object.entries(payMethods).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+thb(e[1])+'</td></tr>'}).join('')+'</table></div>'+
+    '<div><div class="card-title" style="font-size:13px">📊 ค่าใช้จ่ายแยกหมวด</div>'+(Object.keys(expCat).length?'<table><tr><th>หมวด</th><th>ยอด</th></tr>'+Object.entries(expCat).map(function(e){return '<tr><td><span class="badge bg-am">'+e[0]+'</span></td><td>'+thb(e[1])+'</td></tr>'}).join('')+'</table>':'<div style="color:var(--t3);font-size:12px">ยังไม่มีค่าใช้จ่าย</div>')+'</div></div>'+
+    (closedShifts.length?'<div class="card-title" style="font-size:13px;margin-top:12px">🕐 สรุปกะ ('+closedShifts.length+' กะ) · ผลต่างรวม: <span style="color:'+(totalDiff>=0?'var(--gn)':'var(--rd)')+'">'+thb(totalDiff)+'</span></div>'+
+    '<table><tr><th>กะ</th><th>เปิด</th><th>ปิด</th><th>เงินสดเริ่ม</th><th>จริง</th><th>ผลต่าง</th><th>ออเดอร์</th></tr>'+
+    closedShifts.slice(-10).reverse().map(function(s){return '<tr><td>'+s.id+'</td><td style="font-size:10px">'+s.openedAt+'</td><td style="font-size:10px">'+s.closedAt+'</td><td>'+thb(s.cashStart)+'</td><td>'+thb(s.cashEnd)+'</td><td style="color:'+(s.diff>=0?'var(--gn)':'var(--rd)')+'">'+thb(s.diff)+'</td><td>'+s.orderCount+'</td></tr>'}).join('')+'</table>':'');
 }
 function rptQuota(){
   var quotas=DB.quotas||[];
@@ -2802,6 +2834,52 @@ function clearHistFilters(){
 function sendLineMsg(oid){
   toast('Phase 2: จะส่ง LINE ผ่าน Messaging API จริง','info');
   logAction('LINE_SEND','ส่งข้อความ LINE ออเดอร์ '+oid);
+}
+
+// ═══ IMPORT MEMBER FROM REGISTRATION ═══
+function importRegMember(){
+  var code=prompt('วางรหัสนำเข้าจาก LINE:\n(ข้อความที่มี ##REG##...##END##)');
+  if(!code) return;
+  var match=code.match(/##REG##(.+?)##END##/);
+  if(!match){toast('ไม่พบรหัสนำเข้า — ให้วางข้อความทั้งหมดที่ลูกค้าส่งมา','err');return}
+  try{
+    var data=JSON.parse(atob(match[1]));
+    if(!data.name||!data.phone){toast('ข้อมูลไม่ครบ','err');return}
+    var dup=DB.members.find(function(m){return m.phone===data.phone});
+    if(dup){toast('เบอร์ '+data.phone+' มีในระบบแล้ว: '+dup.name,'warn');return}
+    var welcomePts=getShopSettings().welcomePts||50;
+    var m={id:genId('MBR'),name:data.name,nick:data.nick||'',phone:data.phone,
+      addrType:data.addrType||'condo',proj:data.proj||'',room:data.room||'',
+      village:'',houseNo:'',lineId:data.lineId||'',
+      pts:welcomePts,spend:0,level:'ทั่วไป',joinDate:fmtDate(),pdpaConsent:true};
+    DB.members.push(m);saveDB();
+    logAction('IMPORT_MEMBER',m.id+' '+m.name+' (จาก LINE)');
+    toast('นำเข้าสมาชิกสำเร็จ ✅ '+m.name+' ('+m.id+') ได้ '+welcomePts+' แต้ม');
+    renderPage('members');
+  }catch(e){toast('รหัสไม่ถูกต้อง: '+e.message,'err')}
+}
+
+// ═══ SHIFT HISTORY VIEW ═══
+function renderShiftHistory(){
+  var shifts=DB.shifts||[];
+  var recent=shifts.slice(-20).reverse();
+  return '<div class="card-title" style="font-size:13px">🕐 ประวัติกะ ('+shifts.length+' กะ)</div>'+
+    (recent.length?'<table><tr><th>เลข</th><th>เปิดโดย</th><th>เปิดเมื่อ</th><th>ปิดเมื่อ</th><th>เงินสดเริ่ม</th><th>เงินสดจริง</th><th>ระบบ</th><th>ผลต่าง</th><th>ออเดอร์</th><th>ยอดขาย</th></tr>'+
+    recent.map(function(s){return '<tr><td>'+s.id+'</td><td>'+s.openedBy+'</td><td style="font-size:10px">'+s.openedAt+'</td><td style="font-size:10px">'+(s.closedAt||'<span class="badge bg-gn">เปิดอยู่</span>')+'</td><td>'+thb(s.cashStart)+'</td><td>'+thb(s.cashEnd)+'</td><td>'+thb(s.systemCash)+'</td><td style="color:'+(s.diff>=0?'var(--gn)':'var(--rd)')+'">'+thb(s.diff)+'</td><td>'+s.orderCount+'</td><td>'+thb(s.totalSales)+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีประวัติกะ</div></div>');
+}
+
+// ═══ EXPENSE SUMMARY BY CATEGORY ═══
+function renderExpenseSummary(){
+  var expenses=DB.expenses||[];
+  var catMap={};
+  expenses.forEach(function(e){
+    if(!catMap[e.category]) catMap[e.category]=0;
+    catMap[e.category]+=e.amount;
+  });
+  var cats=Object.entries(catMap).sort(function(a,b){return b[1]-a[1]});
+  return '<div class="card-title" style="font-size:13px;margin-top:12px">📊 ค่าใช้จ่ายแยกตามหมวด</div>'+
+    (cats.length?'<table><tr><th>หมวด</th><th>ยอดรวม</th><th>สัดส่วน</th></tr>'+
+    cats.map(function(c){var total=expenses.reduce(function(s,e){return s+e.amount},0);return '<tr><td><span class="badge bg-am">'+c[0]+'</span></td><td style="font-weight:700">'+thb(c[1])+'</td><td>'+Math.round(c[1]/(total||1)*100)+'%</td></tr>'}).join('')+'</table>':'<div style="color:var(--t3);font-size:12px">ยังไม่มีข้อมูล</div>');
 }
 
 // ═══ MISSING — ORDER HELPERS ═══
