@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -1618,7 +1618,7 @@ function renderPromoPage(c){
   c.innerHTML='<div class="card"><div class="card-title">🎁 โปรโมชั่น</div>'+
     '<button class="btn btn-pr" onclick="openAddPromo()" style="margin-bottom:12px">➕ เพิ่มโปรโมชั่น</button>'+
     (promos.length?'<table><tr><th>ชื่อ</th><th>ประเภท</th><th>ส่วนลด</th><th>วันหมดอายุ</th><th>สถานะ</th><th></th></tr>'+
-    promos.map((p,i)=>'<tr><td><strong>'+p.name+'</strong></td><td>'+(p.type==='percent'?'% ส่วนลด':p.type==='fixed'?'฿ คงที่':'⭐ แลกแต้ม')+'</td><td>'+(p.type==='percent'?p.value+'%':thb(p.value))+(p.type==='points'?' (ใช้ '+p.ptsNeeded+' แต้ม)':'')+'</td><td>'+(p.exp||'ไม่จำกัด')+'</td><td>'+(p.active?'<span class="badge bg-gn">เปิด</span>':'<span class="badge bg-gr">ปิด</span>')+'</td><td><button class="btn btn-out btn-sm" onclick="togglePromo('+i+')">'+(p.active?'ปิด':'เปิด')+'</button></td></tr>').join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีโปรโมชั่น</div></div>')+'</div>';
+    promos.map((p,i)=>'<tr><td><strong>'+p.name+'</strong></td><td>'+(p.type==='percent'?'% ส่วนลด':p.type==='fixed'?'฿ คงที่':'⭐ แลกแต้ม')+'</td><td>'+(p.type==='percent'?p.value+'%':thb(p.value))+(p.type==='points'?' (ใช้ '+p.ptsNeeded+' แต้ม)':'')+'</td><td>'+(p.exp||'ไม่จำกัด')+'</td><td>'+(p.active?'<span class="badge bg-gn">เปิด</span>':'<span class="badge bg-gr">ปิด</span>')+'</td><td><button class="btn btn-out btn-sm" onclick="togglePromo('+i+')">'+(p.active?'ปิด':'เปิด')+'</button> <button class="btn btn-out btn-sm" onclick="editPromo('+i+')">✏️</button> <button class="btn btn-rd btn-sm" onclick="deletePromo('+i+')">🗑️</button></td></tr>').join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีโปรโมชั่น</div></div>')+'</div>';
 }
 function openAddPromo(){
   const h='<div class="modal-overlay show" id="moPromo"><div class="modal"><div class="modal-head"><h3>➕ เพิ่มโปรโมชั่น</h3><button class="modal-close" onclick="document.getElementById(\'moPromo\').remove()">&times;</button></div>'+
@@ -2613,6 +2613,167 @@ function saveLineTemplates(){
   var s=getShopSettings();
   s.lineTemplates={statusUpdate:$('lt-status')?$('lt-status').value:'',billCollect:$('lt-bill')?$('lt-bill').value:'',ready:$('lt-ready')?$('lt-ready').value:''};
   saveDB();toast('บันทึก LINE Templates สำเร็จ ✅');
+}
+
+// ═══ MISSING FUNCTIONS — UTILITY ═══
+function setVal(id,v){var el=$(id);if(el)el.value=v}
+function setDisp(id,d){var el=$(id);if(el)el.style.display=d}
+function inDays(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function updBadges(){
+  var active=DB.orders.filter(function(o){return !['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)}).length;
+  var unpaid=DB.orders.filter(function(o){return !isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status)}).length;
+  document.querySelectorAll('.sb-item').forEach(function(el){
+    var pg=el.dataset.page;var badge=el.querySelector('.sb-badge');
+    if(pg==='orders'&&active>0){if(!badge){badge=document.createElement('span');badge.className='sb-badge';el.appendChild(badge)}badge.textContent=active}
+    else if(badge) badge.remove();
+  });
+}
+function calcPromoDisc(net,promo){
+  if(!promo) return 0;
+  if(promo.type==='percent') return Math.round(net*promo.value/100);
+  if(promo.type==='fixed'||promo.type==='points') return promo.value;
+  return 0;
+}
+
+// ═══ MISSING — PROMO MANAGEMENT ═══
+function editPromo(i){
+  var p=DB.promos[i];if(!p) return;
+  var h='<div class="modal-overlay show" id="moEditPromo"><div class="modal"><div class="modal-head"><h3>✏️ แก้ไขโปร</h3><button class="modal-close" onclick="document.getElementById(\'moEditPromo\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+_buildPromoForm('ep',p)+'</div>'+
+    '<div class="modal-foot"><button class="btn btn-rd" onclick="deletePromo('+i+')">🗑️ ลบ</button><button class="btn btn-out" onclick="document.getElementById(\'moEditPromo\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveEditPromo('+i+')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function _buildPromoForm(prefix,p){
+  p=p||{name:'',type:'percent',value:0,ptsNeeded:0,startDate:'',exp:''};
+  return '<div class="form-group"><label class="form-label">ชื่อโปร</label><input id="'+prefix+'-name" value="'+p.name+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภท</label><select id="'+prefix+'-type" onchange="_promoTypeChange(\''+prefix+'\')"><option value="percent" '+(p.type==='percent'?'selected':'')+'>% ส่วนลด</option><option value="fixed" '+(p.type==='fixed'?'selected':'')+'>฿ คงที่</option><option value="points" '+(p.type==='points'?'selected':'')+'>⭐ แลกแต้ม</option></select></div>'+
+    '<div class="form-group"><label class="form-label">ค่าส่วนลด</label><input id="'+prefix+'-val" type="number" value="'+p.value+'"></div></div>'+
+    '<div id="'+prefix+'-pts-area" style="display:'+(p.type==='points'?'block':'none')+'"><div class="form-group"><label class="form-label">แต้มที่ต้องใช้</label><input id="'+prefix+'-pts" type="number" value="'+(p.ptsNeeded||0)+'"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันเริ่ม</label><input id="'+prefix+'-start" type="date" value="'+(p.startDate||'')+'"></div>'+
+    '<div class="form-group"><label class="form-label">วันหมดอายุ</label><input id="'+prefix+'-exp" type="date" value="'+(p.exp||'')+'"></div></div>';
+}
+function _promoTypeChange(prefix){
+  var t=$(prefix+'-type')?$(prefix+'-type').value:'';
+  setDisp(prefix+'-pts-area',t==='points'?'block':'none');
+}
+function saveEditPromo(i){
+  var p=DB.promos[i];if(!p) return;
+  p.name=$('ep-name').value.trim()||p.name;p.type=$('ep-type').value;
+  p.value=parseFloat($('ep-val').value)||0;
+  p.ptsNeeded=parseInt($('ep-pts')?$('ep-pts').value:0)||0;
+  p.startDate=$('ep-start')?$('ep-start').value:'';p.exp=$('ep-exp')?$('ep-exp').value:'';
+  saveDB();toast('แก้ไขโปรสำเร็จ ✅');var mo=$('moEditPromo');if(mo)mo.remove();renderPage('promo');
+}
+function deletePromo(i){
+  if(!confirm('ลบโปรโมชั่น "'+DB.promos[i].name+'" ?')) return;
+  DB.promos.splice(i,1);saveDB();toast('ลบโปรสำเร็จ');
+  var mo=$('moEditPromo');if(mo)mo.remove();renderPage('promo');
+}
+
+// ═══ MISSING — MEMBER CARD DESIGNER ═══
+function mcRefreshCard(){var mid=window._mcMid;if(mid) showMemberCard(mid)}
+function mcSetLogo(e){
+  var file=e.target.files[0];if(!file||file.size>512000){toast('ไฟล์ใหญ่เกิน 500KB','err');return}
+  var r=new FileReader();r.onload=function(ev){
+    var cfg=window._mcSettings||{};cfg.logo=ev.target.result;window._mcSettings=cfg;mcRefreshCard();
+  };r.readAsDataURL(file);
+}
+function mcSetBgImage(e){
+  var file=e.target.files[0];if(!file||file.size>1024000){toast('ไฟล์ใหญ่เกิน 1MB','err');return}
+  var r=new FileReader();r.onload=function(ev){
+    var cfg=window._mcSettings||{};cfg.bgImage=ev.target.result;window._mcSettings=cfg;mcRefreshCard();
+  };r.readAsDataURL(file);
+}
+function mcUpdateSize(key,val){var cfg=window._mcSettings||{};cfg[key]=val;window._mcSettings=cfg}
+function mcSavePreset(){
+  var name=prompt('ชื่อ Preset:');if(!name) return;
+  var s=getShopSettings();if(!s.cardPresets)s.cardPresets=[];
+  s.cardPresets.push({name:name,cfg:{...window._mcSettings}});
+  saveDB();toast('บันทึก Preset สำเร็จ ✅');
+}
+function mcLoadPreset(i){
+  var s=getShopSettings();var p=(s.cardPresets||[])[i];
+  if(p){window._mcSettings={...p.cfg};mcRefreshCard();toast('โหลด Preset: '+p.name)}
+}
+function mcDeletePreset(i){
+  var s=getShopSettings();if(!s.cardPresets||!s.cardPresets[i]) return;
+  if(!confirm('ลบ Preset "'+s.cardPresets[i].name+'" ?')) return;
+  s.cardPresets.splice(i,1);saveDB();toast('ลบ Preset สำเร็จ');
+}
+function mcExportPNG(){
+  var el=$('memberCardEl');if(!el) return;
+  toast('กำลัง Export PNG... (ต้องการ html2canvas)','info');
+  if(typeof html2canvas!=='undefined'){
+    html2canvas(el).then(function(canvas){
+      var a=document.createElement('a');a.href=canvas.toDataURL('image/png');
+      a.download='member_card_'+window._mcMid+'.png';a.click();toast('Export PNG สำเร็จ ✅');
+    });
+  }else{printMemberCard()}
+}
+
+// ═══ MISSING — CRM/MEMBER ═══
+function adjMemberPts(mid,pts,reason){
+  var m=gM(mid);if(!m) return;
+  m.pts=Math.max(0,(m.pts||0)+pts);saveDB();
+  logAction('ADJ_PTS',mid+' '+(pts>0?'+':'')+pts+' ('+reason+')');
+  toast((pts>0?'เพิ่ม':'หัก')+' '+Math.abs(pts)+' แต้ม → คงเหลือ '+m.pts);
+}
+function openMemberLevelModal(mid){
+  var m=gM(mid);if(!m) return;
+  var h='<div class="modal-overlay show" id="moLevel"><div class="modal"><div class="modal-head"><h3>🏅 เปลี่ยนระดับ '+m.name+'</h3><button class="modal-close" onclick="document.getElementById(\'moLevel\').remove()">&times;</button></div>'+
+    '<div class="modal-body"><div class="form-group"><label class="form-label">ระดับปัจจุบัน: <strong>'+m.level+'</strong></label><select id="ml-level"><option'+(m.level==='ทั่วไป'?' selected':'')+'>ทั่วไป</option><option'+(m.level==='Silver'?' selected':'')+'>Silver</option><option'+(m.level==='Gold'?' selected':'')+'>Gold</option><option'+(m.level==='VIP'?' selected':'')+'>VIP</option></select></div></div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moLevel\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="setVIP(\''+mid+'\')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function setVIP(mid){
+  var m=gM(mid);if(!m) return;
+  m.level=$('ml-level')?$('ml-level').value:m.level;
+  saveDB();logAction('SET_LEVEL',mid+' → '+m.level);toast('เปลี่ยนระดับเป็น '+m.level+' ✅');
+  var mo=$('moLevel');if(mo)mo.remove();renderPage(curPage);
+}
+function openCRMSettings(){navTo('crm')}
+function showSelMem(ctx,m){
+  if(ctx==='ldr') openCreateOrderModal(m);
+  else if(ctx==='pkg') openBuyPkgForm(m);
+  else if(ctx==='uq') openUseQuotaForm(m);
+  else if(ctx==='bed') openBedsetForm(m);
+  else if(ctx==='cln') openCleaningForm(m);
+}
+
+// ═══ MISSING — DELIVERY HELPERS ═══
+function refreshDeliverySelects(){
+  var tiers=getShopSettings().deliveryTiers||DEL_TIERS_DEFAULT;
+  var opts=tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('');
+  ['co-del-sel','eo-del-sel','bs-del-sel'].forEach(function(id){var el=$(id);if(el) el.innerHTML=opts});
+}
+function getDeliveryOptions(){return (getShopSettings().deliveryTiers||DEL_TIERS_DEFAULT)}
+
+// ═══ MISSING — EXPORT HELPERS ═══
+function exportItemsReport(){exportReportCSV('sku')}
+function exportQuotaHistory(){exportReportCSV('quota')}
+
+// ═══ MISSING — HISTORY HELPERS ═══
+function clearHistFilters(){
+  if($('histSearch'))$('histSearch').value='';
+  filterHistory();toast('ล้างตัวกรอง');
+}
+
+// ═══ MISSING — LINE ═══
+function sendLineMsg(oid){
+  toast('Phase 2: จะส่ง LINE ผ่าน Messaging API จริง','info');
+  logAction('LINE_SEND','ส่งข้อความ LINE ออเดอร์ '+oid);
+}
+
+// ═══ MISSING — ORDER HELPERS ═══
+function calcBedNet(){
+  var idx=parseInt($('bs-size')?$('bs-size').value:0);
+  var qty=parseInt($('bs-qty')?$('bs-qty').value:1)||1;
+  var b=BED_SETS[idx];return b?b.price*qty:0;
+}
+function onBedSetChange(){var net=calcBedNet();toast('ยอด: '+thb(net),'info')}
+function calcClnNet(){
+  var idx=parseInt($('cn-type')?$('cn-type').value:0);
+  var s=CLN_SVCS[idx];return s?s.minPrice:0;
 }
 
 // ═══ BOOTSTRAP ═══
