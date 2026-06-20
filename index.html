@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -636,13 +636,13 @@ function renderPublicRegister(){
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
     '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+s.shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
-    '<div class="card"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name"></div>'+
-    '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone"></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick"></div>'+
-    '<div class="form-group"><label class="form-label">LINE ID</label><input id="pr-line"></div>'+
+    '<div class="card"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
+    '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone" type="tel" autocomplete="tel"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick" type="text"></div>'+
+    '<div class="form-group"><label class="form-label">LINE ID</label><input id="pr-line" type="text"></div>'+
     '<div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="pr-addr"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="pr-proj"></div>'+
-    '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="pr-proj" type="text"></div>'+
+    '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room" type="text" inputmode="text" placeholder="เช่น A-101/2"></div></div>'+
     '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px"><input type="checkbox" id="pr-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคล ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
     '<button class="btn btn-pr btn-lg" onclick="savePublicRegister()" style="width:100%;justify-content:center;margin-top:12px">📝 สมัครสมาชิก</button></div></div>';
   document.body.appendChild(regDiv);
@@ -815,17 +815,17 @@ function openNewMemberModal(){
     '<div class="modal-head"><h3>➕ สมัครสมาชิกใหม่</h3><button class="modal-close" onclick="closeMo(\'moNewMember\')">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="nm-name"></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="nm-nick"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="nm-name" type="text" autocomplete="name"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="nm-nick" type="text"></div>'+
     '</div>'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="nm-phone"></div>'+
-    '<div class="form-group"><label class="form-label">LINE ID</label><input id="nm-line"></div>'+
+    '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="nm-phone" type="tel" autocomplete="tel"></div>'+
+    '<div class="form-group"><label class="form-label">LINE ID</label><input id="nm-line" type="text"></div>'+
     '</div>'+
     '<div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="nm-addr" onchange="toggleAddr()"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
     '<div id="nm-addr-detail" class="grid g2">'+
-    '<div class="form-group"><label class="form-label">โครงการ</label><input id="nm-proj"></div>'+
-    '<div class="form-group"><label class="form-label">ห้อง</label><input id="nm-room"></div>'+
+    '<div class="form-group"><label class="form-label">โครงการ</label><input id="nm-proj" type="text"></div>'+
+    '<div class="form-group"><label class="form-label">ห้อง</label><input id="nm-room" type="text" inputmode="text"></div>'+
     '</div>'+
     '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px;cursor:pointer"><input type="checkbox" id="nm-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคลเพื่อการให้บริการ ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
     '</div>'+
@@ -835,8 +835,8 @@ function openNewMemberModal(){
 function toggleAddr(){
   const t=$('nm-addr').value;
   $('nm-addr-detail').innerHTML=t==='condo'?
-    '<div class="form-group"><label class="form-label">โครงการ</label><input id="nm-proj"></div><div class="form-group"><label class="form-label">ห้อง</label><input id="nm-room"></div>':
-    '<div class="form-group"><label class="form-label">หมู่บ้าน</label><input id="nm-village"></div><div class="form-group"><label class="form-label">เลขที่บ้าน</label><input id="nm-houseno"></div>';
+    '<div class="form-group"><label class="form-label">โครงการ</label><input id="nm-proj" type="text"></div><div class="form-group"><label class="form-label">ห้อง</label><input id="nm-room" type="text" inputmode="text"></div>':
+    '<div class="form-group"><label class="form-label">หมู่บ้าน</label><input id="nm-village" type="text"></div><div class="form-group"><label class="form-label">เลขที่บ้าน</label><input id="nm-houseno" type="text" inputmode="text" placeholder="เช่น 123/45"></div>';
 }
 function saveNewMember(){
   const name=$('nm-name')?$('nm-name').value.trim():'';
@@ -2898,6 +2898,7 @@ function calcClnNet(){
 loadDB();initDarkMode();
 // Check public register page BEFORE login
 if(location.search.includes('page=register')){
+  document.body.style.overflow='auto';document.body.style.height='auto';
   renderPublicRegister();
 }else{
   initLockScreen();
