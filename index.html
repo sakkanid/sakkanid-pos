@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณเอนิส',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -659,7 +659,9 @@ function savePublicRegister(){
   var room=$('pr-room')?$('pr-room').value.trim():'';
   var s=getShopSettings();
   // Build message for shop
-  var msg='🫧 สมัครสมาชิกใหม่\nร้าน '+s.shopName+'\n\n👤 ชื่อ: '+name+'\n📱 เบอร์: '+phone+(nick?'\n😊 ชื่อเล่น: '+nick:'')+(lineId?'\nLINE: '+lineId:'')+'\n🏠 ที่อยู่: '+(addrType==='condo'?'คอนโด '+proj+' ห้อง '+room:'บ้าน '+proj+' '+room)+'\n✅ ยินยอม PDPA\n\n📋 รหัสนำเข้า:\n##REG##'+btoa(JSON.stringify({name:name,nick:nick,phone:phone,lineId:lineId,addrType:addrType,proj:proj,room:room}))+'##END##';
+  var regJSON=JSON.stringify({name:name,nick:nick,phone:phone,lineId:lineId,addrType:addrType,proj:proj,room:room});
+  var regCode=btoa(unescape(encodeURIComponent(regJSON)));
+  var msg='🫧 สมัครสมาชิกใหม่\nร้าน '+s.shopName+'\n\n👤 ชื่อ: '+name+'\n📱 เบอร์: '+phone+(nick?'\n😊 ชื่อเล่น: '+nick:'')+(lineId?'\nLINE: '+lineId:'')+'\n🏠 ที่อยู่: '+(addrType==='condo'?'คอนโด '+proj+' ห้อง '+room:'บ้าน '+proj+' '+room)+'\n✅ ยินยอม PDPA\n\n📋 รหัสนำเข้า:\n##REG##'+regCode+'##END##';
   var el=$('publicRegPage');
   if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
     '<div style="font-size:48px;margin-bottom:8px">✅</div>'+
@@ -2843,7 +2845,7 @@ function importRegMember(){
   var match=code.match(/##REG##(.+?)##END##/);
   if(!match){toast('ไม่พบรหัสนำเข้า — ให้วางข้อความทั้งหมดที่ลูกค้าส่งมา','err');return}
   try{
-    var data=JSON.parse(atob(match[1]));
+    var data=JSON.parse(decodeURIComponent(escape(atob(match[1]))));
     if(!data.name||!data.phone){toast('ข้อมูลไม่ครบ','err');return}
     var dup=DB.members.find(function(m){return m.phone===data.phone});
     if(dup){toast('เบอร์ '+data.phone+' มีในระบบแล้ว: '+dup.name,'warn');return}
