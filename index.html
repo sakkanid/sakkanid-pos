@@ -158,6 +158,8 @@ body.dark .o-card{background:#1A2332}
 body.dark .btn-out{background:#1A2332;color:var(--pr);border-color:#2A3A4A}
 body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 .search-box{position:relative}.search-box input{padding-left:36px}
+select{-webkit-appearance:menulist;appearance:menulist;min-height:44px;font-size:14px!important}
+input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-size:14px!important}
 .search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px}
 .tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px;margin-bottom:16px}
 .tab{flex:1;padding:8px;text-align:center;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:var(--t3);transition:.15s}
@@ -238,7 +240,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -1072,10 +1074,14 @@ function advanceStatus(oid){
   const statuses=o.type==='cleaning'?STATUSES_CLN:STATUSES_LDR;
   const idx=statuses.indexOf(o.status);
   if(idx<0||idx>=statuses.length-2) return;
-  const nextSt=statuses[idx+1];
+  var nextSt=statuses[idx+1];
   // ต้องชำระก่อนเปลี่ยนเป็น "เสร็จสิ้น" หรือ "ปิดงาน" เท่านั้น
   if((nextSt==='เสร็จสิ้น'||nextSt==='ปิดงาน')&&!isPaidCheck(o)){
     toast('⚠️ ต้องชำระเงินให้ครบก่อนเปลี่ยนเป็น "'+nextSt+'"','err');return;
+  }
+  // Cleaning: ถ้าชำระแล้วและ next คือ "เสร็จสิ้น รอชำระ" → ข้ามไป "ปิดงาน"
+  if(o.type==='cleaning'&&nextSt==='เสร็จสิ้น รอชำระ'&&isPaidCheck(o)){
+    nextSt='ปิดงาน';
   }
   o.status=nextSt;saveDB();
   logAction('CHANGE_STATUS',oid+' → '+nextSt);
@@ -1362,6 +1368,8 @@ function openBuyPkgForm(m){
     PKGS.map((p,i)=>'<option value="'+i+'">'+p.type+' '+p.qty+' ชิ้น — '+thb(p.price)+'</option>').join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">วิธีชำระ</label><select id="bp-method">'+
     getPayMethods().map(m=>'<option>'+m.name+'</option>').join('')+'</select></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="bp-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="form-group"><label class="form-label">เวลา</label><input id="bp-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBuyPkg\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveBuyPackage()">💾 บันทึก</button></div>';
   openMo('moBuyPkg');
@@ -1370,11 +1378,14 @@ function saveBuyPackage(){
   const m=gM(pkgMemberId);if(!m) return;
   const idx=parseInt($('bp-pkg').value);const pkg=PKGS[idx];if(!pkg) return;
   const method=$('bp-method').value;
+  var payDt=fmtDate(new Date($('bp-paydate')?$('bp-paydate').value:new Date()));
+  var payTm=$('bp-paytime')?$('bp-paytime').value:'';
+  var payDateStr=payDt+(payTm?' '+payTm:'');
   const expDate=new Date();expDate.setDate(expDate.getDate()+pkg.expDays);
   const quota={id:genId('QTA'),mid:m.id,pkgName:pkg.type+' '+pkg.qty+' ชิ้น',pkgType:pkg.type,total:pkg.qty,used:0,remain:pkg.qty,buyDate:fmtDate(),exp:fmtDate(expDate)};
   if(!DB.quotas) DB.quotas=[];
   DB.quotas.push(quota);
-  const order={id:genId('PKB'),type:'pkg_buy',mid:m.id,mname:m.name,mphone:m.phone,status:'เสร็จสิ้น',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'Package',t:pkg.type,o:pkg.qty+' ชิ้น',qty:1,p:pkg.price,k:pkg.cost}],extras:[],disc:0,net:pkg.price,cost:pkg.cost,payHist:[{round:1,method,amt:pkg.price,date:fmtDT(),by:curUser.nick}],isPaid:true,pts:pts4(pkg.price),note:'',pickupDate:'',createdAt:fmtDT(),by:curUser.nick};
+  const order={id:genId('PKB'),type:'pkg_buy',mid:m.id,mname:m.name,mphone:m.phone,status:'เสร็จสิ้น',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'Package',t:pkg.type,o:pkg.qty+' ชิ้น',qty:1,p:pkg.price,k:pkg.cost,ce:'Package',te:pkg.type,oe:pkg.qty+' pcs'}],extras:[],disc:0,net:pkg.price,cost:pkg.cost,payHist:[{round:1,method:method,amt:pkg.price,date:payDateStr,by:curUser.nick}],isPaid:true,pts:pts4(pkg.price),note:'',pickupDate:'',createdAt:fmtDT(),by:curUser.nick};
   DB.orders.push(order);
   m.spend=(m.spend||0)+pkg.price;m.pts=(m.pts||0)+order.pts;
   saveDB();logAction('CREATE_ORDER',order.id+' Package '+pkg.type);
@@ -1392,46 +1403,119 @@ function openBedsetForm(m){
   const tiers=getShopSettings().deliveryTiers||DEL_TIERS_DEFAULT;
   $('moBedsetIn').innerHTML=
     '<div class="modal-head"><h3>🛏️ Set เครื่องนอน</h3><button class="modal-close" onclick="closeMo(\'moBedset\')">&times;</button></div>'+
-    '<div class="modal-body">'+
-    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong></div>'+
-    '<div class="form-group"><label class="form-label">ขนาดเตียง</label><select id="bs-size">'+
+    '<div class="modal-body" style="overflow-y:auto;-webkit-overflow-scrolling:touch">'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+m.phone+'</div>'+
+    // Step 1: Select SET package (price comes from here)
+    '<div class="form-group"><label class="form-label">เลือก Set Package</label><select id="bs-set" onchange="bsSetChange()" style="font-size:14px">'+
     BED_SETS.map(function(b,i){return '<option value="'+i+'">'+b.label+' — '+thb(b.price)+'</option>'}).join('')+'</select></div>'+
-    '<div class="form-group"><label class="form-label">จำนวน (set)</label><input id="bs-qty" type="number" value="1" min="1"></div>'+
+    '<div id="bs-set-price" style="background:var(--gnl);padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin-bottom:12px">ราคา Set: '+thb(BED_SETS[0].price)+'</div>'+
+    // Step 2: Specify items (tracking only, no extra charge)
+    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ระบุรายการเครื่องนอน <span style="font-size:11px;color:var(--t3);font-weight:400">(ไม่คิดเงินเพิ่ม)</span></div>'+
+    '<div style="font-size:11px;color:var(--am);margin-bottom:8px">⚠️ รวมไม่เกิน 5 ชิ้น · หมอน+หมอนข้าง รวม ≤3</div>'+
+    bsBuildRow('ผ้าปูที่นอน','Bed Sheet','max 1','bs-q-sheet',1,1)+
+    bsBuildRow('ผ้านวม','Comforter','max 1','bs-q-comf',1,1)+
+    bsBuildRow('ปลอกหมอน','Pillow Case','','bs-q-pil',2,3)+
+    bsBuildRow('ปลอกหมอนข้าง','Bolster Case','','bs-q-bol',1,3)+
+    '<div id="bs-item-status" style="margin-top:8px;text-align:center;font-size:13px;font-weight:600;color:var(--gn)">✅ รวม 5 ชิ้น</div>'+
+    '</div>'+
+    // Delivery + other fields
     '<div class="grid g2"><div class="form-group"><label class="form-label">วิธีรับผ้า</label><select id="bs-delivery" onchange="bsDeliveryChange()"><option value="pickup">🏪 รับเอง</option><option value="delivery">🚗 Delivery</option></select></div>'+
-    '<div class="form-group" id="bs-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="bs-del-sel">'+
-    tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+'</select></div></div>'+
-    '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy)</label><input id="bs-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
-    '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="bs-note"></div>'+
-    '<div class="form-group"><label class="form-label">🎁 โปรโมชั่น</label><select id="bs-promo"><option value="">— ไม่ใช้โปร —</option>'+
-    getActivePromos().map(function(p,i){return '<option value="'+i+'">'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
-    '<div class="form-group"><label class="form-label">สถานะชำระเงิน</label><select id="bs-paid" onchange="bsPaidChange()"><option value="0">❌ ยังไม่ชำระ — รอชำระภายหลัง</option><option value="1">✅ ชำระเงินทันที</option></select></div>'+
-    '<div id="bs-pay-detail" style="display:none"><div class="form-group"><label class="form-label">วิธีชำระ</label><select id="bs-method">'+
-    getPayMethods().map(function(m){return '<option>'+m.name+'</option>'}).join('')+'</select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="bs-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="form-group" id="bs-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="bs-del-sel">'+tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+'</select></div></div>'+
+    '<div class="form-group"><label class="form-label">วันนัดรับ</label><input id="bs-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
+    '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="bs-note" type="text"></div>'+
+    '<div class="form-group"><label class="form-label">🎁 โปรโมชั่น</label><select id="bs-promo"><option value="">— ไม่ใช้โปร —</option>'+getActivePromos().map(function(p,i){return '<option value="'+i+'">'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
+    '<div class="form-group"><label class="form-label">สถานะชำระเงิน</label><select id="bs-paid" onchange="bsPaidChange()"><option value="0">❌ ยังไม่ชำระ</option><option value="1">✅ ชำระเงินทันที</option></select></div>'+
+    '<div id="bs-pay-detail" style="display:none"><div class="form-group"><label class="form-label">วิธีชำระ</label><select id="bs-method">'+getPayMethods().map(function(pm){return '<option>'+pm.name+'</option>'}).join('')+'</select></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="bs-paydate" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="bs-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="bs-payamt" type="number" placeholder="กรอกยอดเงิน"></div></div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBedset\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveBedset()">💾 บันทึก</button></div>';
   openMo('moBedset');
 }
+function bsSetChange(){
+  var idx=parseInt($('bs-set')?$('bs-set').value:0);
+  var b=BED_SETS[idx];if(!b) return;
+  $('bs-set-price').innerHTML='ราคา Set: '+thb(b.price);
+}
+function bsBuildRow(name,en,note,id,defVal,max){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bg)">'+
+    '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+name+'</div><div style="font-size:10px;color:var(--t3)">'+en+(note?' · '+note:'')+'</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+    '<div style="width:44px;height:44px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',-1)">−</div>'+
+    '<div id="'+id+'" style="width:36px;text-align:center;font-size:18px;font-weight:700">'+defVal+'</div>'+
+    '<div style="width:44px;height:44px;border-radius:10px;background:var(--pr);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',1)">+</div>'+
+    '</div></div>';
+}
+function bsQty(id,delta){
+  var el=$(id);if(!el) return;
+  var v=parseInt(el.textContent)||0;
+  var maxMap={'bs-q-sheet':1,'bs-q-comf':1,'bs-q-pil':3,'bs-q-bol':3};
+  var mx=maxMap[id]||99;
+  var nv=Math.max(0,Math.min(mx,v+delta));
+  // Check pillow+bolster ≤3
+  if(id==='bs-q-pil'||id==='bs-q-bol'){
+    var pil=id==='bs-q-pil'?nv:parseInt($('bs-q-pil').textContent)||0;
+    var bol=id==='bs-q-bol'?nv:parseInt($('bs-q-bol').textContent)||0;
+    if(pil+bol>3){toast('หมอน+หมอนข้าง รวมไม่เกิน 3','err');return}
+  }
+  // Check total ≤5
+  var sheet=id==='bs-q-sheet'?nv:parseInt($('bs-q-sheet').textContent)||0;
+  var comf=id==='bs-q-comf'?nv:parseInt($('bs-q-comf').textContent)||0;
+  var pil2=id==='bs-q-pil'?nv:parseInt($('bs-q-pil').textContent)||0;
+  var bol2=id==='bs-q-bol'?nv:parseInt($('bs-q-bol').textContent)||0;
+  if(sheet+comf+pil2+bol2>5){toast('รวมไม่เกิน 5 ชิ้น','err');return}
+  el.textContent=nv;bsItemCheck();
+}
+function bsItemCheck(){
+  var s=parseInt($('bs-q-sheet')?$('bs-q-sheet').textContent:0)||0;
+  var c=parseInt($('bs-q-comf')?$('bs-q-comf').textContent:0)||0;
+  var p=parseInt($('bs-q-pil')?$('bs-q-pil').textContent:0)||0;
+  var b=parseInt($('bs-q-bol')?$('bs-q-bol').textContent:0)||0;
+  var total=s+c+p+b;var ok=total<=5&&(p+b)<=3;
+  if($('bs-item-status'))$('bs-item-status').innerHTML=ok?'<span style="color:var(--gn)">✅ รวม '+total+' ชิ้น</span>':'<span style="color:var(--rd)">❌ เกินจำนวน!</span>';
+}
+function bsSizeChange(){bsSetChange()}
+function bsCalcTotal(){bsSetChange()}
 function bsDeliveryChange(){var isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';if($('bs-del-tier'))$('bs-del-tier').style.display=isDel?'block':'none'}
 function bsPaidChange(){if($('bs-pay-detail'))$('bs-pay-detail').style.display=$('bs-paid').value==='1'?'block':'none'}
 function saveBedset(){
   const m=gM(bedMemberId);if(!m) return;
-  const bs=BED_SETS[parseInt($('bs-size').value)];const qty=parseInt($('bs-qty').value)||1;
+  var setIdx=parseInt($('bs-set')?$('bs-set').value:0);
+  var bs=BED_SETS[setIdx];if(!bs){toast('เลือก Set Package','err');return}
+  var qSheet=parseInt($('bs-q-sheet')?$('bs-q-sheet').textContent:0)||0;
+  var qComf=parseInt($('bs-q-comf')?$('bs-q-comf').textContent:0)||0;
+  var qPil=parseInt($('bs-q-pil')?$('bs-q-pil').textContent:0)||0;
+  var qBol=parseInt($('bs-q-bol')?$('bs-q-bol').textContent:0)||0;
+  var total=qSheet+qComf+qPil+qBol;
+  if(total===0){toast('ระบุรายการอย่างน้อย 1 ชิ้น','err');return}
+  if(qPil+qBol>3){toast('หมอน+หมอนข้าง รวมไม่เกิน 3','err');return}
+  if(total>5){toast('รวมไม่เกิน 5 ชิ้น','err');return}
+  // Build items list (tracking only — price = 0 per item, total from SET)
+  var items=[];
+  if(qSheet) items.push({c:'เครื่องนอน',ce:'Bedding',t:'ผ้าปูที่นอน',te:'Bed Sheet',o:bs.label,oe:bs.size,qty:qSheet,p:0,k:0});
+  if(qComf) items.push({c:'เครื่องนอน',ce:'Bedding',t:'ผ้านวม',te:'Comforter',o:'',oe:'',qty:qComf,p:0,k:0});
+  if(qPil) items.push({c:'เครื่องนอน',ce:'Bedding',t:'ปลอกหมอน',te:'Pillow Case',o:'',oe:'',qty:qPil,p:0,k:0});
+  if(qBol) items.push({c:'เครื่องนอน',ce:'Bedding',t:'ปลอกหมอนข้าง',te:'Bolster Case',o:'',oe:'',qty:qBol,p:0,k:0});
+  // Set price as first item for billing display
+  items.unshift({c:'เครื่องนอน Set',ce:'Bedding Set',t:bs.label,te:bs.label,o:total+' ชิ้น',oe:total+' pcs',qty:1,p:bs.price,k:bs.cost});
+  // Delivery
   const isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';
   const delCost=isDel?parseFloat($('bs-del-sel')?$('bs-del-sel').value:0)||0:0;
+  // Promo
   var disc=0;var promoName='';
   var pi=$('bs-promo')?$('bs-promo').value:'';
-  if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){promoName=pr.name;disc=pr.type==='percent'?Math.round(bs.price*qty*pr.value/100):pr.value;if(pr.type==='points'&&pr.ptsNeeded)m.pts=Math.max(0,(m.pts||0)-pr.ptsNeeded)}}
-  const net=Math.max(0,bs.price*qty+delCost-disc);const paidNow=$('bs-paid').value==='1';
+  if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){promoName=pr.name;disc=pr.type==='percent'?Math.round(bs.price*pr.value/100):pr.value;if(pr.type==='points'&&pr.ptsNeeded)m.pts=Math.max(0,(m.pts||0)-pr.ptsNeeded)}}
+  var net=Math.max(0,bs.price+delCost-disc);
+  // Payment
+  const paidNow=$('bs-paid').value==='1';
   var payAmt=paidNow?(parseFloat($('bs-payamt')?$('bs-payamt').value:0)||net):0;
   var payDt=paidNow?fmtDate(new Date($('bs-paydate')?$('bs-paydate').value:new Date())):'';
   var payTm=paidNow?($('bs-paytime')?$('bs-paytime').value:''):'';
   const method=paidNow&&$('bs-method')?$('bs-method').value:'เงินสด';
-  const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo):'',items:[{c:'เครื่องนอน',t:bs.label,o:bs.items.join(', '),qty:qty,p:bs.price,k:bs.cost}],extras:[],disc:disc,net:net,cost:bs.cost*qty,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
+  const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo):'',items:items,extras:[],disc:disc,net:net,cost:bs.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
   DB.orders.push(order);if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
-  logAction('CREATE_ORDER',order.id+' Bedset');toast('สร้างออเดอร์เครื่องนอนสำเร็จ ✅');
+  logAction('CREATE_ORDER',order.id+' Bedset '+bs.label+' '+total+'ชิ้น');toast('สร้างออเดอร์เครื่องนอนสำเร็จ ✅ '+bs.label);
   closeMo('moBedset');navTo('orders');
 }
 
@@ -2551,7 +2635,7 @@ function buildBillHTML(o){
   if(s.address) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:2px">'+s.address+'</div>';
   // ── Document type + ID + Date ──
   h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
-    '<div style="text-align:center;font-weight:800;font-size:14px;margin:4px 0">'+(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า')+'</div>'+
+    '<div style="text-align:center;font-weight:800;font-size:14px;margin:4px 0">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
     '<div style="text-align:center;font-size:12px;font-weight:600">เลขที่: '+o.id+'</div>'+
     '<div style="text-align:center;font-size:11px;color:#666">วันที่: '+o.createdAt+'</div>'+
     '<div style="text-align:center;font-size:10px;color:#888">โดย: '+o.by+'</div>';
