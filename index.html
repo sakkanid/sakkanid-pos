@@ -238,7 +238,7 @@ body.dark .tab{color:#78909C}body.dark .tab.act{background:#1A2332}
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'6326',protected:true},
+  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
   {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
   {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
   {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
@@ -1859,42 +1859,42 @@ function renderSKUReport(){
 function exportReportCSV(type){
   var csv='',filename='SAKKANID_report_'+type+'_'+todayStr().replace(/-/g,'')+'.csv';
   if(type==='sku'){
-    const skuMap={};
-    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{const k=it.c+'_'+it.t;if(!skuMap[k])skuMap[k]={cat:it.c,type:it.t,qty:0,rev:0,cost:0};skuMap[k].qty+=it.qty;skuMap[k].rev+=it.p*it.qty;skuMap[k].cost+=it.k*it.qty})});
-    csv='หมวด,ประเภท,จำนวน,รายได้,ต้นทุน,กำไร,Margin%\n';
-    Object.values(skuMap).forEach(s=>{csv+=s.cat+','+s.type+','+s.qty+','+s.rev+','+s.cost+','+(s.rev-s.cost)+','+Math.round((s.rev-s.cost)/(s.rev||1)*100)+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ต้นทุน,กำไร\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+(it.k*it.qty)+','+((it.p-it.k)*it.qty)+'\n'})});
   }else if(type==='unpaid'){
-    csv='เลขออเดอร์,ลูกค้า,เบอร์โทร,ยอดสุทธิ,ชำระแล้ว,ค้างชำระ,วันที่\n';
-    DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status)).forEach(o=>{csv+=o.id+','+o.mname+','+o.mphone+','+o.net+','+paidTotal(o)+','+remaining(o)+','+o.createdAt+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,เบอร์โทร,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,ชำระแล้ว,ค้างชำระ,สถานะ,วันที่\n';
+    DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status)).forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+o.mphone+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+paidTotal(o)+','+remaining(o)+','+o.status+','+o.createdAt+'\n'})});
   }else if(type==='member'){
-    csv='ID,ชื่อ,ระดับ,จำนวนออเดอร์,ยอดซื้อรวม,เฉลี่ย/ครั้ง\n';
-    DB.members.forEach(m=>{const ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');const tot=ords.reduce((s,o)=>s+netOf(o),0);csv+=m.id+','+m.name+','+m.level+','+ords.length+','+tot+','+(ords.length?Math.round(tot/ords.length):0)+'\n'});
+    csv='ID สมาชิก,ชื่อ,ระดับ,เลขออเดอร์,ประเภท,ยอด,สถานะ,วันที่\n';
+    DB.members.forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=m.id+','+m.name+','+m.level+','+o.id+','+o.type+','+o.net+','+o.status+','+o.createdAt+'\n'})}else{csv+=m.id+','+m.name+','+m.level+',ไม่มีออเดอร์,-,-,-,-\n'}});
   }else if(type==='staff'){
-    csv='พนักงาน,จำนวนออเดอร์,ยอดขายรวม,เฉลี่ย/บิล\n';
-    const sm={};DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{const b=o.by||'-';if(!sm[b])sm[b]={n:b,c:0,r:0};sm[b].c++;sm[b].r+=netOf(o)});
-    Object.values(sm).forEach(s=>{csv+=s.n+','+s.c+','+s.r+','+(s.c?Math.round(s.r/s.c):0)+'\n'});
+    csv='พนักงาน,เลขออเดอร์,ลูกค้า,ประเภท,ยอด,สถานะ,วันที่\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{csv+=(o.by||'-')+','+o.id+','+o.mname+','+o.type+','+o.net+','+o.status+','+o.createdAt+'\n'});
   }else if(type==='daily'||type==='order'){
-    csv='เลข,ลูกค้า,ประเภท,ยอด,ต้นทุน,ชำระ,สถานะ,โดย,วันที่\n';
-    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+o.type+','+o.net+','+(o.cost||0)+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ประเภทบริการ,ส่วนลด,ยอดสุทธิ,ชำระ,สถานะ,โดย,วันที่\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{
+      (o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
+      (o.extras||[]).forEach(e=>{csv+=o.id+','+o.mname+',บริการเพิ่มเติม,'+e.name+',-,'+e.price+',1,'+e.price+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
+    });
   }else if(type==='financial'){
-    csv='รายการ,ยอด\n';var allO=DB.orders.filter(o=>o.status!=='ยกเลิก');
-    csv+='รายรับ,'+allO.filter(o=>isPaidCheck(o)).reduce((s,o)=>s+netOf(o),0)+'\nต้นทุน,'+allO.reduce((s,o)=>s+(o.cost||0),0)+'\nค่าใช้จ่าย,'+(DB.expenses||[]).reduce((s,e)=>s+e.amount,0)+'\n';
+    csv='เลขออเดอร์,ลูกค้า,ประเภท,ยอด,ต้นทุน,กำไร,วิธีชำระ,ชำระ,สถานะ,วันที่\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{var methods=(o.payHist||[]).map(p=>p.method).join('+');csv+=o.id+','+o.mname+','+o.type+','+o.net+','+(o.cost||0)+','+(o.net-(o.cost||0))+','+(methods||'-')+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.createdAt+'\n'});
+    csv+='\nสรุป,,,,,,,,,\nรายรับ,'+DB.orders.filter(o=>o.status!=='ยกเลิก'&&isPaidCheck(o)).reduce((s,o)=>s+netOf(o),0)+'\nต้นทุน,'+DB.orders.filter(o=>o.status!=='ยกเลิก').reduce((s,o)=>s+(o.cost||0),0)+'\nค่าใช้จ่าย,'+(DB.expenses||[]).reduce((s,e)=>s+e.amount,0)+'\n';
   }else if(type==='quota'){
-    csv='สมาชิก,Package,ใช้แล้ว,คงเหลือ,ซื้อเมื่อ,หมดอายุ\n';
-    (DB.quotas||[]).forEach(q=>{var m=gM(q.mid);csv+=(m?m.name:q.mid)+','+q.pkgName+','+q.used+','+q.remain+','+q.buyDate+','+q.exp+'\n'});
+    csv='เลขออเดอร์ซื้อ,สมาชิก,Package,ใช้แล้ว,คงเหลือ,ซื้อเมื่อ,หมดอายุ\n';
+    (DB.quotas||[]).forEach(q=>{var m=gM(q.mid);var buyOrder=DB.orders.find(o=>o.type==='pkg_buy'&&o.mid===q.mid&&o.createdAt&&o.createdAt.includes(q.buyDate));csv+=(buyOrder?buyOrder.id:'-')+','+(m?m.name:q.mid)+','+q.pkgName+','+q.used+','+q.remain+','+q.buyDate+','+q.exp+'\n'});
   }else if(type==='cleaning'||type==='laundry'||type==='bedset'){
-    csv='เลข,ลูกค้า,ประเภท,ยอด,สถานะ,วันที่\n';
-    DB.orders.filter(o=>o.type===(type==='laundry'?'laundry':type)).forEach(o=>{csv+=o.id+','+o.mname+','+(o.items[0]?o.items[0].t:'')+','+o.net+','+o.status+','+o.createdAt+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,สถานะ,ชำระ,วันที่\n';
+    DB.orders.filter(o=>o.type===type).forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.createdAt+'\n'})});
   }else if(type==='delivery'){
-    csv='เลข,ลูกค้า,ที่อยู่,ค่าส่ง,ยอด,สถานะ\n';
-    DB.orders.filter(o=>o.delivery==='delivery'&&o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+(o.deliveryAddr||'')+','+o.delCost+','+o.net+','+o.status+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,ที่อยู่,ค่าส่ง,หมวด,ประเภท,จำนวน,ยอดสุทธิ,สถานะ,ชำระ,วันที่\n';
+    DB.orders.filter(o=>o.delivery==='delivery'&&o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+(o.deliveryAddr||'')+','+o.delCost+','+it.c+','+it.t+','+it.qty+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.createdAt+'\n'})});
   }else if(type==='promo'){
-    csv='โปร,ใช้(ครั้ง),ส่วนลดรวม,ยอดขายรวม\n';
-    var pm2={};DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{if(!pm2[o.promo])pm2[o.promo]={n:o.promo,c:0,d:0,r:0};pm2[o.promo].c++;pm2[o.promo].d+=(o.disc||0);pm2[o.promo].r+=netOf(o)});
-    Object.values(pm2).forEach(p=>{csv+=p.n+','+p.c+','+p.d+','+p.r+'\n'});
+    csv='เลขออเดอร์,ลูกค้า,โปรโมชั่น,ส่วนลด,ยอดสุทธิ,สถานะ,วันที่\n';
+    DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+o.promo+','+(o.disc||0)+','+o.net+','+o.status+','+o.createdAt+'\n'});
   }else if(type==='top'||type==='monthly'){
-    csv='ลูกค้า,ระดับ,ออเดอร์,ยอดซื้อ,แต้ม\n';
-    DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{csv+=m.name+','+m.level+','+(DB.orders.filter(o=>o.mid===m.id).length)+','+m.spend+','+m.pts+'\n'});
+    csv='ลูกค้า,ระดับ,เลขออเดอร์,ประเภท,ยอด,วันที่\n';
+    DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=m.name+','+m.level+','+o.id+','+o.type+','+o.net+','+o.createdAt+'\n'})}else{csv+=m.name+','+m.level+',ไม่มีออเดอร์,-,-,-\n'}});
   }
   if(csv){
     const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
