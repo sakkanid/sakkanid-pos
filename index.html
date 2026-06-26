@@ -416,6 +416,7 @@ const PAGES=[
   {id:'promo',icon:'🎁',label:'โปรโมชั่น',section:'ลูกค้า'},
   {id:'report',icon:'📈',label:'รายงาน',section:'วิเคราะห์'},
   {id:'pricelist',icon:'💰',label:'ตารางราคา',section:'ตั้งค่า'},
+  {id:'expense',icon:'💵',label:'ค่าใช้จ่าย',section:'ตั้งค่า'},
   {id:'settings',icon:'⚙️',label:'ตั้งค่า',section:'ตั้งค่า'}
 ];
 
@@ -617,6 +618,7 @@ function renderPage(page){
     case 'promo':renderPromoPage(c);break;
     case 'report':renderReportPage(c);break;
     case 'pricelist':renderPricelistPage(c);break;
+    case 'expense':renderExpensePage(c);break;
     case 'settings':renderSettingsPage(c);break;
     default:c.innerHTML='<div class="empty-state"><div class="es-icon">🔧</div><div class="es-text">หน้านี้กำลังพัฒนา</div></div>';
   }
@@ -2659,11 +2661,12 @@ function printMemberCard(){
 }
 
 // ═══ EXPENSE TRACKING ═══
-function renderExpensePage(){
+function renderExpensePage(c){
+  if(!c) c=$('mainContent');
   if(!DB.expenses) DB.expenses=[];
   var expenses=DB.expenses.slice(-50).reverse();
   var totalMonth=DB.expenses.filter(function(e){return (e.date||'').includes('/'+String(new Date().getMonth()+1)+'/')}).reduce(function(s,e){return s+e.amount},0);
-  $('mainContent').innerHTML=
+  c.innerHTML=
     '<div class="grid g3" style="margin-bottom:16px">'+
     '<div class="kpi"><div class="kpi-lbl">ค่าใช้จ่ายเดือนนี้</div><div class="kpi-val" style="color:var(--rd)">'+thb(totalMonth)+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">รายการทั้งหมด</div><div class="kpi-val">'+DB.expenses.length+'</div></div>'+
@@ -2677,7 +2680,6 @@ function renderExpensePage(){
     '<div class="card"><div class="card-title">📋 รายการล่าสุด</div>'+
     (expenses.length?'<table><tr><th>วันที่</th><th>หมวด</th><th>รายการ</th><th>จำนวน</th><th>โดย</th></tr>'+
     expenses.map(function(e){return '<tr><td style="font-size:11px">'+e.date+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
-  $('pageTitle').textContent='💸 ค่าใช้จ่าย';
 }
 function saveExpense(){
   var cat=$('exp-cat')?$('exp-cat').value:'';
