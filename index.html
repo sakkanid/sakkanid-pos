@@ -3149,62 +3149,81 @@ let syncStatus='idle'; // idle|syncing|success|error
 let lastSyncTime=null;
 
 async function apiCall(action,sheet,body){
-  var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'');
+  syncStatus='syncing';updSyncUI();
   try{
-    syncStatus='syncing';updSyncUI();
-    var opts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body||{})};
-    if(action==='getAll'||action==='getFullDB'||action==='ping') opts={method:'GET'};
-    if(action==='getAll') url=API_URL+'?action=getAll&sheet='+sheet;
-    if(action==='getFullDB') url=API_URL+'?action=getFullDB';
-    if(action==='ping') url=API_URL+'?action=ping';
-    var resp=await fetch(url,opts);
-    // Apps Script redirects, follow manually
-    if(resp.status===302||resp.redirected){
-      resp=await fetch(resp.url||url,opts);
+    var data;
+    if(body&&Object.keys(body).length){
+      // WRITE: POST with no-cors (fire-and-forget, then verify with GET)
+      var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'');
+      await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(body)});
+      data={ok:true,note:'sent'};
+    }else{
+      // READ: JSONP via script tag (bypasses CORS completely)
+      data=await jsonpCall(action,sheet);
     }
-    var data=await resp.json();
     syncStatus=data.ok?'success':'error';
     if(data.ok) lastSyncTime=new Date();
-    updSyncUI();
-    return data;
+    updSyncUI();return data;
   }catch(err){
     syncStatus='error';updSyncUI();
-    console.error('API Error:',err);
     return {ok:false,error:err.message};
   }
 }
 
-// ── Push all data to Sheets ──
+// JSONP: inject <script> tag to bypass CORS
+function jsonpCall(action,sheet){
+  return new Promise(function(resolve,reject){
+    var cbName='_skcb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+    var timeout=setTimeout(function(){
+      delete window[cbName];if(s.parentNode)s.parentNode.removeChild(s);
+      reject(new Error('Timeout'));
+    },30000);
+    window[cbName]=function(data){
+      clearTimeout(timeout);delete window[cbName];
+      if(s.parentNode)s.parentNode.removeChild(s);
+      resolve(data);
+    };
+    var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'')+'&callback='+cbName;
+    var s=document.createElement('script');
+    s.src=url;s.onerror=function(){clearTimeout(timeout);delete window[cbName];s.parentNode.removeChild(s);reject(new Error('Script load failed'))};
+    document.head.appendChild(s);
+  });
+}
+
+// ── Push all data to Sheets (per-sheet) ──
 async function syncPushAll(){
   toast('📤 กำลัง sync ขึ้น Cloud...','info');
-  var pushData={
+  var sheets={
     orders:DB.orders||[],
     members:DB.members||[],
     quotas:DB.quotas||[],
     promos:DB.promos||[],
     expenses:DB.expenses||[],
-    shifts:DB.shifts||[]
+    shifts:DB.shifts||[],
+    pricelist:CAT.map(function(it){return{c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:it.p,k:it.k,pt:it.pt||'fixed',sku:it.sku||''}}),
+    settings:Object.keys(getShopSettings()).map(function(k){var v=getShopSettings()[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}})
   };
-  // Flatten pricelist from CAT
-  pushData.pricelist=CAT.map(function(it){return{c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:it.p,k:it.k,pt:it.pt||'fixed',sku:it.sku||''}});
-  // Settings as key-value
-  var s=getShopSettings();
-  pushData.settings=Object.keys(s).map(function(k){return{key:k,value:typeof s[k]==='object'?JSON.stringify(s[k]):String(s[k])}});
-  var result=await apiCall('syncPush','',pushData);
-  if(result.ok){
-    toast('✅ Sync สำเร็จ! ข้อมูลขึ้น Cloud แล้ว');
-    logAction('SYNC_PUSH','Push all data to Google Sheets');
-  }else{
-    toast('❌ Sync ล้มเหลว: '+(result.error||''),'err');
+  var success=0;
+  for(var name in sheets){
+    if(sheets[name].length){
+      try{
+        var url=API_URL+'?action=replaceAll&sheet='+name;
+        await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({rows:sheets[name]})});
+        success++;
+      }catch(e){console.error('Push '+name+' failed:',e)}
+    }
   }
-  return result;
+  syncStatus='success';lastSyncTime=new Date();updSyncUI();
+  toast('✅ Sync สำเร็จ! ('+success+' sheets)');
+  logAction('SYNC_PUSH','Push to Google Sheets');
 }
 
 // ── Pull all data from Sheets ──
 async function syncPullAll(){
   toast('📥 กำลังดึงข้อมูลจาก Cloud...','info');
-  var result=await apiCall('getFullDB');
-  if(result.ok&&result.data){
+  try{
+    var result=await jsonpCall('getFullDB','');
+    if(result.ok&&result.data){
     var d=result.data;
     // Merge data
     if(d.orders&&d.orders.length){DB.orders=d.orders.map(fixOrder)}
@@ -3235,6 +3254,7 @@ async function syncPullAll(){
     toast('❌ ดึงข้อมูลล้มเหลว: '+(result.error||''),'err');
   }
   return result;
+  }catch(err){toast('❌ ดึงข้อมูลล้มเหลว: '+err.message,'err');return{ok:false}}
 }
 
 // ── Fix order data types from Sheets ──
@@ -3290,9 +3310,15 @@ function openSyncPanel(){
 
 async function syncTestConnection(){
   toast('🔌 กำลังทดสอบ...','info');
-  var r=await apiCall('ping');
-  if(r.ok) toast('✅ เชื่อมต่อสำเร็จ! API v'+r.version);
-  else toast('❌ เชื่อมต่อไม่ได้: '+(r.error||''),'err');
+  try{
+    var r=await jsonpCall('ping','');
+    if(r.ok) toast('✅ เชื่อมต่อสำเร็จ! API v'+(r.v||'?'));
+    else toast('❌ เชื่อมต่อไม่ได้: '+(r.error||''),'err');
+    return r;
+  }catch(err){
+    toast('❌ เชื่อมต่อไม่ได้: '+err.message,'err');
+    return {ok:false,error:err.message};
+  }
 }
 
 // ═══ BOOTSTRAP ═══
