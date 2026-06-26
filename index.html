@@ -578,8 +578,8 @@ function initApp(){
   $('lockScreen').style.display='none';$('app').style.display='block';
   $('sfName').textContent=curUser.nick;$('sfRole').textContent=curUser.role;
   buildSidebar();navTo('dashboard');startClock();
-  // Initial sync from cloud
-  setTimeout(function(){syncTestConnection().then(function(){syncPullAll()})},2000);
+  // Initial sync from cloud (only if API URL is configured)
+  setTimeout(function(){if(getApiUrl())syncTestConnection().then(function(){syncPullAll()})},2000);
 }
 function buildSidebar(){
   let h='',lastSec='';
@@ -2093,13 +2093,14 @@ function renderSettingsPage(c){
   const tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
   const methods=s.paymentMethods||PAY_METHODS_DEFAULT;
   const autoLock=s.autoLockMin||0;
-  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'line\')">📱 LINE</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'connect\')">🔗 การเชื่อมต่อ</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'line\')">📱 LINE</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
   '<div id="settingsContent">'+renderSettingsShop(s)+'</div>';
 }
 function showSettingsTab(el,tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));el.classList.add('act');
   const s=getShopSettings();const rc=$('settingsContent');
   if(tab==='shop') rc.innerHTML=renderSettingsShop(s);
+  else if(tab==='connect') rc.innerHTML=renderSettingsConnect(s);
   else if(tab==='delivery') rc.innerHTML=renderSettingsDelivery(s);
   else if(tab==='payment') rc.innerHTML=renderSettingsPayment(s);
   else if(tab==='users') rc.innerHTML=renderSettingsUsers();
@@ -2149,6 +2150,69 @@ function renderSettingsShop(s){
     (s.payQR?'<div style="margin:4px 0"><img src="'+s.payQR+'" style="height:50px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">QR PromptPay</span></div>':'')+
     '<button class="btn btn-pr btn-sm" onclick="saveBillConfig()">💾 บันทึกตั้งค่าบิล</button></div>';
 }
+function renderSettingsConnect(s){
+  var apiOk=!!s.apiUrl;var lineOk=!!s.lineChannelToken;
+  return '<div class="grid g2">'+
+    '<div class="card"><div class="card-title">📊 Google Sheets API</div>'+
+    '<div style="margin-bottom:10px"><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅ เชื่อมต่อแล้ว':'❌ ยังไม่ได้ตั้งค่า')+'</span></div>'+
+    '<div class="form-group"><label class="form-label">Apps Script URL</label><input id="cn-api-url" type="text" value="'+(s.apiUrl||'')+'" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:12px"></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">วิธีได้ URL: Google Sheets → Extensions → Apps Script → Deploy → Web app → Copy URL</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    '<button class="btn btn-out btn-sm" onclick="testApiConnection()">🔌 ทดสอบ</button>'+
+    '<button class="btn btn-gn btn-sm" onclick="syncPushAll()">📤 Push ข้อมูลขึ้น Cloud</button>'+
+    '<button class="btn btn-am btn-sm" onclick="syncPullAll()">📥 Pull ข้อมูลจาก Cloud</button>'+
+    '</div>'+
+    (apiOk?'<div style="margin-top:8px;padding:8px;background:var(--gnl);border-radius:6px;font-size:11px"><strong>Sync ล่าสุด:</strong> '+(lastSyncTime?lastSyncTime.toLocaleString('th-TH'):'ยังไม่เคย sync')+'</div>':'')+
+    '</div>'+
+    '<div class="card"><div class="card-title">📱 LINE Messaging API</div>'+
+    '<div style="margin-bottom:10px"><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅ เชื่อมต่อแล้ว':'⏳ Phase 2 — ยังไม่เปิดใช้')+'</span></div>'+
+    '<div class="form-group"><label class="form-label">Channel Access Token</label><input id="cn-line-token" type="password" value="'+(s.lineChannelToken||'')+'" placeholder="ใส่ Channel Access Token จาก LINE Developers"></div>'+
+    '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
+    '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
+    '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    '</div></div>'+
+    '<div class="card"><div class="card-title">📋 สรุปการเชื่อมต่อ</div>'+
+    '<table><tr><th>บริการ</th><th>สถานะ</th><th>ใช้สำหรับ</th></tr>'+
+    '<tr><td>📊 Google Sheets</td><td><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅':'❌')+'</span></td><td>Sync ข้อมูลทุกอย่าง + หลายอุปกรณ์</td></tr>'+
+    '<tr><td>📱 LINE Messaging</td><td><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅':'⏳')+'</span></td><td>แจ้งสถานะลูกค้า + ส่งบิล</td></tr>'+
+    '<tr><td>🗺️ Google Maps</td><td><span class="badge bg-gr">⏳ Phase 3</span></td><td>คำนวณค่าส่งตามระยะทาง</td></tr>'+
+    '</table></div>';
+}
+function saveConnectionSettings(){
+  var s=getShopSettings();
+  var url=$('cn-api-url')?$('cn-api-url').value.trim():'';
+  var token=$('cn-line-token')?$('cn-line-token').value.trim():'';
+  var secret=$('cn-line-secret')?$('cn-line-secret').value.trim():'';
+  var oa=$('cn-line-oa')?$('cn-line-oa').value.trim():'';
+  if(url) s.apiUrl=url; else delete s.apiUrl;
+  if(token) s.lineChannelToken=token; else delete s.lineChannelToken;
+  if(secret) s.lineChannelSecret=secret; else delete s.lineChannelSecret;
+  if(oa) s.lineOA=oa;
+  saveDB();logAction('CHANGE_SETTINGS','อัปเดตการเชื่อมต่อ');
+  toast('💾 บันทึกการเชื่อมต่อสำเร็จ ✅');
+  showSettingsTab(document.querySelector('.tab.act'),'connect');
+}
+async function testApiConnection(){
+  var url=$('cn-api-url')?$('cn-api-url').value.trim():'';
+  if(!url){toast('กรอก URL ก่อน','err');return}
+  toast('🔌 กำลังทดสอบ...','info');
+  try{
+    var data=await new Promise(function(resolve,reject){
+      var cbName='_test_'+Date.now();
+      var timeout=setTimeout(function(){delete window[cbName];reject(new Error('Timeout — ตรวจสอบ URL หรือ Deploy ใหม่'))},15000);
+      window[cbName]=function(d){clearTimeout(timeout);delete window[cbName];resolve(d)};
+      var sc=document.createElement('script');
+      sc.src=url+'?action=ping&callback='+cbName;
+      sc.onerror=function(){clearTimeout(timeout);delete window[cbName];reject(new Error('ไม่สามารถเชื่อมต่อ URL นี้ได้'))};
+      document.head.appendChild(sc);
+    });
+    if(data.ok) toast('✅ เชื่อมต่อสำเร็จ! API v'+(data.v||'?'));
+    else toast('❌ API ตอบกลับผิดพลาด','err');
+  }catch(err){toast('❌ '+err.message,'err')}
+}
+
 function renderSettingsDelivery(s){
   const tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
   return '<div class="card"><div class="card-title">🚗 ค่าจัดส่ง — Delivery Tiers</div>'+
@@ -3144,8 +3208,9 @@ function cnCalcNet(){
 }
 
 // ═══ GOOGLE SHEETS SYNC ═══
-const API_URL='https://script.google.com/macros/s/AKfycby5XQGUrXcvIIklRCtR0lqP2TCpKaKySKyNZfkKDWh9cqD2SQ2p716d0Bd7dki9GHke/exec';
-let syncStatus='idle'; // idle|syncing|success|error
+function getApiUrl(){var s=getShopSettings();return s.apiUrl||''}
+function getLineToken(){var s=getShopSettings();return s.lineChannelToken||''}
+let syncStatus='idle';
 let lastSyncTime=null;
 
 async function apiCall(action,sheet,body){
@@ -3154,7 +3219,7 @@ async function apiCall(action,sheet,body){
     var data;
     if(body&&Object.keys(body).length){
       // WRITE: POST with no-cors (fire-and-forget, then verify with GET)
-      var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'');
+      var url=getApiUrl()+'?action='+action+(sheet?'&sheet='+sheet:'');
       await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(body)});
       data={ok:true,note:'sent'};
     }else{
@@ -3183,7 +3248,7 @@ function jsonpCall(action,sheet){
       if(s.parentNode)s.parentNode.removeChild(s);
       resolve(data);
     };
-    var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'')+'&callback='+cbName;
+    var url=getApiUrl()+'?action='+action+(sheet?'&sheet='+sheet:'')+'&callback='+cbName;
     var s=document.createElement('script');
     s.src=url;s.onerror=function(){clearTimeout(timeout);delete window[cbName];s.parentNode.removeChild(s);reject(new Error('Script load failed'))};
     document.head.appendChild(s);
@@ -3192,30 +3257,40 @@ function jsonpCall(action,sheet){
 
 // ── Push all data to Sheets (per-sheet) ──
 async function syncPushAll(){
-  toast('📤 กำลัง sync ขึ้น Cloud...','info');
+  var apiUrl=getApiUrl();
+  if(!apiUrl){toast('⚠️ ยังไม่ได้ตั้งค่า API URL — ไปที่ ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return}
+  toast('📤 กำลัง sync ขึ้น Cloud (15 sheets)...','info');
+  var allOrders=DB.orders||[];
   var sheets={
-    orders:DB.orders||[],
+    orders:allOrders,
+    orders_laundry:allOrders.filter(function(o){return o.type==='laundry'}),
+    orders_package:allOrders.filter(function(o){return o.type==='pkg_buy'||o.type==='quota'}),
+    orders_bedset:allOrders.filter(function(o){return o.type==='bedset'}),
+    orders_cleaning:allOrders.filter(function(o){return o.type==='cleaning'}),
     members:DB.members||[],
     quotas:DB.quotas||[],
     promos:DB.promos||[],
     expenses:DB.expenses||[],
     shifts:DB.shifts||[],
     pricelist:CAT.map(function(it){return{c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:it.p,k:it.k,pt:it.pt||'fixed',sku:it.sku||''}}),
+    bed_sets:BED_SETS.map(function(b){return{size:b.size,label:b.label,price:b.price,cost:b.cost,items:JSON.stringify(b.items)}}),
+    cln_svcs:CLN_SVCS.map(function(s){return{type:s.type,label:s.label,minPrice:s.minPrice,cost:s.cost}}),
+    packages:PKGS.map(function(p){return{type:p.type,qty:p.qty,price:p.price,cost:p.cost,expDays:p.expDays}}),
     settings:Object.keys(getShopSettings()).map(function(k){var v=getShopSettings()[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}})
   };
   var success=0;
   for(var name in sheets){
     if(sheets[name].length){
       try{
-        var url=API_URL+'?action=replaceAll&sheet='+name;
+        var url=apiUrl+'?action=replaceAll&sheet='+name;
         await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({rows:sheets[name]})});
         success++;
       }catch(e){console.error('Push '+name+' failed:',e)}
     }
   }
   syncStatus='success';lastSyncTime=new Date();updSyncUI();
-  toast('✅ Sync สำเร็จ! ('+success+' sheets)');
-  logAction('SYNC_PUSH','Push to Google Sheets');
+  toast('✅ Sync สำเร็จ! ('+success+'/15 sheets)');
+  logAction('SYNC_PUSH','Push to Google Sheets (15 sheets)');
 }
 
 // ── Pull all data from Sheets ──
@@ -3237,6 +3312,21 @@ async function syncPullAll(){
       CAT.length=0;
       d.pricelist.forEach(function(it){CAT.push({c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:Number(it.p)||0,k:Number(it.k)||0,pt:it.pt||'fixed',sku:it.sku||''})});
       CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
+    }
+    // Update BED_SETS from bed_sets sheet
+    if(d.bed_sets&&d.bed_sets.length){
+      BED_SETS.length=0;
+      d.bed_sets.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});
+    }
+    // Update CLN_SVCS from cln_svcs sheet
+    if(d.cln_svcs&&d.cln_svcs.length){
+      CLN_SVCS.length=0;
+      d.cln_svcs.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});
+    }
+    // Update PKGS from packages sheet
+    if(d.packages&&d.packages.length){
+      PKGS.length=0;
+      d.packages.forEach(function(p){PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});
     }
     // Restore settings
     if(d.settings&&d.settings.length){
@@ -3276,7 +3366,7 @@ saveDB=function(){
   // Debounce: sync 10 seconds after last save
   if(syncTimer) clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
-    if(API_URL&&curUser) syncPushAll();
+    if(getApiUrl()&&curUser) syncPushAll();
   },10000);
 };
 
@@ -3303,7 +3393,7 @@ function openSyncPanel(){
     '</div>'+
     '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--t3)">'+
     '<strong>Auto-sync:</strong> ระบบ sync อัตโนมัติ 10 วินาทีหลังบันทึกข้อมูล<br>'+
-    '<strong>URL:</strong> <code style="font-size:10px;word-break:break-all">'+API_URL.substring(0,60)+'...</code>'+
+    '<strong>URL:</strong> <code style="font-size:10px;word-break:break-all">'+(getApiUrl()||'ยังไม่ได้ตั้งค่า').substring(0,60)+'...</code>'+
     '</div></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSync\').remove()">ปิด</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
