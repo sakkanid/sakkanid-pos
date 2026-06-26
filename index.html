@@ -3385,26 +3385,32 @@ async function syncPullSilent(){
     var data=await jsonpCall('getFullDB','');
     if(!data.ok||!data.data) return;
     var d=data.data;var changed=false;
-    if(d.orders&&d.orders.length!==(DB.orders||[]).length){DB.orders=d.orders.map(fixOrder);changed=true}
-    if(d.members&&d.members.length!==(DB.members||[]).length){DB.members=d.members;changed=true}
-    if(d.quotas&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
-    if(d.promos&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
-    if(d.expenses&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
-    if(d.pricelist&&d.pricelist.length){
+    // CRITICAL: only update if cloud has data (never overwrite with empty!)
+    if(d.orders&&d.orders.length>0&&d.orders.length!==(DB.orders||[]).length){DB.orders=d.orders.map(fixOrder);changed=true}
+    if(d.members&&d.members.length>0&&d.members.length!==(DB.members||[]).length){DB.members=d.members;changed=true}
+    if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
+    if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
+    if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
+    if(d.pricelist&&d.pricelist.length>0){
       var newP=d.pricelist.some(function(it,i){var o=CAT[i];return !o||Number(it.p)!==o.p});
       if(newP){CAT.length=0;d.pricelist.forEach(function(it){CAT.push({c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:Number(it.p)||0,k:Number(it.k)||0,pt:it.pt||'fixed',sku:it.sku||''})});CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});changed=true}
     }
-    if(d.bed_sets&&d.bed_sets.length){
+    if(d.bed_sets&&d.bed_sets.length>0){
       var bc=d.bed_sets.some(function(b,i){var o=BED_SETS[i];return !o||Number(b.price)!==o.price});
       if(bc){BED_SETS.length=0;d.bed_sets.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});changed=true}
     }
-    if(d.cln_svcs&&d.cln_svcs.length){
+    if(d.cln_svcs&&d.cln_svcs.length>0){
       var cc=d.cln_svcs.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice});
       if(cc){CLN_SVCS.length=0;d.cln_svcs.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});changed=true}
     }
-    if(d.packages&&d.packages.length){
+    if(d.packages&&d.packages.length>0){
       var pc=d.packages.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price});
       if(pc){PKGS.length=0;d.packages.forEach(function(p){PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});changed=true}
+    }
+    if(d.settings&&d.settings.length>0){
+      d.settings.forEach(function(s){
+        if(s.key&&s.value!==undefined){try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}}
+      });
     }
     if(changed){
       originalSaveDB();syncStatus='success';lastSyncTime=new Date();updSyncUI();
