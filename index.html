@@ -122,7 +122,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip:hover{border-color:var(--pr);color:var(--pr)}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:80mm;font-size:12px}#printArea.print-a4{width:210mm;font-size:13px}#printArea.print-a5{width:148mm;font-size:11px}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:50%;top:0;transform:translateX(-50%);width:80mm;font-size:12px}#printArea.print-a4{width:190mm;font-size:13px}#printArea.print-a5{width:138mm;font-size:11px}@page{margin:10mm}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -477,24 +477,38 @@ function getActivePromos(){
   return (DB.promos||[]).filter(p=>p.active && (!p.startDate||p.startDate<=today) && (!p.exp||p.exp>=today));
 }
 function pts4(net){const s=getShopSettings();const rate=s.ptsRate||100;return Math.floor(net/rate)}
+function fmtPhone(p){
+  if(!p) return '';
+  var s=String(p).replace(/[^0-9]/g,'');
+  if(s.length>=9&&s.charAt(0)!=='0') s='0'+s;
+  if(s.length===10) return s.slice(0,3)+'-'+s.slice(3,6)+'-'+s.slice(6);
+  return s;
+}
 function logAction(action,detail){
   if(!DB.auditLog) DB.auditLog=[];
   DB.auditLog.push({ts:new Date().toISOString(),user:curUser?curUser.nick:'',role:curUser?curUser.role:'',action,detail});
   if(DB.auditLog.length>5000) DB.auditLog=DB.auditLog.slice(-3000);
 }
 function formatBillDate(dt){
-  if(!dt) return fmtDT();
-  // Already formatted dd/mm/yyyy
-  if(typeof dt==='string'&&dt.match(/^\d{2}\/\d{2}\/\d{4}/)) return dt;
-  // ISO format
+  if(!dt) return formatBillDate(new Date().toISOString());
   try{
-    var d=new Date(dt);if(isNaN(d)) return dt;
+    var d;
+    // Already formatted dd/mm/yyyy — parse it
+    if(typeof dt==='string'&&dt.match(/^\d{2}\/\d{2}\/\d{4}/)){
+      var parts=dt.split(/[\/ :]/);
+      var yr=parseInt(parts[2]);
+      if(yr>2500) yr=yr-543; // Convert Buddhist to CE
+      var timePart=parts[3]?parts[3]+':'+parts[4]:'';
+      return parts[0]+'/'+parts[1]+'/'+yr+(timePart?' '+timePart+' น.':'');
+    }
+    // ISO or other format
+    d=new Date(dt);if(isNaN(d)) return dt;
     var dd=String(d.getDate()).padStart(2,'0');
     var mm=String(d.getMonth()+1).padStart(2,'0');
-    var yy=d.getFullYear()+543;
+    var yy=d.getFullYear(); // CE year (ค.ศ.)
     var hh=String(d.getHours()).padStart(2,'0');
     var mi=String(d.getMinutes()).padStart(2,'0');
-    return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
+    return dd+'/'+mm+'/'+yy+' '+hh+':'+mi+' น.';
   }catch(e){return dt}
 }
 function getPayMethods(){return (getShopSettings().paymentMethods||PAY_METHODS_DEFAULT).filter(m=>m.active)}
@@ -2999,22 +3013,23 @@ function addExpenseCategory(){
 // ═══ IMPROVED BILL — GROUPED BY CATEGORY ═══
 function buildBillHTML(o){
   var s=getShopSettings();var bc=s.billConfig||{};var paid=isPaidCheck(o);
-  var h='<div style="width:80mm;font-family:var(--ff);font-size:'+(bc.fontSize||12)+'px;padding:8px;color:#000;background:#fff;font-weight:'+(bc.fontWeight||600)+'">';
+  var h='<div style="width:80mm;font-family:var(--ff);font-size:'+(bc.fontSize||12)+'px;padding:8px;color:#000;background:#fff;font-weight:'+(bc.fontWeight||600)+';margin:0 auto">';
   // ── Header ──
-  var logoH=(bc.logoSize||36);
-  if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:4px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
+  var logoH=(bc.logoSize||50);
+  if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:6px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
   h+='<div style="text-align:center;font-weight:800;font-size:15px">'+(bc.headerText||s.shopName)+'</div>'+
-    '<div style="text-align:center;font-size:11px;color:#666;margin-bottom:2px">'+s.phone+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div>';
-  if(s.address) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:2px">'+s.address+'</div>';
+    '<div style="text-align:center;font-size:11px;color:#666;margin-bottom:2px">'+fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div>';
+  if(s.address) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:1px">'+s.address+'</div>';
+  if(bc.taxId) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:2px">เลขประจำตัวผู้เสียภาษี: '+bc.taxId+'</div>';
   // ── Document type + ID + Date ──
   h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
     '<div style="text-align:center;font-weight:800;font-size:14px;margin:4px 0">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
     '<div style="text-align:center;font-size:12px;font-weight:600">เลขที่: '+o.id+'</div>'+
     '<div style="text-align:center;font-size:11px;color:#666">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
-    '<div style="text-align:center;font-size:10px;color:#888">โดย: '+o.by+'</div>';
-  // ── Customer + Pickup date (right after name) ──
+    '<div style="text-align:left;font-size:10px;color:#888">แคชเชียร์: '+o.by+'</div>';
+  // ── Customer + Pickup date ──
   h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
-    '<div style="font-size:12px"><strong>'+o.mname+'</strong> · '+o.mphone+'</div>';
+    '<div style="font-size:12px"><strong>'+o.mname+'</strong> · '+fmtPhone(o.mphone)+'</div>';
   if(o.pickupDate) h+='<div style="font-size:11px;color:#006F98;font-weight:600">'+(o.type==='cleaning'?'🧹 วันนัดทำความสะอาด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' เวลา '+o.cleanTime:'')+'</div>';
   h+='<div style="font-size:10px;color:#666">'+(o.delivery==='delivery'?'🚗 Delivery: '+o.deliveryAddr:o.delivery==='onsite'?'📍 สถานที่: '+(o.deliveryAddr||'-'):'🏪 รับเอง')+'</div>';
   // ── Items grouped by category ──
@@ -3082,7 +3097,6 @@ function buildBillHTML(o){
   // ── Footer ──
   h+='<div style="border-top:1px dashed #999;margin:6px 0"></div>';
   h+='<div style="text-align:center;font-size:'+(bc.fontSize?bc.fontSize-2:10)+'px;color:#999">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
-  if(bc.taxId) h+='<div style="text-align:center;font-size:9px;color:#999">เลขภาษี: '+bc.taxId+'</div>';
   if(bc.footerImage) h+='<div style="text-align:center;margin-top:4px"><img src="'+bc.footerImage+'" style="max-height:50px;max-width:100%"></div>';
   if(!paid&&s.payQR) h+='<div style="text-align:center;margin-top:6px"><div style="font-size:10px;color:#666;margin-bottom:2px">สแกนชำระเงิน</div><img src="'+s.payQR+'" style="max-height:'+(bc.qrPaySize||80)+'px"></div>';
   h+='</div>';return h;
