@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap');
 :root{
@@ -479,6 +480,21 @@ function logAction(action,detail){
   if(!DB.auditLog) DB.auditLog=[];
   DB.auditLog.push({ts:new Date().toISOString(),user:curUser?curUser.nick:'',role:curUser?curUser.role:'',action,detail});
   if(DB.auditLog.length>5000) DB.auditLog=DB.auditLog.slice(-3000);
+}
+function formatBillDate(dt){
+  if(!dt) return fmtDT();
+  // Already formatted dd/mm/yyyy
+  if(typeof dt==='string'&&dt.match(/^\d{2}\/\d{2}\/\d{4}/)) return dt;
+  // ISO format
+  try{
+    var d=new Date(dt);if(isNaN(d)) return dt;
+    var dd=String(d.getDate()).padStart(2,'0');
+    var mm=String(d.getMonth()+1).padStart(2,'0');
+    var yy=d.getFullYear()+543;
+    var hh=String(d.getHours()).padStart(2,'0');
+    var mi=String(d.getMinutes()).padStart(2,'0');
+    return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
+  }catch(e){return dt}
 }
 function getPayMethods(){return (getShopSettings().paymentMethods||PAY_METHODS_DEFAULT).filter(m=>m.active)}
 function getStClass(st){
@@ -1166,7 +1182,7 @@ function showBill(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>🧾 บิล '+o.id+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center">'+buildBillHTML(o)+'</div>'+
-    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+oid+'\')">📸 บันทึกรูป</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
   openMo('moBill');
 }
 function doPrint(oid){
@@ -1175,6 +1191,19 @@ function doPrint(oid){
   $('printArea').innerHTML=billEl.innerHTML;$('printArea').style.display='block';
   window.print();
   setTimeout(()=>{$('printArea').style.display='none'},500);
+}
+function saveBillImage(oid){
+  var billEl=$('moBillIn').querySelector('.modal-body');
+  if(!billEl){toast('ไม่พบบิล','err');return}
+  if(typeof html2canvas==='undefined'){toast('กำลังโหลด... ลองกดอีกครั้ง','warn');return}
+  toast('📸 กำลังบันทึกรูปบิล...','info');
+  html2canvas(billEl,{scale:2,backgroundColor:'#ffffff',useCORS:true}).then(function(canvas){
+    var link=document.createElement('a');
+    link.download='SAKKANID_bill_'+oid+'_'+todayStr().replace(/-/g,'')+'.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    toast('📸 บันทึกรูปบิลสำเร็จ ✅');
+  }).catch(function(e){toast('❌ บันทึกรูปล้มเหลว: '+e.message,'err')});
 }
 
 // ═══ EDIT ORDER — FULL EDITING ═══
@@ -1610,7 +1639,7 @@ function renderHistoryList(done){
 }
 function filterHistory(){
   const q=($('histSearch')?$('histSearch').value:'').toLowerCase();
-  const done=DB.orders.filter(o=>['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)&&(o.id.toLowerCase().includes(q)||o.mname.toLowerCase().includes(q))).reverse();
+  const done=DB.orders.filter(o=>['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)&&(o.id.toLowerCase().includes(q)||(o.mname||'').toLowerCase().includes(q))).reverse();
   $('histList').innerHTML=renderHistoryList(done);
 }
 function exportHistory(){
@@ -1975,43 +2004,44 @@ function renderSKUReport(){
 // ═══ EXPORT REPORT CSV ═══
 function exportReportCSV(type){
   var csv='',filename='SAKKANID_report_'+type+'_'+todayStr().replace(/-/g,'')+'.csv';
+  var fd=function(dt){return formatBillDate(dt)};
   if(type==='sku'){
-    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ต้นทุน,กำไร\n';
-    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+(it.k*it.qty)+','+((it.p-it.k)*it.qty)+'\n'})});
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ต้นทุน,กำไร\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+(it.k*it.qty)+','+((it.p-it.k)*it.qty)+'\n'})});
   }else if(type==='unpaid'){
-    csv='เลขออเดอร์,ลูกค้า,เบอร์โทร,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,ชำระแล้ว,ค้างชำระ,สถานะ,วันที่\n';
-    DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status)).forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+o.mphone+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+paidTotal(o)+','+remaining(o)+','+o.status+','+o.createdAt+'\n'})});
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,เบอร์โทร,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,ชำระแล้ว,ค้างชำระ,สถานะ\n';
+    DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&!['เสร็จสิ้น','ปิดงาน'].includes(o.status)).forEach(o=>{(o.items||[]).forEach(it=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+String(o.mphone||'')+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+paidTotal(o)+','+remaining(o)+','+o.status+'\n'})});
   }else if(type==='member'){
-    csv='ID สมาชิก,ชื่อ,ระดับ,เลขออเดอร์,ประเภท,ยอด,สถานะ,วันที่\n';
-    DB.members.forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=m.id+','+m.name+','+m.level+','+o.id+','+o.type+','+o.net+','+o.status+','+o.createdAt+'\n'})}else{csv+=m.id+','+m.name+','+m.level+',ไม่มีออเดอร์,-,-,-,-\n'}});
+    csv='วันที่สร้าง,ID สมาชิก,ชื่อ,ระดับ,เลขออเดอร์,ประเภท,ยอด,สถานะ\n';
+    DB.members.forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=fd(o.createdAt)+','+m.id+','+m.name+','+m.level+','+o.id+','+o.type+','+o.net+','+o.status+'\n'})}else{csv+='-,'+m.id+','+m.name+','+m.level+',ไม่มีออเดอร์,-,-,-\n'}});
   }else if(type==='staff'){
-    csv='พนักงาน,เลขออเดอร์,ลูกค้า,ประเภท,ยอด,สถานะ,วันที่\n';
-    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{csv+=(o.by||'-')+','+o.id+','+o.mname+','+o.type+','+o.net+','+o.status+','+o.createdAt+'\n'});
+    csv='วันที่สร้าง,พนักงาน,เลขออเดอร์,ลูกค้า,ประเภท,ยอด,สถานะ\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{csv+=fd(o.createdAt)+','+(o.by||'-')+','+o.id+','+o.mname+','+o.type+','+o.net+','+o.status+'\n'});
   }else if(type==='daily'||type==='order'){
-    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ประเภทบริการ,ส่วนลด,ยอดสุทธิ,ชำระ,สถานะ,โดย,วันที่\n';
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ประเภทบริการ,ส่วนลด,ยอดสุทธิ,ชำระ,สถานะ,โดย\n';
     DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{
-      (o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
-      (o.extras||[]).forEach(e=>{csv+=o.id+','+o.mname+',บริการเพิ่มเติม,'+e.name+',-,'+e.price+',1,'+e.price+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+','+o.createdAt+'\n'});
+      (o.items||[]).forEach(it=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+'\n'});
+      (o.extras||[]).forEach(e=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+',บริการเพิ่มเติม,'+e.name+',-,'+e.price+',1,'+e.price+','+o.type+','+(o.disc||0)+','+o.net+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.by+'\n'});
     });
   }else if(type==='financial'){
-    csv='เลขออเดอร์,ลูกค้า,ประเภท,ยอด,ต้นทุน,กำไร,วิธีชำระ,ชำระ,สถานะ,วันที่\n';
-    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{var methods=(o.payHist||[]).map(p=>p.method).join('+');csv+=o.id+','+o.mname+','+o.type+','+o.net+','+(o.cost||0)+','+(o.net-(o.cost||0))+','+(methods||'-')+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+','+o.createdAt+'\n'});
-    csv+='\nสรุป,,,,,,,,,\nรายรับ,'+DB.orders.filter(o=>o.status!=='ยกเลิก'&&isPaidCheck(o)).reduce((s,o)=>s+netOf(o),0)+'\nต้นทุน,'+DB.orders.filter(o=>o.status!=='ยกเลิก').reduce((s,o)=>s+(o.cost||0),0)+'\nค่าใช้จ่าย,'+(DB.expenses||[]).reduce((s,e)=>s+e.amount,0)+'\n';
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,ประเภท,ยอด,ต้นทุน,กำไร,วิธีชำระ,ชำระ,สถานะ\n';
+    DB.orders.filter(o=>o.status!=='ยกเลิก').forEach(o=>{var methods=(o.payHist||[]).map(p=>p.method).join('+');csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+o.type+','+o.net+','+(o.cost||0)+','+(o.net-(o.cost||0))+','+(methods||'-')+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.status+'\n'});
+    csv+='\nสรุป,,,,,,,,\nรายรับ,'+DB.orders.filter(o=>o.status!=='ยกเลิก'&&isPaidCheck(o)).reduce((s,o)=>s+netOf(o),0)+'\nต้นทุน,'+DB.orders.filter(o=>o.status!=='ยกเลิก').reduce((s,o)=>s+(o.cost||0),0)+'\nค่าใช้จ่าย,'+(DB.expenses||[]).reduce((s,e)=>s+e.amount,0)+'\n';
   }else if(type==='quota'){
-    csv='เลขออเดอร์ซื้อ,สมาชิก,Package,ใช้แล้ว,คงเหลือ,ซื้อเมื่อ,หมดอายุ\n';
-    (DB.quotas||[]).forEach(q=>{var m=gM(q.mid);var buyOrder=DB.orders.find(o=>o.type==='pkg_buy'&&o.mid===q.mid&&o.createdAt&&o.createdAt.includes(q.buyDate));csv+=(buyOrder?buyOrder.id:'-')+','+(m?m.name:q.mid)+','+q.pkgName+','+q.used+','+q.remain+','+q.buyDate+','+q.exp+'\n'});
+    csv='วันที่ซื้อ,เลขออเดอร์ซื้อ,สมาชิก,Package,ใช้แล้ว,คงเหลือ,หมดอายุ\n';
+    (DB.quotas||[]).forEach(q=>{var m=gM(q.mid);var buyOrder=DB.orders.find(o=>o.type==='pkg_buy'&&o.mid===q.mid);csv+=(q.buyDate||'-')+','+(buyOrder?buyOrder.id:'-')+','+(m?m.name:q.mid)+','+q.pkgName+','+q.used+','+q.remain+','+q.exp+'\n'});
   }else if(type==='cleaning'||type==='laundry'||type==='bedset'){
-    csv='เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,สถานะ,ชำระ,วันที่\n';
-    DB.orders.filter(o=>o.type===type).forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.createdAt+'\n'})});
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,หมวด,ประเภท,ตัวเลือก,ราคา/ชิ้น,จำนวน,รวม,ยอดสุทธิ,สถานะ,ชำระ\n';
+    DB.orders.filter(o=>o.type===type).forEach(o=>{(o.items||[]).forEach(it=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+it.c+','+it.t+','+(it.o||'-')+','+it.p+','+it.qty+','+(it.p*it.qty)+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+'\n'})});
   }else if(type==='delivery'){
-    csv='เลขออเดอร์,ลูกค้า,ที่อยู่,ค่าส่ง,หมวด,ประเภท,จำนวน,ยอดสุทธิ,สถานะ,ชำระ,วันที่\n';
-    DB.orders.filter(o=>o.delivery==='delivery'&&o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=o.id+','+o.mname+','+(o.deliveryAddr||'')+','+o.delCost+','+it.c+','+it.t+','+it.qty+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+','+o.createdAt+'\n'})});
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,ที่อยู่,ค่าส่ง,หมวด,ประเภท,จำนวน,ยอดสุทธิ,สถานะ,ชำระ\n';
+    DB.orders.filter(o=>o.delivery==='delivery'&&o.status!=='ยกเลิก').forEach(o=>{(o.items||[]).forEach(it=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+(o.deliveryAddr||'')+','+o.delCost+','+it.c+','+it.t+','+it.qty+','+o.net+','+o.status+','+(isPaidCheck(o)?'ชำระแล้ว':'ค้าง')+'\n'})});
   }else if(type==='promo'){
-    csv='เลขออเดอร์,ลูกค้า,โปรโมชั่น,ส่วนลด,ยอดสุทธิ,สถานะ,วันที่\n';
-    DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{csv+=o.id+','+o.mname+','+o.promo+','+(o.disc||0)+','+o.net+','+o.status+','+o.createdAt+'\n'});
+    csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,โปรโมชั่น,ส่วนลด,ยอดสุทธิ,สถานะ\n';
+    DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+o.promo+','+(o.disc||0)+','+o.net+','+o.status+'\n'});
   }else if(type==='top'||type==='monthly'){
-    csv='ลูกค้า,ระดับ,เลขออเดอร์,ประเภท,ยอด,วันที่\n';
-    DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=m.name+','+m.level+','+o.id+','+o.type+','+o.net+','+o.createdAt+'\n'})}else{csv+=m.name+','+m.level+',ไม่มีออเดอร์,-,-,-\n'}});
+    csv='วันที่สร้าง,ลูกค้า,ระดับ,เลขออเดอร์,ประเภท,ยอด\n';
+    DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=fd(o.createdAt)+','+m.name+','+m.level+','+o.id+','+o.type+','+o.net+'\n'})}else{csv+='-,'+m.name+','+m.level+',ไม่มีออเดอร์,-,-\n'}});
   }
   if(csv){
     const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
@@ -2020,7 +2050,6 @@ function exportReportCSV(type){
   }
 }
 
-// ═══ PRICELIST PAGE ═══
 function renderPricelistPage(c){
   c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
   '<div class="card" id="priceContent"><div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหาบริการ..." oninput="filterPricelist()"></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
@@ -2484,7 +2513,7 @@ function uqSave(){
 function globalSearch(q){
   if(!q||q.length<2) return;
   q=q.toLowerCase();
-  const orders=DB.orders.filter(o=>o.id.toLowerCase().includes(q)||o.mname.toLowerCase().includes(q)||o.mphone.includes(q)).slice(0,10);
+  const orders=DB.orders.filter(o=>o.id.toLowerCase().includes(q)||(o.mname||'').toLowerCase().includes(q)||(String(o.mphone||'')).includes(q)).slice(0,10);
   const members=DB.members.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q)||m.id.toLowerCase().includes(q)).slice(0,5);
   let h='<div class="card"><div class="card-title">🔍 ผลการค้นหา "'+q+'"</div>';
   if(orders.length){
@@ -2775,7 +2804,7 @@ function buildBillHTML(o){
   h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
     '<div style="text-align:center;font-weight:800;font-size:14px;margin:4px 0">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
     '<div style="text-align:center;font-size:12px;font-weight:600">เลขที่: '+o.id+'</div>'+
-    '<div style="text-align:center;font-size:11px;color:#666">วันที่: '+o.createdAt+'</div>'+
+    '<div style="text-align:center;font-size:11px;color:#666">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
     '<div style="text-align:center;font-size:10px;color:#888">โดย: '+o.by+'</div>';
   // ── Customer + Pickup date (right after name) ──
   h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
@@ -3270,7 +3299,7 @@ async function syncPushAll(){
     orders_bedset:allOrders.filter(function(o){return o.type==='bedset'}),
     orders_cleaning:allOrders.filter(function(o){return o.type==='cleaning'}),
     members:DB.members||[],
-    quotas:DB.quotas||[],
+    quotas:(DB.quotas||[]).map(function(q){var m=gM(q.mid);return{id:q.id,mid:q.mid,mname:m?m.name:'',pkgName:q.pkgName,pkgType:q.pkgType,total:q.total,used:q.used,remain:q.remain,buyDate:q.buyDate,exp:q.exp}}),
     promos:DB.promos||[],
     expenses:DB.expenses||[],
     shifts:DB.shifts||[],
