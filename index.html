@@ -211,6 +211,7 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
         <div class="topbar-right">
           <div class="search-box" style="width:200px"><input id="globalSearchInput" placeholder="🔍 ค้นหาออเดอร์/สมาชิก..." onkeydown="if(event.key==='Enter')globalSearch(this.value)" style="font-size:12px;padding:6px 10px 6px 32px"></div>
           <span id="clockEl" style="font-family:var(--fm);font-size:12px;color:var(--t3)"></span>
+          <span id="syncIndicator" style="cursor:pointer" onclick="openSyncPanel()"><span style="font-size:11px">☁️ Cloud</span></span>
         </div>
       </div>
       <div class="content" id="mainContent"></div>
@@ -577,6 +578,8 @@ function initApp(){
   $('lockScreen').style.display='none';$('app').style.display='block';
   $('sfName').textContent=curUser.nick;$('sfRole').textContent=curUser.role;
   buildSidebar();navTo('dashboard');startClock();
+  // Initial sync from cloud
+  setTimeout(function(){syncTestConnection().then(function(){syncPullAll()})},2000);
 }
 function buildSidebar(){
   let h='',lastSec='';
@@ -3138,6 +3141,158 @@ function cnCalcNet(){
   if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){if(pr.type==='percent')disc=Math.round(price*pr.value/100);else if(pr.type!=='buyXfreeY')disc=pr.value||0}}
   var net=Math.max(0,price-disc);
   if($('cn-net-total'))$('cn-net-total').innerHTML='ยอดสุทธิ: '+thb(net)+(disc?'<div style="font-size:12px;color:var(--am)">🎁 ลด '+thb(disc)+'</div>':'');
+}
+
+// ═══ GOOGLE SHEETS SYNC ═══
+const API_URL='https://script.google.com/macros/s/AKfycby5XQGUrXcvIIklRCtR0lqP2TCpKaKySKyNZfkKDWh9cqD2SQ2p716d0Bd7dki9GHke/exec';
+let syncStatus='idle'; // idle|syncing|success|error
+let lastSyncTime=null;
+
+async function apiCall(action,sheet,body){
+  var url=API_URL+'?action='+action+(sheet?'&sheet='+sheet:'');
+  try{
+    syncStatus='syncing';updSyncUI();
+    var opts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body||{})};
+    if(action==='getAll'||action==='getFullDB'||action==='ping') opts={method:'GET'};
+    if(action==='getAll') url=API_URL+'?action=getAll&sheet='+sheet;
+    if(action==='getFullDB') url=API_URL+'?action=getFullDB';
+    if(action==='ping') url=API_URL+'?action=ping';
+    var resp=await fetch(url,opts);
+    // Apps Script redirects, follow manually
+    if(resp.status===302||resp.redirected){
+      resp=await fetch(resp.url||url,opts);
+    }
+    var data=await resp.json();
+    syncStatus=data.ok?'success':'error';
+    if(data.ok) lastSyncTime=new Date();
+    updSyncUI();
+    return data;
+  }catch(err){
+    syncStatus='error';updSyncUI();
+    console.error('API Error:',err);
+    return {ok:false,error:err.message};
+  }
+}
+
+// ── Push all data to Sheets ──
+async function syncPushAll(){
+  toast('📤 กำลัง sync ขึ้น Cloud...','info');
+  var pushData={
+    orders:DB.orders||[],
+    members:DB.members||[],
+    quotas:DB.quotas||[],
+    promos:DB.promos||[],
+    expenses:DB.expenses||[],
+    shifts:DB.shifts||[]
+  };
+  // Flatten pricelist from CAT
+  pushData.pricelist=CAT.map(function(it){return{c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:it.p,k:it.k,pt:it.pt||'fixed',sku:it.sku||''}});
+  // Settings as key-value
+  var s=getShopSettings();
+  pushData.settings=Object.keys(s).map(function(k){return{key:k,value:typeof s[k]==='object'?JSON.stringify(s[k]):String(s[k])}});
+  var result=await apiCall('syncPush','',pushData);
+  if(result.ok){
+    toast('✅ Sync สำเร็จ! ข้อมูลขึ้น Cloud แล้ว');
+    logAction('SYNC_PUSH','Push all data to Google Sheets');
+  }else{
+    toast('❌ Sync ล้มเหลว: '+(result.error||''),'err');
+  }
+  return result;
+}
+
+// ── Pull all data from Sheets ──
+async function syncPullAll(){
+  toast('📥 กำลังดึงข้อมูลจาก Cloud...','info');
+  var result=await apiCall('getFullDB');
+  if(result.ok&&result.data){
+    var d=result.data;
+    // Merge data
+    if(d.orders&&d.orders.length){DB.orders=d.orders.map(fixOrder)}
+    if(d.members&&d.members.length){DB.members=d.members}
+    if(d.quotas&&d.quotas.length){DB.quotas=d.quotas}
+    if(d.promos&&d.promos.length){DB.promos=d.promos}
+    if(d.expenses&&d.expenses.length){DB.expenses=d.expenses}
+    if(d.shifts&&d.shifts.length){DB.shifts=d.shifts}
+    // Update pricelist
+    if(d.pricelist&&d.pricelist.length){
+      CAT.length=0;
+      d.pricelist.forEach(function(it){CAT.push({c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:Number(it.p)||0,k:Number(it.k)||0,pt:it.pt||'fixed',sku:it.sku||''})});
+      CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
+    }
+    // Restore settings
+    if(d.settings&&d.settings.length){
+      d.settings.forEach(function(s){
+        if(s.key&&s.value!==undefined){
+          try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}
+        }
+      });
+    }
+    saveDB();
+    toast('✅ ดึงข้อมูลจาก Cloud สำเร็จ!');
+    logAction('SYNC_PULL','Pull all data from Google Sheets');
+    renderPage(curPage);
+  }else{
+    toast('❌ ดึงข้อมูลล้มเหลว: '+(result.error||''),'err');
+  }
+  return result;
+}
+
+// ── Fix order data types from Sheets ──
+function fixOrder(o){
+  if(typeof o.items==='string'){try{o.items=JSON.parse(o.items)}catch(e){o.items=[]}}
+  if(typeof o.extras==='string'){try{o.extras=JSON.parse(o.extras)}catch(e){o.extras=[]}}
+  if(typeof o.payHist==='string'){try{o.payHist=JSON.parse(o.payHist)}catch(e){o.payHist=[]}}
+  o.net=Number(o.net)||0;o.disc=Number(o.disc)||0;o.cost=Number(o.cost)||0;
+  o.delCost=Number(o.delCost)||0;o.pts=Number(o.pts)||0;
+  o.isPaid=o.isPaid===true||o.isPaid==='true';
+  return o;
+}
+
+// ── Auto-sync after save (debounced) ──
+let syncTimer=null;
+const originalSaveDB=saveDB;
+saveDB=function(){
+  originalSaveDB();
+  // Debounce: sync 10 seconds after last save
+  if(syncTimer) clearTimeout(syncTimer);
+  syncTimer=setTimeout(function(){
+    if(API_URL&&curUser) syncPushAll();
+  },10000);
+};
+
+// ── Sync UI indicator ──
+function updSyncUI(){
+  var el=$('syncIndicator');
+  if(!el) return;
+  var icons={idle:'☁️',syncing:'🔄',success:'✅',error:'❌'};
+  var labels={idle:'Cloud',syncing:'Syncing...',success:'Synced',error:'Error'};
+  el.innerHTML='<span style="font-size:11px;cursor:pointer" onclick="openSyncPanel()" title="Last sync: '+(lastSyncTime?lastSyncTime.toLocaleTimeString():'never')+'">'+icons[syncStatus]+' '+labels[syncStatus]+'</span>';
+}
+
+// ── Sync Panel (manual controls) ──
+function openSyncPanel(){
+  var h='<div class="modal-overlay show" id="moSync"><div class="modal"><div class="modal-head"><h3>☁️ Google Sheets Sync</h3><button class="modal-close" onclick="document.getElementById(\'moSync\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="grid g2" style="margin-bottom:12px">'+
+    '<div class="kpi"><div class="kpi-lbl">สถานะ</div><div class="kpi-val" style="font-size:16px">'+(syncStatus==='success'?'✅ เชื่อมต่อแล้ว':syncStatus==='syncing'?'🔄 กำลัง sync...':syncStatus==='error'?'❌ ผิดพลาด':'☁️ รอ sync')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">Sync ล่าสุด</div><div class="kpi-val" style="font-size:14px">'+(lastSyncTime?lastSyncTime.toLocaleString('th-TH'):'ยังไม่เคย sync')+'</div></div></div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button class="btn btn-pr" onclick="syncPushAll().then(function(){document.getElementById(\'moSync\').remove()})"><span style="font-size:18px">📤</span> Push ขึ้น Cloud (POS → Sheets)</button>'+
+    '<button class="btn btn-gn" onclick="syncPullAll().then(function(){document.getElementById(\'moSync\').remove()})"><span style="font-size:18px">📥</span> Pull จาก Cloud (Sheets → POS)</button>'+
+    '<button class="btn btn-am" onclick="syncTestConnection()">🔌 ทดสอบการเชื่อมต่อ</button>'+
+    '</div>'+
+    '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--t3)">'+
+    '<strong>Auto-sync:</strong> ระบบ sync อัตโนมัติ 10 วินาทีหลังบันทึกข้อมูล<br>'+
+    '<strong>URL:</strong> <code style="font-size:10px;word-break:break-all">'+API_URL.substring(0,60)+'...</code>'+
+    '</div></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSync\').remove()">ปิด</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+
+async function syncTestConnection(){
+  toast('🔌 กำลังทดสอบ...','info');
+  var r=await apiCall('ping');
+  if(r.ok) toast('✅ เชื่อมต่อสำเร็จ! API v'+r.version);
+  else toast('❌ เชื่อมต่อไม่ได้: '+(r.error||''),'err');
 }
 
 // ═══ BOOTSTRAP ═══
