@@ -122,7 +122,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip:hover{border-color:var(--pr);color:var(--pr)}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:80mm;font-size:12px}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:80mm;font-size:12px}#printArea.print-a4{width:210mm;font-size:13px}#printArea.print-a5{width:148mm;font-size:11px}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -544,7 +544,7 @@ function initLockScreen(){
   $('lockScreen').style.display='flex';$('app').style.display='none';
   // Update logo from settings
   var s=getShopSettings();
-  $('lockLogo').innerHTML=(s.logo?'<img src="'+s.logo+'" style="height:60px;margin-bottom:8px"><br>':'🫧 ')+s.shopName;
+  $('lockLogo').innerHTML=(s.logo?'<img src="'+s.logo+'" style="height:'+(s.loginLogoSize||80)+'px;display:block;margin:0 auto 8px"><div>'+s.shopName+'</div>':'<div>🫧 '+s.shopName+'</div>');
   $('lockSub').textContent='Laundry POS System';
   // Show ALL users with name + role (scrollable)
   var h='';USERS.forEach(function(u,i){
@@ -962,7 +962,7 @@ function openAddItemModal(){
     '<div class="form-group"><label class="form-label">ประเภทผ้า</label><select id="ai-type" onchange="onAITypeChange()"><option value="">— เลือกหมวดก่อน —</option></select></div>'+
     '<div class="form-group"><label class="form-label">ตัวเลือก</label><select id="ai-opt" onchange="fillAIPrice()"><option value="">— ไม่มี —</option></select></div>'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">ราคา/ชิ้น (฿)</label><input id="ai-price" type="number" readonly></div>'+
+    '<div class="form-group"><label class="form-label">ราคา/ชิ้น (฿)</label><input id="ai-price" type="number"><div id="ai-price-hint" style="display:none;font-size:11px;margin-top:4px"></div></div>'+
     '<div class="form-group"><label class="form-label">จำนวน</label><input id="ai-qty" type="number" value="1" min="1"></div>'+
     '</div></div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moAddItem\')">ยกเลิก</button><button class="btn btn-pr" onclick="confirmAddItem()">✅ เพิ่มรายการ</button></div>';
@@ -979,15 +979,31 @@ function onAITypeChange(){
   const opts=[...new Set(CAT.filter(x=>x.c===cat&&x.t===type).map(x=>x.o).filter(Boolean))];
   if(opts.length){
     $('ai-opt').innerHTML='<option value="">— เลือก —</option>'+opts.map(o=>'<option>'+o+'</option>').join('');
+    $('ai-opt').disabled=false;
   }else{
     $('ai-opt').innerHTML='<option value="">— ไม่มีตัวเลือก —</option>';
+    $('ai-opt').disabled=true;
     fillAIPrice();
   }
 }
 function fillAIPrice(){
   const cat=$('ai-cat').value,type=$('ai-type').value,opt=$('ai-opt').value;
   const item=CAT.find(x=>x.c===cat&&x.t===type&&(x.o===opt||(!opt&&!x.o)));
-  if(item) $('ai-price').value=item.p;
+  if(item){
+    $('ai-price').value=item.p;
+    // Show min++ indicator
+    var hint=$('ai-price-hint');
+    if(hint){
+      if(item.pt==='min++'){
+        hint.innerHTML='<span style="color:var(--am)">💡 ราคาเริ่มต้น '+thb(item.p)+' — แก้ไขราคาได้ตามจริง</span>';
+        hint.style.display='block';
+        $('ai-price').style.border='2px solid var(--am)';
+      }else{
+        hint.innerHTML='';hint.style.display='none';
+        $('ai-price').style.border='';
+      }
+    }
+  }
 }
 function confirmAddItem(){
   const cat=$('ai-cat').value,type=$('ai-type').value,opt=$('ai-opt')?$('ai-opt').value:'';
@@ -1195,9 +1211,15 @@ function showBill(oid){
 function doPrint(oid){
   const billEl=$('moBillIn').querySelector('.modal-body');
   if(!billEl) return;
-  $('printArea').innerHTML=billEl.innerHTML;$('printArea').style.display='block';
+  var pa=$('printArea');pa.innerHTML=billEl.innerHTML;
+  // Detect paper size from content
+  var content=billEl.innerHTML;
+  if(content.includes('width:210mm')) pa.className='print-a4';
+  else if(content.includes('width:148mm')) pa.className='print-a5';
+  else pa.className='';
+  pa.style.display='block';
   window.print();
-  setTimeout(()=>{$('printArea').style.display='none'},500);
+  setTimeout(()=>{pa.style.display='none';pa.className=''},500);
 }
 function saveBillImage(oid){
   var billEl=$('moBillIn').querySelector('.modal-body');
@@ -1322,7 +1344,9 @@ function generateDocument(oid){
   h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px"><tr style="background:#f0f0f0"><th style="text-align:left;padding:6px;border:1px solid #ddd">ลำดับ</th><th style="text-align:left;padding:6px;border:1px solid #ddd">รายการ</th><th style="text-align:center;padding:6px;border:1px solid #ddd">จำนวน</th><th style="text-align:right;padding:6px;border:1px solid #ddd">ราคา/หน่วย</th><th style="text-align:right;padding:6px;border:1px solid #ddd">จำนวนเงิน</th></tr>';
   var num=1;
   (o.items||[]).forEach(function(it){
-    h+='<tr><td style="padding:6px;border:1px solid #ddd;text-align:center">'+num+'</td><td style="padding:6px;border:1px solid #ddd">'+it.t+(it.o?' · '+it.o:'')+(it.te?'<br><span style="font-size:10px;color:#999">'+it.te+(it.oe?' '+it.oe:'')+'</span>':'')+'</td><td style="padding:6px;border:1px solid #ddd;text-align:center">'+it.qty+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb(it.p)+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb(it.p*it.qty)+'</td></tr>';
+    var itemName='ค่าบริการ'+(it.c?' '+it.c:'')+' — '+it.t+(it.o?' · '+it.o:'');
+    var itemEn=it.te?(it.te+(it.oe?' '+it.oe:'')):'';
+    h+='<tr><td style="padding:6px;border:1px solid #ddd;text-align:center">'+num+'</td><td style="padding:6px;border:1px solid #ddd">'+itemName+(itemEn?'<br><span style="font-size:10px;color:#999">'+itemEn+'</span>':'')+'</td><td style="padding:6px;border:1px solid #ddd;text-align:center">'+it.qty+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb(it.p)+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb(it.p*it.qty)+'</td></tr>';
     num++;
   });
   (o.extras||[]).forEach(function(e){
@@ -2127,11 +2151,12 @@ function renderUnpaidReport(){
     unpaid.map(o=>'<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+thb(o.net)+'</td><td style="color:var(--rd);font-weight:700">'+thb(remaining(o))+'</td><td>'+o.createdAt+'</td><td><button class="btn btn-am btn-sm" onclick="openPayModal(\''+o.id+'\')">💰 เก็บเงิน</button> <button class="btn btn-out btn-sm" onclick="showLinePreview(\''+o.id+'\')">📱 เรียกเก็บ</button></td></tr>').join('')+'</table>';
 }
 function renderMemberReport(){
-  const memberStats=DB.members.map(m=>{
+  var levelFilter=window._memberReportLevel||'';
+  const memberStats=DB.members.filter(function(m){return !levelFilter||m.level===levelFilter}).map(m=>{
     const orders=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');
     return{name:m.name,id:m.id,level:m.level,orderCount:orders.length,totalSpend:orders.reduce((s,o)=>s+netOf(o),0),avgSpend:orders.length?Math.round(orders.reduce((s,o)=>s+netOf(o),0)/orders.length):0};
   }).sort((a,b)=>b.totalSpend-a.totalSpend);
-  return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="font-size:13px;margin:0">👥 ยอดซื้อตามสมาชิก</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'member\')">📤 Export</button></div>'+
+  return '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div class="card-title" style="font-size:13px;margin:0">👥 ยอดซื้อตามสมาชิก ('+memberStats.length+' คน)</div><div style="display:flex;gap:6px"><select onchange="window._memberReportLevel=this.value;showRpt(\'member\')" style="font-size:12px;padding:4px 8px;border-radius:6px"><option value="">ทุกระดับ</option><option value="ทั่วไป" '+(levelFilter==='ทั่วไป'?'selected':'')+'>ทั่วไป</option><option value="Silver" '+(levelFilter==='Silver'?'selected':'')+'>Silver</option><option value="Gold" '+(levelFilter==='Gold'?'selected':'')+'>Gold</option><option value="VIP" '+(levelFilter==='VIP'?'selected':'')+'>VIP</option></select><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'member\')">📤 Export</button></div></div>'+
     '<table><tr><th>ลูกค้า</th><th>ระดับ</th><th>ออเดอร์</th><th>ยอดซื้อรวม</th><th>เฉลี่ย/ครั้ง</th></tr>'+
     memberStats.map(m=>'<tr onclick="viewMemberDetail(\''+m.id+'\')" style="cursor:pointer"><td><strong>'+m.name+'</strong></td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':'gr')+'">'+m.level+'</span></td><td>'+m.orderCount+'</td><td>'+thb(m.totalSpend)+'</td><td>'+thb(m.avgSpend)+'</td></tr>').join('')+'</table>';
 }
@@ -2340,6 +2365,9 @@ function renderSettingsShop(s){
     '<div class="form-group"><label class="form-label">DPI เครื่องพิมพ์</label><select id="bc-dpi"><option value="203" '+((s.billConfig||{}).dpi==='203'||!(s.billConfig||{}).dpi?'selected':'')+'>203 DPI (ทั่วไป)</option><option value="300" '+((s.billConfig||{}).dpi==='300'?'selected':'')+'>300 DPI (คมชัด)</option></select></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">🖼️ รูปท้ายบิล (แนะนำ 300x100px)</label><input type="file" accept="image/*" onchange="bcUploadFooterImg(event)" style="font-size:12px"></div>'+
     '<div class="form-group"><label class="form-label">💳 QR PromptPay (แนบในบิล LINE)</label><input type="file" accept="image/*" onchange="bcUploadPayQR(event)" style="font-size:12px"></div></div>'+
+    '<div class="grid g3"><div class="form-group"><label class="form-label">ขนาดโลโก้หน้า Login: <span id="ll-val">'+(s.loginLogoSize||80)+'</span>px</label><input type="range" id="bc-login-logo" min="40" max="160" value="'+(s.loginLogoSize||80)+'" oninput="$(\'ll-val\').textContent=this.value" style="width:100%"><div style="font-size:10px;color:var(--t3)">แนะนำ: ภาพ PNG ขนาด 200×200px ขึ้นไป</div></div>'+
+    '<div class="form-group"><label class="form-label">ขนาด QR PromptPay ในบิล</label><select id="bc-qr-size"><option value="60" '+((s.billConfig||{}).qrPaySize==='60'?'selected':'')+'>เล็ก (60px)</option><option value="80" '+(!(s.billConfig||{}).qrPaySize||(s.billConfig||{}).qrPaySize==='80'?'selected':'')+'>กลาง (80px) — แนะนำ</option><option value="120" '+((s.billConfig||{}).qrPaySize==='120'?'selected':'')+'>ใหญ่ (120px)</option></select></div>'+
+    '<div class="form-group"><label class="form-label">ขนาดโลโก้ในบิล: <span id="bc-logo-val">'+((s.billConfig||{}).logoSize||36)+'</span>px</label><input type="range" id="bc-logosize" min="20" max="80" value="'+((s.billConfig||{}).logoSize||36)+'" oninput="$(\'bc-logo-val\').textContent=this.value" style="width:100%"></div></div>'+
     ((s.billConfig||{}).footerImage?'<div style="margin:4px 0"><img src="'+s.billConfig.footerImage+'" style="height:40px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">รูปท้ายบิล</span></div>':'')+
     (s.payQR?'<div style="margin:4px 0"><img src="'+s.payQR+'" style="height:50px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">QR PromptPay</span></div>':'')+
     '<button class="btn btn-pr btn-sm" onclick="saveBillConfig()">💾 บันทึกตั้งค่าบิล</button></div>';
@@ -2587,6 +2615,8 @@ function saveBillConfig(){
   s.billConfig.fontSize=parseInt($('bc-fontsize')?$('bc-fontsize').value:12)||12;
   s.billConfig.fontWeight=$('bc-fontweight')?$('bc-fontweight').value:'600';
   s.billConfig.dpi=$('bc-dpi')?$('bc-dpi').value:'203';
+  s.billConfig.qrPaySize=$('bc-qr-size')?$('bc-qr-size').value:'80';
+  s.loginLogoSize=parseInt($('bc-login-logo')?$('bc-login-logo').value:80)||80;
   saveDB();logAction('CHANGE_SETTINGS','อัปเดตตั้งค่าบิล');toast('บันทึกตั้งค่าบิลสำเร็จ ✅');
 }
 function bcUploadFooterImg(e){
@@ -3054,7 +3084,7 @@ function buildBillHTML(o){
   h+='<div style="text-align:center;font-size:'+(bc.fontSize?bc.fontSize-2:10)+'px;color:#999">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
   if(bc.taxId) h+='<div style="text-align:center;font-size:9px;color:#999">เลขภาษี: '+bc.taxId+'</div>';
   if(bc.footerImage) h+='<div style="text-align:center;margin-top:4px"><img src="'+bc.footerImage+'" style="max-height:50px;max-width:100%"></div>';
-  if(!paid&&s.payQR) h+='<div style="text-align:center;margin-top:6px"><div style="font-size:10px;color:#666;margin-bottom:2px">สแกนชำระเงิน</div><img src="'+s.payQR+'" style="max-height:80px"></div>';
+  if(!paid&&s.payQR) h+='<div style="text-align:center;margin-top:6px"><div style="font-size:10px;color:#666;margin-bottom:2px">สแกนชำระเงิน</div><img src="'+s.payQR+'" style="max-height:'+(bc.qrPaySize||80)+'px"></div>';
   h+='</div>';return h;
 }
 
