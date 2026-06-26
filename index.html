@@ -179,9 +179,9 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
 
 <!-- ═══ LOGIN SCREEN ═══ -->
 <div id="lockScreen">
-  <div class="lock-logo">🫧 SAKKANID</div>
-  <div class="lock-sub">Laundry POS System</div>
-  <div id="userGrid" class="user-grid"></div>
+  <div class="lock-logo" id="lockLogo">🫧 SAKKANID</div>
+  <div class="lock-sub" id="lockSub">Laundry POS System</div>
+  <div id="userGrid" class="user-grid" style="max-height:300px;overflow-y:auto;flex-wrap:wrap;justify-content:center"></div>
   <div id="pinArea" class="pin-area" style="display:none">
     <div style="font-size:13px;opacity:.8;margin-bottom:4px" id="pinUser"></div>
     <div class="pin-dots" id="pinDots"></div>
@@ -412,6 +412,7 @@ const PAGES=[
   {id:'cleaning',icon:'🧹',label:'ทำความสะอาด',section:'สร้างออเดอร์'},
   {id:'orders',icon:'📋',label:'สถานะออเดอร์',section:'จัดการ'},
   {id:'history',icon:'🕐',label:'ประวัติการขาย',section:'จัดการ'},
+  {id:'docs',icon:'📄',label:'ประวัติเอกสาร',section:'จัดการ'},
   {id:'calendar',icon:'📅',label:'ปฏิทิน',section:'จัดการ'},
   {id:'members',icon:'👥',label:'สมาชิก',section:'ลูกค้า'},
   {id:'crm',icon:'⭐',label:'CRM',section:'ลูกค้า'},
@@ -541,8 +542,13 @@ function seedDemo(){
 // ═══ AUTH ═══
 function initLockScreen(){
   $('lockScreen').style.display='flex';$('app').style.display='none';
-  let h='';USERS.forEach((u,i)=>{
-    h+='<div class="user-btn" onclick="selUser('+i+')"><div class="ub-name">'+u.nick+'</div><div class="ub-role">'+u.role+'</div></div>';
+  // Update logo from settings
+  var s=getShopSettings();
+  $('lockLogo').innerHTML=(s.logo?'<img src="'+s.logo+'" style="height:60px;margin-bottom:8px"><br>':'🫧 ')+s.shopName;
+  $('lockSub').textContent='Laundry POS System';
+  // Show ALL users with name + role (scrollable)
+  var h='';USERS.forEach(function(u,i){
+    h+='<div class="user-btn" onclick="selUser('+i+')" style="min-width:100px"><div class="ub-name">'+u.name+'</div><div class="ub-role">'+u.nick+' · '+u.role+'</div></div>';
   });
   $('userGrid').innerHTML=h;
   $('pinArea').style.display='none';pinStr='';selUserIdx=null;
@@ -551,7 +557,7 @@ function selUser(i){
   selUserIdx=i;pinStr='';
   document.querySelectorAll('.user-btn').forEach((b,j)=>b.classList.toggle('sel',j===i));
   $('pinArea').style.display='block';
-  $('pinUser').textContent=USERS[i].nick+' — กรุณาใส่ PIN';
+  $('pinUser').textContent=USERS[i].name+' ('+USERS[i].nick+') — กรุณาใส่ PIN';
   renderPinDots();renderPinPad();$('pinMsg').textContent='';
 }
 function renderPinDots(){
@@ -633,6 +639,7 @@ function renderPage(page){
     case 'cleaning':renderCleaningPage(c);break;
     case 'orders':renderOrdersPage(c);break;
     case 'history':renderHistoryPage(c);break;
+    case 'docs':renderDocsPage(c);break;
     case 'calendar':renderCalendarPage(c);break;
     case 'members':renderMembersPage(c);break;
     case 'crm':renderCRMPage(c);break;
@@ -1220,6 +1227,8 @@ function openDocModal(oid){
   var h='<div class="modal-overlay show" id="moDoc"><div class="modal" style="max-width:600px"><div class="modal-head"><h3>📄 ออกเอกสาร — '+o.id+'</h3><button class="modal-close" onclick="document.getElementById(\'moDoc\').remove()">&times;</button></div>'+
     '<div class="modal-body" style="overflow-y:auto">'+
     '<div class="form-group"><label class="form-label">ประเภทเอกสาร</label><select id="doc-type" onchange="docTypeChange()"><option value="receipt">🧾 ใบเสร็จรับเงิน (Receipt)</option><option value="taxinv">📋 ใบกำกับภาษี (Tax Invoice)</option><option value="quotation">💰 ใบเสนอราคา (Quotation)</option><option value="invoice">📨 ใบแจ้งหนี้ (Invoice)</option></select></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ขนาดกระดาษ</label><select id="doc-paper"><option value="A4">A4 (210×297mm)</option><option value="A5">A5 (148×210mm)</option></select></div>'+
+    '<div class="form-group"><label class="form-label">เลขที่เอกสาร (แก้ไขได้)</label><input id="doc-num" type="text" value="" placeholder="ระบบจะสร้างให้อัตโนมัติ"></div></div>'+
     '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:8px">👤 ข้อมูลลูกค้า/บริษัท</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อ / ชื่อบริษัท</label><input id="doc-cname" type="text" value="'+(m?m.name:'')+'"></div>'+
     '<div class="form-group"><label class="form-label">เลขประจำตัวผู้เสียภาษี</label><input id="doc-taxid" type="text" placeholder="เช่น 1234567890123"></div></div>'+
@@ -1283,10 +1292,14 @@ function generateDocument(oid){
   var whtAmt=Math.round(net*whtRate/100);
   var netPayable=grandTotal-whtAmt;
   // Generate document number
-  var docNum=dt.prefix+'-'+o.id.replace(/[A-Z]+-/,'')+'-'+String(new Date().getFullYear()+543).slice(-2);
+  var customNum=$('doc-num')?$('doc-num').value.trim():'';
+  var docNum=customNum||dt.prefix+'-'+o.id.replace(/[A-Z]+-/,'')+'-'+String(new Date().getFullYear()+543).slice(-2);
+  var paperSize=$('doc-paper')?$('doc-paper').value:'A4';
+  var pw=paperSize==='A5'?'148mm':'210mm';
+  var pfs=paperSize==='A5'?'11px':'13px';
   // Build document HTML
   var fs=bc.fontSize||12;var fw=bc.fontWeight||600;
-  var h='<div style="width:210mm;max-width:100%;font-family:var(--ff);font-size:'+fs+'px;padding:24px;color:#000;background:#fff;font-weight:'+fw+'">';
+  var h='<div style="width:'+pw+';max-width:100%;font-family:var(--ff);font-size:'+pfs+';padding:'+(paperSize==='A5'?'16px':'24px')+';color:#000;background:#fff;font-weight:'+fw+'">';
   // Header
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">';
   h+='<div>'+(s.logo?'<img src="'+s.logo+'" style="height:50px;margin-bottom:4px"><br>':'')+'<div style="font-size:18px;font-weight:800">'+s.shopName+'</div>';
@@ -1349,6 +1362,10 @@ function generateDocument(oid){
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
   // Remove doc modal
   var docMo=$('moDoc');if(docMo) docMo.remove();
+  // Save to document history
+  if(!DB.docHistory) DB.docHistory=[];
+  DB.docHistory.push({docNum:docNum,docType:dtype,typeName:dt.name,orderId:oid,customer:cname,taxId:taxid,net:o.net,grandTotal:grandTotal,whtRate:whtRate,whtAmt:whtAmt,vatMode:vatMode,vatAmt:vatAmt,paperSize:paperSize,createdAt:fmtDT(),by:curUser?curUser.nick:''});
+  saveDB();
   toast('📄 สร้าง'+dt.name+'สำเร็จ ✅');
 }
 
@@ -2917,7 +2934,7 @@ function renderExpensePage(c){
     '<div class="kpi"><div class="kpi-lbl">ค่าใช้จ่ายรวม</div><div class="kpi-val" style="color:var(--am)">'+thb(DB.expenses.reduce(function(s,e){return s+e.amount},0))+'</div></div></div>'+
     '<div class="card"><div class="card-title">💸 บันทึกค่าใช้จ่าย</div>'+
     '<div class="grid g3" style="gap:6px;margin-bottom:10px">'+
-    '<div class="form-group"><label class="form-label">หมวด</label><select id="exp-cat"><option>วัสดุสิ้นเปลือง</option><option>ค่าสาธารณูปโภค</option><option>ค่าแรง</option><option>ซ่อมบำรุง</option><option>ค่าเช่า</option><option>อื่นๆ</option></select></div>'+
+    '<div class="form-group"><label class="form-label">หมวด</label><div style="display:flex;gap:4px"><select id="exp-cat" style="flex:1">'+getExpenseCategories().map(function(c){return '<option>'+c+'</option>'}).join('')+'</select><button class="btn btn-out btn-sm" onclick="addExpenseCategory()" title="เพิ่มหมวดใหม่">+</button></div></div>'+
     '<div class="form-group"><label class="form-label">รายการ</label><input id="exp-name" placeholder="เช่น น้ำยาซักผ้า"></div>'+
     '<div class="form-group"><label class="form-label">จำนวนเงิน (฿)</label><input id="exp-amt" type="number"></div></div>'+
     '<button class="btn btn-am" onclick="saveExpense()">💾 บันทึกค่าใช้จ่าย</button></div>'+
@@ -2933,7 +2950,20 @@ function saveExpense(){
   if(!DB.expenses) DB.expenses=[];
   DB.expenses.push({id:'EXP-'+String(DB.expenses.length+1).padStart(4,'0'),category:cat,name:name,amount:amt,date:fmtDT(),by:curUser.nick});
   saveDB();logAction('ADD_EXPENSE',name+' '+thb(amt));
-  toast('บันทึกค่าใช้จ่าย ✅ '+thb(amt));renderExpensePage();
+  toast('บันทึกค่าใช้จ่าย ✅ '+thb(amt));renderPage('expense');
+}
+function getExpenseCategories(){
+  var defaults=['วัสดุสิ้นเปลือง','ค่าสาธารณูปโภค','ค่าแรง','ซ่อมบำรุง','ค่าเช่า','ค่าขนส่ง','วัตถุดิบ','อื่นๆ'];
+  var custom=getShopSettings().expenseCategories||[];
+  return defaults.concat(custom.filter(function(c){return defaults.indexOf(c)<0}));
+}
+function addExpenseCategory(){
+  var name=prompt('ชื่อหมวดค่าใช้จ่ายใหม่:');
+  if(!name||!name.trim()) return;
+  var s=getShopSettings();if(!s.expenseCategories) s.expenseCategories=[];
+  if(getExpenseCategories().indexOf(name.trim())>=0){toast('หมวดนี้มีอยู่แล้ว','warn');return}
+  s.expenseCategories.push(name.trim());saveDB();
+  toast('เพิ่มหมวด "'+name.trim()+'" สำเร็จ ✅');renderPage('expense');
 }
 
 // ═══ IMPROVED BILL — GROUPED BY CATEGORY ═══
@@ -3382,6 +3412,45 @@ function cnCalcNet(){
   if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){if(pr.type==='percent')disc=Math.round(price*pr.value/100);else if(pr.type!=='buyXfreeY')disc=pr.value||0}}
   var net=Math.max(0,price-disc);
   if($('cn-net-total'))$('cn-net-total').innerHTML='ยอดสุทธิ: '+thb(net)+(disc?'<div style="font-size:12px;color:var(--am)">🎁 ลด '+thb(disc)+'</div>':'');
+}
+
+// ═══ DOCUMENT HISTORY PAGE ═══
+function renderDocsPage(c){
+  var docs=(DB.docHistory||[]).slice().reverse();
+  var typeFilter='';
+  c.innerHTML='<div class="card"><div class="card-title">📄 ประวัติเอกสาร ('+docs.length+' รายการ)</div>'+
+    '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="docSearch" placeholder="ค้นหาเลขเอกสาร/ออเดอร์/ลูกค้า..." oninput="filterDocs()"></div>'+
+    '<div><select id="docTypeFilter" onchange="filterDocs()"><option value="">ทุกประเภท</option><option value="receipt">🧾 ใบเสร็จ</option><option value="taxinv">📋 ใบกำกับภาษี</option><option value="quotation">💰 ใบเสนอราคา</option><option value="invoice">📨 ใบแจ้งหนี้</option></select> <button class="btn btn-out btn-sm" onclick="exportDocsCSV()">📤 Export</button></div></div>'+
+    '<div id="docsListArea">'+renderDocsList(docs)+'</div></div>';
+}
+function renderDocsList(docs){
+  if(!docs.length) return '<div class="empty-state"><div class="es-text">ยังไม่มีเอกสาร</div></div>';
+  return '<table><tr><th>วันที่</th><th>เลขที่</th><th>ประเภท</th><th>ออเดอร์</th><th>ลูกค้า</th><th>ยอด</th><th>โดย</th><th></th></tr>'+
+    docs.map(function(d){
+      var typeColor=d.docType==='receipt'?'bg-gn':d.docType==='taxinv'?'bg-pr':d.docType==='quotation'?'bg-am':'bg-pp';
+      return '<tr><td style="font-size:11px">'+formatBillDate(d.createdAt)+'</td><td><strong>'+d.docNum+'</strong></td><td><span class="badge '+typeColor+'">'+d.typeName+'</span></td><td><code>'+d.orderId+'</code></td><td>'+(d.customer||'-')+'</td><td>'+thb(d.grandTotal)+'</td><td>'+d.by+'</td><td><button class="btn btn-out btn-sm" onclick="reprintDoc(\''+d.orderId+'\',\''+d.docType+'\')">🖨️</button></td></tr>';
+    }).join('')+'</table>';
+}
+function filterDocs(){
+  var q=($('docSearch')?$('docSearch').value:'').toLowerCase();
+  var tf=$('docTypeFilter')?$('docTypeFilter').value:'';
+  var docs=(DB.docHistory||[]).filter(function(d){
+    var matchQ=!q||d.docNum.toLowerCase().includes(q)||(d.orderId||'').toLowerCase().includes(q)||(d.customer||'').toLowerCase().includes(q);
+    var matchT=!tf||d.docType===tf;
+    return matchQ&&matchT;
+  }).reverse();
+  $('docsListArea').innerHTML=renderDocsList(docs);
+}
+function reprintDoc(oid,docType){
+  showBill(oid);
+  setTimeout(function(){openDocModal(oid);if($('doc-type'))$('doc-type').value=docType},500);
+}
+function exportDocsCSV(){
+  var csv='วันที่,เลขที่เอกสาร,ประเภท,เลขออเดอร์,ลูกค้า,เลขภาษี,ยอดสุทธิ,ยอดรวม,VAT,หัก ณ ที่จ่าย,โดย\n';
+  (DB.docHistory||[]).forEach(function(d){
+    csv+=formatBillDate(d.createdAt)+','+d.docNum+','+d.typeName+','+d.orderId+','+(d.customer||'')+','+(d.taxId||'')+','+d.net+','+d.grandTotal+','+(d.vatAmt||0)+','+(d.whtAmt||0)+','+d.by+'\n';
+  });
+  var blob=new Blob(['\ufeff'+csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='SAKKANID_documents.csv';a.click();toast('📤 Export เอกสารสำเร็จ');
 }
 
 // ═══ GOOGLE SHEETS SYNC ═══
