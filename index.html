@@ -465,7 +465,7 @@ function getShopSettings(){
   const s=DB.shopSettings;
   if(!s.shopName) s.shopName='ร้านซักรีด SAKKANID';
   if(!s.phone) s.phone='082-XXX-XXXX';
-  if(!s.lineOA) s.lineOA='@089svume';
+  if(!s.lineOA) s.lineOA='@sakkanid';
   if(!s.address) s.address='กรุงเทพฯ';
   if(!s.deliveryTiers) s.deliveryTiers=DEL_TIERS_DEFAULT;
   if(!s.paymentMethods) s.paymentMethods=PAY_METHODS_DEFAULT;
@@ -2407,7 +2407,7 @@ function renderSettingsConnect(s){
     '<div style="margin-bottom:10px"><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅ เชื่อมต่อแล้ว':'⏳ Phase 2 — ยังไม่เปิดใช้')+'</span></div>'+
     '<div class="form-group"><label class="form-label">Channel Access Token</label><input id="cn-line-token" type="password" value="'+(s.lineChannelToken||'')+'" placeholder="ใส่ Channel Access Token จาก LINE Developers"></div>'+
     '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
-    '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@089svume"></div>'+
+    '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
     '</div></div>'+
@@ -2430,6 +2430,12 @@ function saveConnectionSettings(){
   if(oa) s.lineOA=oa;
   saveDB();logAction('CHANGE_SETTINGS','อัปเดตการเชื่อมต่อ');
   toast('💾 บันทึกการเชื่อมต่อสำเร็จ ✅');
+  // Auto-push settings to cloud so Apps Script gets the new token
+  if(s.apiUrl){
+    var settingsRows=Object.keys(s).map(function(k){var v=s[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}});
+    fetch(s.apiUrl+'?action=replaceAll&sheet=settings',{method:'POST',mode:'no-cors',body:JSON.stringify({rows:settingsRows})});
+    toast('☁️ Sync ตั้งค่าขึ้น Cloud แล้ว');
+  }
   showSettingsTab(document.querySelector('.tab.act'),'connect');
 }
 async function testApiConnection(){
@@ -3508,9 +3514,10 @@ function exportDocsCSV(){
 // ═══ LINE MESSAGING ═══
 async function sendLineMessage(userId,messages){
   var apiUrl=getApiUrl();
-  if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
-  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','err');return{ok:false}}
-  var token=getLineToken();
+  if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน — ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return{ok:false}}
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID — ลูกค้าต้อง Add LINE OA ก่อน','err');return{ok:false}}
+  var token=getShopSettings().lineChannelToken||'';
+  if(!token){toast('⚠️ ยังไม่ได้ตั้งค่า LINE Channel Token — ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return{ok:false}}
   try{
     var url=apiUrl+'?action=linePush';
     await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({token:token,to:userId,messages:messages})});
