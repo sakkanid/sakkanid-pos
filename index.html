@@ -843,7 +843,7 @@ function startNewOrder(ctx){
 }
 function searchMembers(){
   const q=($('memSearch')?$('memSearch').value:'').toLowerCase();
-  const list=DB.members.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q)||(m.nick||'').toLowerCase().includes(q)).slice(0,20);
+  const list=DB.members.filter(m=>(m.name||'').toLowerCase().includes(q)||String(m.phone||"").includes(q)||(m.nick||'').toLowerCase().includes(q)).slice(0,20);
   const el=$('memResults');
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="es-text">ไม่พบสมาชิก</div></div>';return}
   el.innerHTML=list.map(m=>
@@ -1942,7 +1942,7 @@ function renderMemberTable(list){
 }
 function filterMembersPage(){
   const q=($('memPageSearch')?$('memPageSearch').value:'').toLowerCase();
-  const list=DB.members.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q));
+  const list=DB.members.filter(m=>(m.name||'').toLowerCase().includes(q)||String(m.phone||"").includes(q));
   $('memPageList').innerHTML=renderMemberTable(list);
 }
 function exportMembers(){
@@ -2754,7 +2754,7 @@ function globalSearch(q){
   if(!q||q.length<2) return;
   q=q.toLowerCase();
   const orders=DB.orders.filter(o=>o.id.toLowerCase().includes(q)||(o.mname||'').toLowerCase().includes(q)||(String(o.mphone||'')).includes(q)).slice(0,10);
-  const members=DB.members.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q)||m.id.toLowerCase().includes(q)).slice(0,5);
+  const members=DB.members.filter(m=>(m.name||'').toLowerCase().includes(q)||String(m.phone||"").includes(q)||m.id.toLowerCase().includes(q)).slice(0,5);
   let h='<div class="card"><div class="card-title">🔍 ผลการค้นหา "'+q+'"</div>';
   if(orders.length){
     h+='<h3 style="font-size:13px;color:var(--t3);margin:10px 0 6px">📋 ออเดอร์ ('+orders.length+')</h3>';
@@ -3444,12 +3444,37 @@ function showRegQR(){
 }
 function saveRegQRImage(){
   var box=$('regQRBox');if(!box) return;
-  if(typeof html2canvas==='undefined'){toast('กำลังโหลด... กดอีกครั้ง','warn');return}
-  var wrapper=box.closest('.modal-body');
-  html2canvas(wrapper,{scale:2,backgroundColor:'#ffffff'}).then(function(canvas){
-    var a=document.createElement('a');a.download='SAKKANID_QR_register.png';a.href=canvas.toDataURL('image/png');a.click();
-    toast('📸 บันทึก QR สำเร็จ ✅');
-  });
+  var qrCanvas=box.querySelector('canvas');
+  if(!qrCanvas){toast('ไม่พบ QR Code','err');return}
+  var s=getShopSettings();
+  // Create new canvas with shop name + QR + link
+  var w=400,pad=40,qrSize=260;
+  var c=document.createElement('canvas');
+  c.width=w;c.height=w+80;
+  var ctx=c.getContext('2d');
+  // White background
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+  // Shop name
+  ctx.fillStyle='#1a2a4a';ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+  ctx.fillText(s.shopName||'SAKKANID',w/2,36);
+  // Subtitle
+  ctx.fillStyle='#6B7A88';ctx.font='14px sans-serif';
+  ctx.fillText('สแกนเพื่อสมัครสมาชิก',w/2,58);
+  // Draw QR code
+  var qrX=(w-qrSize)/2,qrY=72;
+  ctx.drawImage(qrCanvas,qrX,qrY,qrSize,qrSize);
+  // Border around QR
+  ctx.strokeStyle='#E5E7EB';ctx.lineWidth=2;
+  ctx.strokeRect(qrX-8,qrY-8,qrSize+16,qrSize+16);
+  // Footer
+  ctx.fillStyle='#999';ctx.font='11px sans-serif';
+  ctx.fillText(s.shopName+' · LINE: '+(s.lineOA||''),w/2,qrY+qrSize+28);
+  // Download
+  var a=document.createElement('a');
+  a.download='SAKKANID_QR_register.png';
+  a.href=c.toDataURL('image/png');
+  a.click();
+  toast('📸 บันทึก QR สำเร็จ ✅');
 }
 
 // ═══ DAILY REPORT VIA LINE ═══
