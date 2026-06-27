@@ -465,7 +465,7 @@ function getShopSettings(){
   const s=DB.shopSettings;
   if(!s.shopName) s.shopName='ร้านซักรีด SAKKANID';
   if(!s.phone) s.phone='082-XXX-XXXX';
-  if(!s.lineOA) s.lineOA='@sakkanid';
+  if(!s.lineOA) s.lineOA='@089svume';
   if(!s.address) s.address='กรุงเทพฯ';
   if(!s.deliveryTiers) s.deliveryTiers=DEL_TIERS_DEFAULT;
   if(!s.paymentMethods) s.paymentMethods=PAY_METHODS_DEFAULT;
@@ -2407,7 +2407,7 @@ function renderSettingsConnect(s){
     '<div style="margin-bottom:10px"><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅ เชื่อมต่อแล้ว':'⏳ Phase 2 — ยังไม่เปิดใช้')+'</span></div>'+
     '<div class="form-group"><label class="form-label">Channel Access Token</label><input id="cn-line-token" type="password" value="'+(s.lineChannelToken||'')+'" placeholder="ใส่ Channel Access Token จาก LINE Developers"></div>'+
     '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
-    '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
+    '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@089svume"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
     '</div></div>'+
