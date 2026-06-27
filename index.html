@@ -860,6 +860,7 @@ function openNewMemberModal(){
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="nm-phone" type="tel" autocomplete="tel"></div>'+
     '<div class="form-group"><label class="form-label">LINE ID</label><input id="nm-line" type="text"></div>'+
+    '<div class="form-group"><label class="form-label">LINE User ID <span style="font-size:10px;color:var(--t3)">(Uxxxxxxxx — ได้จาก webhook)</span></label><input id="nm-line-uid" type="text" placeholder="ลูกค้า Add OA → ได้อัตโนมัติ"></div>'+
     '</div>'+
     '<div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="nm-addr" onchange="toggleAddr()"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
     '<div id="nm-addr-detail" class="grid g2">'+
@@ -893,6 +894,7 @@ function saveNewMember(){
     village:$('nm-village')?$('nm-village').value.trim():'',
     houseNo:$('nm-houseno')?$('nm-houseno').value.trim():'',
     lineId:$('nm-line')?$('nm-line').value.trim():'',
+    lineUserId:$('nm-line-uid')?$('nm-line-uid').value.trim():'',
     pts:welcomePts,spend:0,level:'ทั่วไป',joinDate:fmtDate()
   };
   DB.members.push(m);saveDB();
@@ -2879,14 +2881,20 @@ function saveEditMember(mid){
 function showLinePreview(oid){
   const o=gO(oid);if(!o) return;
   const s=getShopSettings();const paid=isPaidCheck(o);
+  const m=gM(o.mid);const hasLineId=m&&m.lineUserId;
   let msg='สวัสดีค่ะ '+o.mname+' 🫧\nร้าน '+s.shopName+'\n\nเลขออเดอร์: '+o.id+'\nสถานะ: '+o.status+'\nยอด: '+thb(o.net);
   if(!paid) msg+='\n\n❌ ยอดค้างชำระ: '+thb(remaining(o))+'\nกรุณาชำระตาม QR ด้านล่าง 🙏';
   else msg+='\n\n✅ ชำระเงินครบแล้ว';
   msg+='\n\nขอบคุณที่ใช้บริการค่ะ 💙';
   const h='<div class="modal-overlay show" id="moLine"><div class="modal"><div class="modal-head"><h3>📱 LINE Preview</h3><button class="modal-close" onclick="document.getElementById(\'moLine\').remove()">&times;</button></div>'+
-    '<div class="modal-body" style="display:flex;justify-content:center">'+
+    '<div class="modal-body"><div style="display:flex;justify-content:center;margin-bottom:12px">'+
     '<div style="background:#7BC67E;border-radius:16px;padding:14px 16px;max-width:300px;color:#fff;font-size:13px;white-space:pre-line;line-height:1.6">'+msg+'</div></div>'+
-    '<div class="modal-foot"><button class="btn btn-out" onclick="copyLineMsg()">📋 Copy</button><button class="btn btn-gn" onclick="toast(\'Phase 2: ส่ง LINE จริง\',\'info\')">📱 ส่ง LINE</button></div></div></div>';
+    (hasLineId?'<div style="text-align:center;font-size:12px;color:var(--gn)">✅ LINE User ID: '+m.lineUserId.substring(0,8)+'...</div>':'<div style="text-align:center;font-size:12px;color:var(--am)">⚠️ ลูกค้ายังไม่มี LINE User ID<br><span style="font-size:11px;color:var(--t3)">ลูกค้าต้อง Add LINE OA ก่อน → ระบบจะได้ User ID อัตโนมัติ</span></div>')+
+    '</div>'+
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="document.getElementById(\'moLine\').remove()">ปิด</button><button class="btn btn-out" onclick="copyLineMsg()">📋 Copy</button>'+
+    '<button class="btn btn-gn" onclick="sendBillViaLine(\''+oid+'\');document.getElementById(\'moLine\').remove()" '+(hasLineId?'':'disabled style="opacity:.5"')+'>📱 ส่งบิลทาง LINE</button>'+
+    '<button class="btn btn-out" onclick="sendStatusViaLine(\''+oid+'\');document.getElementById(\'moLine\').remove()" '+(hasLineId?'':'disabled style="opacity:.5"')+'>📋 แจ้งสถานะ</button>'+
+    '</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
   window._lineMsg=msg;
 }
@@ -3495,6 +3503,84 @@ function exportDocsCSV(){
     csv+=formatBillDate(d.createdAt)+','+d.docNum+','+d.typeName+','+d.orderId+','+(d.customer||'')+','+(d.taxId||'')+','+d.net+','+d.grandTotal+','+(d.vatAmt||0)+','+(d.whtAmt||0)+','+d.by+'\n';
   });
   var blob=new Blob(['\ufeff'+csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='SAKKANID_documents.csv';a.click();toast('📤 Export เอกสารสำเร็จ');
+}
+
+// ═══ LINE MESSAGING ═══
+async function sendLineMessage(userId,messages){
+  var apiUrl=getApiUrl();
+  if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','err');return{ok:false}}
+  var token=getLineToken();
+  try{
+    var url=apiUrl+'?action=linePush';
+    await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({token:token,to:userId,messages:messages})});
+    toast('📱 ส่ง LINE สำเร็จ ✅');
+    return{ok:true};
+  }catch(e){
+    toast('❌ ส่ง LINE ล้มเหลว: '+e.message,'err');
+    return{ok:false,error:e.message};
+  }
+}
+
+async function sendBillViaLine(oid){
+  var o=gO(oid);if(!o) return;
+  var m=gM(o.mid);
+  var userId=m?m.lineUserId:'';
+  if(!userId){
+    toast('⚠️ ลูกค้ายังไม่มี LINE User ID — ลูกค้าต้อง Add LINE OA ก่อน','warn');
+    return;
+  }
+  var s=getShopSettings();
+  // Build text message
+  var paid=isPaidCheck(o);
+  var msg=s.shopName+'\n';
+  msg+=(paid?'🧾 ใบเสร็จรับเงิน':'📋 แจ้งยอดชำระ')+'\n';
+  msg+='เลขที่: '+o.id+'\n';
+  msg+='ลูกค้า: '+o.mname+'\n';
+  msg+='วันที่: '+formatBillDate(o.createdAt)+'\n';
+  msg+='───────────\n';
+  (o.items||[]).forEach(function(it){
+    msg+=it.t+(it.o?' · '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty)+'\n';
+  });
+  if(o.extras&&o.extras.length){
+    o.extras.forEach(function(e){msg+=e.name+' = '+thb(e.price)+'\n'});
+  }
+  msg+='───────────\n';
+  msg+='ยอดสุทธิ: '+thb(o.net)+'\n';
+  if(paid){
+    msg+='✅ ชำระเงินครบแล้ว\n';
+    if(o.payHist&&o.payHist.length){msg+='ชำระโดย: '+o.payHist.map(function(p){return p.method}).join(', ')+'\n'}
+  }else{
+    msg+='❌ ค้างชำระ: '+thb(remaining(o))+'\n';
+  }
+  msg+='\n'+s.shopName+' · '+fmtPhone(s.phone);
+
+  var messages=[{type:'text',text:msg}];
+  // Add QR PromptPay image if unpaid and available
+  if(!paid&&s.payQR){
+    messages.push({type:'text',text:'💳 สแกน QR PromptPay เพื่อชำระเงิน'});
+  }
+  toast('📱 กำลังส่ง LINE...','info');
+  await sendLineMessage(userId,messages);
+  logAction('SEND_LINE',o.id+' → '+o.mname);
+}
+
+async function sendStatusViaLine(oid){
+  var o=gO(oid);if(!o) return;
+  var m=gM(o.mid);
+  var userId=m?m.lineUserId:'';
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
+  var s=getShopSettings();
+  var msg=s.shopName+'\n📋 แจ้งสถานะออเดอร์\n\n';
+  msg+='เลขที่: '+o.id+'\n';
+  msg+='ลูกค้า: '+o.mname+'\n';
+  msg+='สถานะ: '+o.status+'\n';
+  if(o.pickupDate) msg+='📅 วันนัดรับ: '+fmtISO(o.pickupDate)+'\n';
+  if(!isPaidCheck(o)) msg+='\n❌ ค้างชำระ: '+thb(remaining(o))+'\n';
+  msg+='\n'+s.shopName+' · '+fmtPhone(s.phone);
+
+  await sendLineMessage(userId,[{type:'text',text:msg}]);
+  logAction('SEND_LINE_STATUS',o.id+' → '+o.status);
 }
 
 // ═══ GOOGLE SHEETS SYNC ═══
