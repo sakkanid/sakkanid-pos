@@ -618,6 +618,7 @@ function initApp(){
   setTimeout(function(){if(getApiUrl())syncTestConnection().then(function(){syncPullAll()})},2000);
   // Start auto-pull every 60 seconds
   if(getApiUrl()) startAutoPull();
+  startDailyReportSchedule();
 }
 function buildSidebar(){
   let h='',lastSec='';
@@ -672,8 +673,8 @@ function renderPublicRegister(){
   var s=getShopSettings();
   // Read LINE OA from URL parameter (passed from POS) — not from localStorage
   var urlParams=new URLSearchParams(location.search);
-  var lineOA=urlParams.get('line')||s.lineOA||'';
-  var shopName=urlParams.get('shop')||s.shopName||'SAKKANID';
+  var lineOA=urlParams.get('l')||urlParams.get('line')||s.lineOA||'';
+  var shopName=urlParams.get('s')||urlParams.get('shop')||s.shopName||'SAKKANID';
   window._regLineOA=lineOA;
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
@@ -714,21 +715,31 @@ function savePublicRegister(){
     '<div style="background:#FEF3C7;border-radius:12px;padding:14px;text-align:left;margin-bottom:16px;font-size:13px">'+
     '<div style="font-weight:700;color:#92400E;margin-bottom:6px">📱 ขั้นตอนถัดไป</div>'+
     '<div style="color:#92400E">1. กดปุ่ม "ส่งข้อมูลให้ร้าน" ด้านล่าง<br>2. ส่งข้อความให้ร้านผ่าน LINE<br>3. ร้านจะนำเข้าข้อมูลให้อัตโนมัติ<br>4. เริ่มสะสมแต้มได้ทันที!</div></div>'+
-    '<button onclick="prCopyMsg()" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-bottom:8px">📱 ส่งข้อมูลให้ร้านผ่าน LINE</button>'+
-    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ</button>'+
+    '<button onclick="prSendLine()" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-bottom:8px">📱 ส่งข้อมูลให้ร้านผ่าน LINE</button>'+
+    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ (วางเอง)</button>'+
     '<div style="margin-top:16px;font-size:12px;color:#999">ขอบคุณที่สมัครสมาชิกค่ะ 🫧</div></div>';
   window._regMsg=msg;
+}
+function prSendLine(){
+  var lineOA=window._regLineOA||'';
+  var msg=window._regMsg||'';
+  if(!lineOA){toast('ไม่พบ LINE OA — กรุณา Copy ข้อความแล้วส่งเอง','warn');prCopyText();return}
+  // Use /R/oaMessage/ to open chat WITH pre-filled message
+  var oaId=lineOA.replace(/^@/,'');
+  var lineUrl='https://line.me/R/oaMessage/%40'+oaId+'/?'+encodeURIComponent(msg);
+  window.open(lineUrl,'_blank');
+  toast('📱 เปิด LINE แล้ว — กดส่งข้อความได้เลย ✅');
 }
 function prCopyMsg(){
   var lineOA=window._regLineOA||'';
   var msg=window._regMsg||'';
-  navigator.clipboard.writeText(msg).then(function(){
-    toast('Copy สำเร็จ ✅ เปิด LINE ส่งให้ร้าน');
-    if(lineOA){setTimeout(function(){window.open('https://line.me/R/ti/p/'+encodeURIComponent(lineOA),'_blank')},500)}
-  }).catch(function(){
-    var ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
-    toast('Copy สำเร็จ ✅');
-  });
+  // Copy then open LINE chat with pre-filled message
+  try{navigator.clipboard.writeText(msg)}catch(e){}
+  if(lineOA){
+    var oaId=lineOA.replace(/^@/,'');
+    window.open('https://line.me/R/oaMessage/%40'+oaId+'/?'+encodeURIComponent(msg),'_blank');
+  }
+  toast('📱 เปิด LINE แล้ว — กดส่งข้อความได้เลย ✅');
 }
 function prCopyText(){
   var msg=window._regMsg||'';
@@ -1921,7 +1932,7 @@ function showCalDay(dateStr){
 function renderMembersPage(c){
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
     '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
 }
 function renderMemberTable(list){
@@ -2415,6 +2426,14 @@ function renderSettingsConnect(s){
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
     '</div></div>'+
+    // Daily Report
+    '<div class="card"><div class="card-title">📊 รายงานประจำวันทาง LINE</div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">LINE User ID เจ้าของร้าน</label><input id="cn-report-to" type="text" value="'+(s.dailyReportTo||'')+'" placeholder="Uxxxxxxxx (เจ้าของร้าน)"></div>'+
+    '<div class="form-group"><label class="form-label">เวลาส่งรายงาน</label><input id="cn-report-time" type="time" value="'+(s.dailyReportTime||'21:00')+'"></div></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ระบบจะส่งสรุปออเดอร์ + รายได้ + ค่าใช้จ่าย ทุกวัน ตามเวลาที่กำหนด (POS ต้องเปิดอยู่)</div>'+
+    '<div style="display:flex;gap:6px"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    '<button class="btn btn-out btn-sm" onclick="sendDailyReport()">📊 ทดสอบส่งรายงาน</button></div></div>'+
+    // Summary table
     '<div class="card"><div class="card-title">📋 สรุปการเชื่อมต่อ</div>'+
     '<table><tr><th>บริการ</th><th>สถานะ</th><th>ใช้สำหรับ</th></tr>'+
     '<tr><td>📊 Google Sheets</td><td><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅':'❌')+'</span></td><td>Sync ข้อมูลทุกอย่าง + หลายอุปกรณ์</td></tr>'+
@@ -2432,6 +2451,8 @@ function saveConnectionSettings(){
   if(token) s.lineChannelToken=token; else delete s.lineChannelToken;
   if(secret) s.lineChannelSecret=secret; else delete s.lineChannelSecret;
   if(oa) s.lineOA=oa;
+  s.dailyReportTo=$('cn-report-to')?$('cn-report-to').value.trim():'';
+  s.dailyReportTime=$('cn-report-time')?$('cn-report-time').value:'21:00';
   saveDB();logAction('CHANGE_SETTINGS','อัปเดตการเชื่อมต่อ');
   toast('💾 บันทึกการเชื่อมต่อสำเร็จ ✅');
   // Auto-push settings to cloud so Apps Script gets the new token
@@ -3397,9 +3418,102 @@ function copyRegisterLink(){
   var s=getShopSettings();
   var base=location.origin+location.pathname;
   var lineOA=s.lineOA||'';
-  var shop=encodeURIComponent(s.shopName||'SAKKANID');
-  var link=base+'?page=register'+(lineOA?'&line='+encodeURIComponent(lineOA):'')+(shop?'&shop='+shop:'');
+  var link=base+'?r=1'+(lineOA?'&l='+encodeURIComponent(lineOA):'')+'&s='+encodeURIComponent(s.shopName||'SAKKANID');
   navigator.clipboard.writeText(link).then(function(){toast('📎 Copy ลิงก์สมัครสำเร็จ ✅')}).catch(function(){prompt('Copy ลิงก์นี้:',link)});
+}
+function getRegLink(){
+  var s=getShopSettings();var base=location.origin+location.pathname;
+  return base+'?r=1'+(s.lineOA?'&l='+encodeURIComponent(s.lineOA):'')+'&s='+encodeURIComponent(s.shopName||'SAKKANID');
+}
+function showRegQR(){
+  var s=getShopSettings();var link=getRegLink();
+  var h='<div class="modal-overlay show" id="moRegQR"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🔲 QR Code ลิงก์สมัครสมาชิก</h3><button class="modal-close" onclick="document.getElementById(\'moRegQR\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="text-align:center">'+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:4px">'+s.shopName+'</div>'+
+    '<div style="font-size:13px;color:var(--t3);margin-bottom:12px">สแกนเพื่อสมัครสมาชิก</div>'+
+    '<div id="regQRBox" style="display:inline-block;padding:16px;background:#fff;border-radius:12px;border:2px solid var(--bd)"></div>'+
+    '<div style="margin-top:10px;font-size:11px;color:var(--t3);word-break:break-all">'+link+'</div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moRegQR\').remove()">ปิด</button><button class="btn btn-out" onclick="saveRegQRImage()">📸 บันทึกรูป</button><button class="btn btn-out" onclick="copyRegisterLink()">📎 Copy ลิงก์</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  setTimeout(function(){
+    var box=$('regQRBox');if(box&&typeof QRCode!=='undefined'){
+      box.innerHTML='';
+      new QRCode(box,{text:link,width:200,height:200,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+    }
+  },200);
+}
+function saveRegQRImage(){
+  var box=$('regQRBox');if(!box) return;
+  if(typeof html2canvas==='undefined'){toast('กำลังโหลด... กดอีกครั้ง','warn');return}
+  var wrapper=box.closest('.modal-body');
+  html2canvas(wrapper,{scale:2,backgroundColor:'#ffffff'}).then(function(canvas){
+    var a=document.createElement('a');a.download='SAKKANID_QR_register.png';a.href=canvas.toDataURL('image/png');a.click();
+    toast('📸 บันทึก QR สำเร็จ ✅');
+  });
+}
+
+// ═══ DAILY REPORT VIA LINE ═══
+let dailyReportTimer=null;
+function startDailyReportSchedule(){
+  if(dailyReportTimer) clearInterval(dailyReportTimer);
+  var s=getShopSettings();
+  if(!s.dailyReportTime||!s.dailyReportTo) return;
+  dailyReportTimer=setInterval(function(){
+    var now=new Date();
+    var hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    if(hhmm===s.dailyReportTime){
+      var sentKey='dailyReport_'+todayStr();
+      if(!localStorage.getItem(sentKey)){
+        localStorage.setItem(sentKey,'1');
+        sendDailyReport();
+      }
+    }
+  },60000);
+}
+async function sendDailyReport(){
+  var s=getShopSettings();
+  var to=s.dailyReportTo||'';
+  if(!to){toast('⚠️ ยังไม่ได้ตั้งค่า LINE User ID เจ้าของร้าน','err');return}
+  var today=todayStr();
+  var allOrders=DB.orders||[];
+  var todayOrders=allOrders.filter(function(o){return (o.createdAt||'').includes(today.replace(/-/g,'/').replace(/20/,'25'))||((o.createdAt||'').includes(today))});
+  var total=todayOrders.length;
+  var revenue=todayOrders.filter(function(o){return isPaidCheck(o)}).reduce(function(s,o){return s+netOf(o)},0);
+  var unpaid=todayOrders.filter(function(o){return !isPaidCheck(o)});
+  var unpaidAmt=unpaid.reduce(function(s,o){return s+remaining(o)},0);
+  // Count by type
+  var byType={};todayOrders.forEach(function(o){var t=o.type||'other';byType[t]=(byType[t]||0)+1});
+  // Count by status
+  var byStatus={};todayOrders.forEach(function(o){var st=o.status||'';byStatus[st]=(byStatus[st]||0)+1});
+  // Build message
+  var msg='📊 รายงานสรุปประจำวัน\n'+s.shopName+'\n📅 '+formatBillDate(new Date().toISOString())+'\n';
+  msg+='═══════════════\n';
+  msg+='📋 ออเดอร์วันนี้: '+total+' รายการ\n';
+  msg+='💰 รายได้: '+thb(revenue)+'\n';
+  if(unpaid.length) msg+='❌ ค้างชำระ: '+unpaid.length+' รายการ ('+thb(unpaidAmt)+')\n';
+  else msg+='✅ ไม่มียอดค้างชำระ\n';
+  msg+='───────────\n';
+  msg+='📦 แยกตามบริการ:\n';
+  var typeLabels={laundry:'👕 ซักรีด',bedset:'🛏️ เครื่องนอน',cleaning:'🧹 ทำความสะอาด',pkg_buy:'📦 ซื้อ Package',quota:'📦 ใช้โควต้า'};
+  Object.keys(byType).forEach(function(t){msg+='  '+(typeLabels[t]||t)+': '+byType[t]+' รายการ\n'});
+  msg+='───────────\n';
+  msg+='📊 แยกตามสถานะ:\n';
+  Object.keys(byStatus).forEach(function(st){msg+='  '+st+': '+byStatus[st]+'\n'});
+  // Expenses
+  var todayExp=(DB.expenses||[]).filter(function(e){return (e.date||'').includes(today.replace(/-/g,'/'))});
+  if(todayExp.length){
+    var expTotal=todayExp.reduce(function(s,e){return s+(e.amount||0)},0);
+    msg+='───────────\n💸 ค่าใช้จ่ายวันนี้: '+todayExp.length+' รายการ ('+thb(expTotal)+')\n';
+  }
+  // Members
+  var newMembers=(DB.members||[]).filter(function(m){return (m.joinDate||'').includes(today.replace(/-/g,'/'))});
+  if(newMembers.length) msg+='───────────\n👥 สมาชิกใหม่: '+newMembers.length+' คน\n';
+  msg+='═══════════════\n';
+  msg+=s.shopName+' · POS Report';
+
+  toast('📊 กำลังส่งรายงานประจำวัน...','info');
+  await sendLineMessage(to,[{type:'text',text:msg}]);
+  logAction('DAILY_REPORT','ส่งรายงานประจำวัน');
 }
 function importRegMember(){
   var code=prompt('วางรหัสนำเข้าจาก LINE:\n(ข้อความที่มี ##REG##...##END##)');
@@ -3858,7 +3972,7 @@ async function syncTestConnection(){
 // ═══ BOOTSTRAP ═══
 loadDB();initDarkMode();
 // Check public register page BEFORE login
-if(location.search.includes('page=register')){
+if(location.search.includes('page=register')||location.search.includes('r=1')){
   document.body.style.overflow='auto';document.body.style.height='auto';
   renderPublicRegister();
 }else{
