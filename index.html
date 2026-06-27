@@ -670,9 +670,14 @@ function renderPage(page){
 function renderPublicRegister(){
   $('lockScreen').style.display='none';$('app').style.display='none';
   var s=getShopSettings();
+  // Read LINE OA from URL parameter (passed from POS) — not from localStorage
+  var urlParams=new URLSearchParams(location.search);
+  var lineOA=urlParams.get('line')||s.lineOA||'';
+  var shopName=urlParams.get('shop')||s.shopName||'SAKKANID';
+  window._regLineOA=lineOA;
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
-    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+s.shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
+    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
     '<div class="card"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone" type="tel" autocomplete="tel"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick" type="text"></div>'+
@@ -713,14 +718,13 @@ function savePublicRegister(){
     '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ</button>'+
     '<div style="margin-top:16px;font-size:12px;color:#999">ขอบคุณที่สมัครสมาชิกค่ะ 🫧</div></div>';
   window._regMsg=msg;
-  window._regLineOA=s.lineOA||'';
 }
 function prCopyMsg(){
   var lineOA=window._regLineOA||'';
   var msg=window._regMsg||'';
   navigator.clipboard.writeText(msg).then(function(){
     toast('Copy สำเร็จ ✅ เปิด LINE ส่งให้ร้าน');
-    if(lineOA){setTimeout(function(){window.open('https://line.me/R/ti/p/'+lineOA.replace('@','%40'),'_blank')},500)}
+    if(lineOA){setTimeout(function(){window.open('https://line.me/R/ti/p/'+encodeURIComponent(lineOA),'_blank')},500)}
   }).catch(function(){
     var ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
     toast('Copy สำเร็จ ✅');
@@ -1917,7 +1921,7 @@ function showCalDay(dateStr){
 function renderMembersPage(c){
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
     '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
 }
 function renderMemberTable(list){
@@ -3389,6 +3393,14 @@ function sendLineMsg(oid){
 }
 
 // ═══ IMPORT MEMBER FROM REGISTRATION ═══
+function copyRegisterLink(){
+  var s=getShopSettings();
+  var base=location.origin+location.pathname;
+  var lineOA=s.lineOA||'';
+  var shop=encodeURIComponent(s.shopName||'SAKKANID');
+  var link=base+'?page=register'+(lineOA?'&line='+encodeURIComponent(lineOA):'')+(shop?'&shop='+shop:'');
+  navigator.clipboard.writeText(link).then(function(){toast('📎 Copy ลิงก์สมัครสำเร็จ ✅')}).catch(function(){prompt('Copy ลิงก์นี้:',link)});
+}
 function importRegMember(){
   var code=prompt('วางรหัสนำเข้าจาก LINE:\n(ข้อความที่มี ##REG##...##END##)');
   if(!code) return;
