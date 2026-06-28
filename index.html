@@ -934,7 +934,7 @@ function searchMembers(){
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="es-text">ไม่พบสมาชิก</div></div>';return}
   el.innerHTML=list.map(m=>
     '<div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--b1);cursor:pointer;border-radius:8px" onmouseover="this.style.background=\'var(--prl)\'" onmouseout="this.style.background=\'\'" onclick="selectMember(\''+m.id+'\')">'+
-    '<div style="flex:1"><div style="font-weight:600;font-size:13px">'+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+m.phone+' · '+m.id+'</div></div>'+
+    '<div style="flex:1"><div style="font-weight:600;font-size:13px">'+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+fmtPhone(m.phone)+' · '+m.id+'</div></div>'+
     '<span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></div>'
   ).join('');
 }
@@ -1012,7 +1012,7 @@ function openCreateOrderModal(m){
   $('moCreateOrderIn').innerHTML=
     '<div class="modal-head"><h3>👕 สร้างออเดอร์ซักรีด</h3><button class="modal-close" onclick="closeMo(\'moCreateOrder\')">&times;</button></div>'+
     '<div class="modal-body">'+
-    '<div class="card" style="background:var(--prl);box-shadow:none"><div style="font-weight:700">👤 '+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+m.phone+' · '+m.id+' · '+m.level+'</div></div>'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><div style="font-weight:700">👤 '+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+fmtPhone(m.phone)+' · '+m.id+' · '+m.level+'</div></div>'+
     '<button class="btn btn-pr" onclick="openAddItemModal()" style="margin-bottom:12px">➕ เพิ่มรายการซัก</button>'+
     '<div id="orderItemsList"></div>'+
     '<div id="orderExtrasArea" style="margin-top:12px"><div class="card-title" style="font-size:13px">💡 บริการเพิ่มเติม</div>'+
@@ -1703,7 +1703,7 @@ function openBuyPkgForm(m){
   $('moBuyPkgIn').innerHTML=
     '<div class="modal-head"><h3>🛒 ซื้อ Package</h3><button class="modal-close" onclick="closeMo(\'moBuyPkg\')">&times;</button></div>'+
     '<div class="modal-body">'+
-    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+m.phone+'</div>'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+fmtPhone(m.phone)+'</div>'+
     '<div class="form-group"><label class="form-label">เลือก Package</label><select id="bp-pkg" onchange="bpCalcTotal()">'+
     PKGS.map((p,i)=>'<option value="'+i+'">'+p.type+' '+p.qty+' ชิ้น — '+thb(p.price)+'</option>').join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">วิธีชำระ</label><select id="bp-method">'+
@@ -1753,7 +1753,7 @@ function openBedsetForm(m){
   $('moBedsetIn').innerHTML=
     '<div class="modal-head"><h3>🛏️ Set เครื่องนอน</h3><button class="modal-close" onclick="closeMo(\'moBedset\')">&times;</button></div>'+
     '<div class="modal-body" style="overflow-y:auto;-webkit-overflow-scrolling:touch">'+
-    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+m.phone+'</div>'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+fmtPhone(m.phone)+'</div>'+
     // Step 1: Select SET package (price comes from here)
     '<div class="form-group"><label class="form-label">เลือก Set Package</label><select id="bs-set" onchange="bsSetChange();bsCalcNet()" style="font-size:14px">'+
     BED_SETS.map(function(b,i){return '<option value="'+i+'">'+b.label+' — '+thb(b.price)+'</option>'}).join('')+'</select></div>'+
@@ -2024,7 +2024,7 @@ function renderMembersPage(c){
 function renderMemberTable(list){
   if(!list.length) return '<div class="empty-state"><div class="es-text">ไม่มีสมาชิก</div></div>';
   return '<table><tr><th>ID</th><th>ชื่อ</th><th>เบอร์</th><th>แต้ม</th><th>ยอดซื้อ</th><th>ระดับ</th></tr>'+
-    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong></td><td>'+m.phone+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
+    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong></td><td>'+fmtPhone(m.phone)+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
 }
 function filterMembersPage(){
   const q=($('memPageSearch')?$('memPageSearch').value:'').toLowerCase();
@@ -3101,7 +3101,7 @@ function showMemberCard(mid){
     (cfg.showShopInfo!==false?'<div style="font-size:10px;opacity:.7">'+s.phone+(s.lineOA?' · '+s.lineOA:'')+'</div>':'')+
     '<div style="position:absolute;bottom:20px;left:20px">'+
     '<div style="font-size:14px;font-weight:700">'+m.name+'</div>'+
-    '<div style="font-size:11px;opacity:.8">'+m.id+' · '+m.phone+'</div>'+
+    '<div style="font-size:11px;opacity:.8">'+m.id+' · '+fmtPhone(m.phone)+'</div>'+
     '<div style="margin-top:4px"><span style="background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">'+m.level+'</span>'+(cfg.showPoints!==false?'<span style="margin-left:6px;font-size:11px">'+m.pts+' แต้ม</span>':'')+'</div></div>'+
     '<div id="memberQR" style="position:absolute;bottom:16px;right:16px;background:#fff;padding:4px;border-radius:6px"></div>'+
     '</div>'+
@@ -3154,7 +3154,7 @@ function renderExpensePage(c){
     '<button class="btn btn-am" onclick="saveExpense()">💾 บันทึกค่าใช้จ่าย</button></div>'+
     '<div class="card"><div class="card-title">📋 รายการล่าสุด</div>'+
     (expenses.length?'<table><tr><th>วันที่</th><th>หมวด</th><th>รายการ</th><th>จำนวน</th><th>โดย</th></tr>'+
-    expenses.map(function(e){return '<tr><td style="font-size:11px">'+e.date+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
+    expenses.map(function(e){return '<tr><td style="font-size:11px">'+fmtJoinDate(e.date)+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
 }
 function saveExpense(){
   var cat=$('exp-cat')?$('exp-cat').value:'';
@@ -3162,7 +3162,7 @@ function saveExpense(){
   var amt=parseFloat($('exp-amt')?$('exp-amt').value:0)||0;
   if(!name||!amt){toast('กรอกรายการและจำนวนเงิน','err');return}
   if(!DB.expenses) DB.expenses=[];
-  DB.expenses.push({id:'EXP-'+String(DB.expenses.length+1).padStart(4,'0'),category:cat,name:name,amount:amt,date:fmtDT(),by:curUser.nick});
+  DB.expenses.push({id:'EXP-'+String(DB.expenses.length+1).padStart(4,'0'),category:cat,name:name,amount:amt,date:fmtJoinDate(new Date().toISOString()),by:curUser.nick});
   saveDB();logAction('ADD_EXPENSE',name+' '+thb(amt));
   toast('บันทึกค่าใช้จ่าย ✅ '+thb(amt));renderPage('expense');
 }
@@ -4103,12 +4103,13 @@ async function syncPullSilent(){
     if(!data.ok||!data.data) return;
     var d=data.data;var changed=false;
     // CRITICAL: only update if cloud has data (never overwrite with empty!)
-    if(d.orders&&d.orders.length>0&&d.orders.length!==(DB.orders||[]).length){DB.orders=d.orders.map(fixOrder);changed=true}
-    if(d.members&&d.members.length>0&&d.members.length!==(DB.members||[]).length){
-      DB.members=d.members.map(function(m){
+    if(d.orders&&d.orders.length>0){var newOrders=d.orders.map(fixOrder);if(JSON.stringify(newOrders.map(function(o){return o.id}))!==JSON.stringify((DB.orders||[]).map(function(o){return o.id}))){DB.orders=newOrders;changed=true}}
+    if(d.members&&d.members.length>0){
+      var newMem=d.members.map(function(m){
         var p=String(m.phone||'').replace(/^'+/,'').replace(/[^0-9]/g,'');if(p&&p.charAt(0)!=='0')p='0'+p;m.phone=p;
         if(m.joinDate&&String(m.joinDate).includes('T')){var dt=new Date(m.joinDate);if(!isNaN(dt.getTime())){var yr=dt.getFullYear();if(yr>2500)yr-=543;m.joinDate=String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+yr}}
-        return m});changed=true}
+        return m});
+      if(newMem.length!==(DB.members||[]).length||JSON.stringify(newMem.map(function(m){return m.id}))!==JSON.stringify((DB.members||[]).map(function(m){return m.id}))){DB.members=newMem;changed=true}}
     if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
     if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
     if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
