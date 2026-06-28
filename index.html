@@ -729,30 +729,59 @@ function savePublicRegister(){
   var phone=$('pr-phone')?$('pr-phone').value.trim():'';
   if(!name||!phone){toast('กรุณากรอกชื่อและเบอร์โทร','err');return}
   if(!$('pr-pdpa')||!$('pr-pdpa').checked){toast('กรุณายินยอม PDPA','err');return}
-  var nick=$('pr-nick')?$('pr-nick').value.trim():'';
-  var lineId=$('pr-line')?$('pr-line').value.trim():'';
-  var addrType=$('pr-addr')?$('pr-addr').value:'condo';
-  var proj=$('pr-proj')?$('pr-proj').value.trim():'';
-  var room=$('pr-room')?$('pr-room').value.trim():'';
-  var s=getShopSettings();
-  // Build message for shop
-  var regJSON=JSON.stringify({name:name,nick:nick,phone:phone,lineId:lineId,lineUserId:($('pr-line-uid')?$('pr-line-uid').value:''),addrType:addrType,proj:proj,room:room});
-  var regCode=btoa(unescape(encodeURIComponent(regJSON)));
-  var msg='🫧 สมัครสมาชิกใหม่\nร้าน '+s.shopName+'\n\n👤 ชื่อ: '+name+'\n📱 เบอร์: '+phone+(nick?'\n😊 ชื่อเล่น: '+nick:'')+(lineId?'\nLINE: '+lineId:'')+'\n🏠 ที่อยู่: '+(addrType==='condo'?'คอนโด '+proj+' ห้อง '+room:'บ้าน '+proj+' '+room)+'\n✅ ยินยอม PDPA\n\n📋 รหัสนำเข้า:\n##REG##'+regCode+'##END##';
+  var urlParams=new URLSearchParams(location.search);
+  var apiUrl=urlParams.get('api')||'';
+  var memberData={
+    name:name,
+    nick:$('pr-nick')?$('pr-nick').value.trim():'',
+    phone:phone,
+    lineId:$('pr-line')?$('pr-line').value.trim():'',
+    lineUserId:$('pr-line-uid')?$('pr-line-uid').value:'',
+    addrType:$('pr-addr')?$('pr-addr').value:'condo',
+    proj:$('pr-proj')?$('pr-proj').value.trim():'',
+    room:$('pr-room')?$('pr-room').value.trim():'',
+    pdpaConsent:'yes'
+  };
+  // Show loading
+  var el=$('publicRegPage');
+  if(el) el.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
+  if(apiUrl){
+    // Send directly to Google Sheets via Apps Script
+    fetch(apiUrl+'?action=registerMember',{method:'POST',mode:'no-cors',body:JSON.stringify(memberData)});
+    // Show success after short delay (no-cors can't read response)
+    setTimeout(function(){showRegSuccess(name,phone)},2000);
+  }else{
+    // Fallback: old method (generate code for staff)
+    var s=getShopSettings();
+    var regJSON=JSON.stringify(memberData);
+    var regCode=btoa(unescape(encodeURIComponent(regJSON)));
+    window._regMsg='🫧 สมัครสมาชิกใหม่\n\n👤 '+name+'\n📱 '+phone+'\n\n##REG##'+regCode+'##END##';
+    showRegSuccessFallback(name,phone);
+  }
+}
+function showRegSuccess(name,phone){
+  var shopName=new URLSearchParams(location.search).get('s')||'SAKKANID';
+  var el=$('publicRegPage');
+  if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
+    '<div style="font-size:56px;margin-bottom:8px">🎉</div>'+
+    '<div style="font-size:22px;font-weight:800;color:#0D8A6A;margin-bottom:8px">สมัครสมาชิกสำเร็จ!</div>'+
+    '<div style="font-size:14px;color:#6B7A88;margin-bottom:20px">ข้อมูลถูกบันทึกในระบบอัตโนมัติ</div>'+
+    '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
+    '<div style="font-weight:700;font-size:16px;color:#0D8A6A">'+name+'</div>'+
+    '<div style="font-size:13px;color:#6B7A88;margin-top:4px">📱 '+phone+'</div>'+
+    '<div style="font-size:13px;color:#0D8A6A;margin-top:8px">✅ ข้อมูลเข้าระบบอัตโนมัติ<br>✅ LINE แจ้งเตือนสมัครสำเร็จ<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
+    '<div style="font-size:14px;color:#666;margin-bottom:8px">ขอบคุณที่สมัครสมาชิก '+shopName+' ค่ะ 🫧</div></div>';
+}
+function showRegSuccessFallback(name,phone){
   var el=$('publicRegPage');
   if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
     '<div style="font-size:48px;margin-bottom:8px">✅</div>'+
     '<div style="font-size:20px;font-weight:800;color:#0D8A6A;margin-bottom:16px">ลงทะเบียนเรียบร้อย!</div>'+
     '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
     '<div style="font-weight:700;font-size:15px">'+name+'</div>'+
-    '<div style="font-size:13px;color:#6B7A88">'+phone+(nick?' · '+nick:'')+'</div></div>'+
-    '<div style="background:#FEF3C7;border-radius:12px;padding:14px;text-align:left;margin-bottom:16px;font-size:13px">'+
-    '<div style="font-weight:700;color:#92400E;margin-bottom:6px">📱 ขั้นตอนถัดไป</div>'+
-    '<div style="color:#92400E">1. กดปุ่ม "ส่งข้อมูลให้ร้าน" ด้านล่าง<br>2. ส่งข้อความให้ร้านผ่าน LINE<br>3. ร้านจะนำเข้าข้อมูลให้อัตโนมัติ<br>4. เริ่มสะสมแต้มได้ทันที!</div></div>'+
+    '<div style="font-size:13px;color:#6B7A88">'+phone+'</div></div>'+
     '<button onclick="prSendLine()" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-bottom:8px">📱 ส่งข้อมูลให้ร้านผ่าน LINE</button>'+
-    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ (วางเอง)</button>'+
-    '<div style="margin-top:16px;font-size:12px;color:#999">ขอบคุณที่สมัครสมาชิกค่ะ 🫧</div></div>';
-  window._regMsg=msg;
+    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ</button></div>';
 }
 function prSendLine(){
   var lineOA=window._regLineOA||'';
@@ -3468,7 +3497,7 @@ function copyRegisterLink(){
   var s=getShopSettings();
   var base=location.origin+location.pathname;
   var lineOA=s.lineOA||'';
-  var link=base+'?r=1'+(lineOA?'&l='+encodeURIComponent(lineOA):'')+'&s='+encodeURIComponent(s.shopName||'SAKKANID')+(s.liffId?'&liff='+s.liffId:'');
+  var link=base+'?r=1'+(lineOA?'&l='+encodeURIComponent(lineOA):'')+'&s='+encodeURIComponent(s.shopName||'SAKKANID')+(s.liffId?'&liff='+s.liffId:'')+(s.apiUrl?'&api='+encodeURIComponent(s.apiUrl):'');
   navigator.clipboard.writeText(link).then(function(){toast('📎 Copy ลิงก์สมัครสำเร็จ ✅')}).catch(function(){prompt('Copy ลิงก์นี้:',link)});
 }
 function getRegLink(){
