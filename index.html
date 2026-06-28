@@ -3770,6 +3770,8 @@ async function fetchLineUsers(){
   var apiUrl=getApiUrl();if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return}
   toast('📱 กำลังดึงข้อมูล LINE Users...','info');
   try{
+    // Pull latest members from cloud first (webhook may have created new ones)
+    await syncPullSilent();
     var data=await jsonpCall('getLineUsers','');
     if(!data.ok||!data.data){toast('❌ ดึงข้อมูลไม่ได้','err');return}
     var lineUsers=data.data;
