@@ -2510,7 +2510,23 @@ function renderSettingsConnect(s){
     '<tr><td>📊 Google Sheets</td><td><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅':'❌')+'</span></td><td>Sync ข้อมูลทุกอย่าง + หลายอุปกรณ์</td></tr>'+
     '<tr><td>📱 LINE Messaging</td><td><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅':'⏳')+'</span></td><td>แจ้งสถานะลูกค้า + ส่งบิล</td></tr>'+
     '<tr><td>🗺️ Google Maps</td><td><span class="badge bg-gr">⏳ Phase 3</span></td><td>คำนวณค่าส่งตามระยะทาง</td></tr>'+
-    '</table></div>';
+    '</table></div>'+
+    (apiOk?'<div class="card"><div class="card-title">📱 ตั้งค่าอุปกรณ์ใหม่</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">เปิดลิงก์นี้บนเครื่องใหม่ → ข้อมูลทั้งหมด sync อัตโนมัติ ไม่ต้องตั้งค่าใหม่</div>'+
+    '<div style="display:flex;gap:6px"><button class="btn btn-out btn-sm" onclick="copyDeviceSetupLink()">📎 Copy ลิงก์ตั้งค่า</button><button class="btn btn-out btn-sm" onclick="showDeviceSetupQR()">🔲 QR ตั้งค่า</button></div></div>':'');
+}
+function copyDeviceSetupLink(){
+  var s=getShopSettings();if(!s.apiUrl){toast('ตั้งค่า API URL ก่อน','err');return}
+  var link=location.origin+location.pathname+'?setup='+encodeURIComponent(s.apiUrl);
+  navigator.clipboard.writeText(link).then(function(){toast('📎 Copy ลิงก์ตั้งค่าสำเร็จ ✅')}).catch(function(){prompt('Copy:',link)});
+}
+function showDeviceSetupQR(){
+  var s=getShopSettings();if(!s.apiUrl){toast('ตั้งค่า API URL ก่อน','err');return}
+  var link=location.origin+location.pathname+'?setup='+encodeURIComponent(s.apiUrl);
+  var mo=document.createElement('div');mo.id='moSetupQR';mo.className='modal-overlay show';
+  mo.innerHTML='<div class="modal" style="max-width:400px"><div class="modal-head"><h3>📱 QR ตั้งค่าอุปกรณ์ใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moSetupQR\').remove()">&times;</button></div><div class="modal-body" style="text-align:center"><div style="font-size:14px;margin-bottom:12px">สแกน QR นี้บนเครื่องใหม่</div><div id="setupQRBox" style="display:inline-block;padding:12px;background:#fff;border-radius:8px;border:1px solid var(--bd)"></div><div style="margin-top:8px;font-size:11px;color:var(--t3);word-break:break-all">'+link+'</div></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSetupQR\').remove()">ปิด</button></div></div>';
+  document.body.appendChild(mo);
+  setTimeout(function(){var box=$('setupQRBox');if(box&&typeof QRCode!=='undefined'){box.innerHTML='';new QRCode(box,{text:link,width:180,height:180})}},200);
 }
 function saveConnectionSettings(){
   var s=getShopSettings();
@@ -2944,10 +2960,10 @@ function viewMemberDetail(mid){
     '<div class="kpi"><div class="kpi-lbl">ออเดอร์</div><div class="kpi-val">'+orders.length+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">ระดับ</div><div class="kpi-val" style="font-size:16px">'+m.level+'</div></div></div>'+
     '<div class="card" style="box-shadow:none;background:var(--bg)"><div class="grid g2">'+
-    '<div><div class="form-label">เบอร์โทร</div><div>'+m.phone+'</div></div>'+
-    '<div><div class="form-label">LINE ID</div><div>'+(m.lineId||'-')+'</div></div>'+
-    '<div><div class="form-label">ที่อยู่</div><div>'+(m.addrType==='condo'?(m.proj||'')+' '+(m.room||''):(m.village||'')+' '+(m.houseNo||''))+'</div></div>'+
-    '<div><div class="form-label">สมัครเมื่อ</div><div>'+m.joinDate+'</div></div>'+
+    '<div><div class="form-label">เบอร์โทร</div><div>'+fmtPhone(m.phone)+'</div></div>'+
+    '<div><div class="form-label">LINE ID</div><div>'+(m.lineId||'-')+(m.lineUserId?' <span style="font-size:10px;color:var(--gn)">✅ UID</span>':'')+'</div></div>'+
+    '<div><div class="form-label">ที่อยู่</div><div>'+(m.addrType==='condo'?(m.proj?m.proj:'')+(m.room?' ห้อง '+m.room:''):(m.village?m.village:'')+(m.houseNo?' '+m.houseNo:''))||'-'+'</div></div>'+
+    '<div><div class="form-label">สมัครเมื่อ</div><div>'+formatBillDate(m.joinDate)+'</div></div>'+
     '</div></div>'+
     '<button class="btn btn-out btn-sm" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไขข้อมูล</button> '+
     '<button class="btn btn-pr btn-sm" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+
@@ -2961,21 +2977,33 @@ function viewMemberDetail(mid){
 // ═══ EDIT MEMBER ═══
 function openEditMember(mid){
   const m=gM(mid);if(!m) return;
-  const h='<div class="modal-overlay show" id="moEditMem"><div class="modal"><div class="modal-head"><h3>✏️ แก้ไขสมาชิก '+m.id+'</h3><button class="modal-close" onclick="document.getElementById(\'moEditMem\').remove()">&times;</button></div>'+
-    '<div class="modal-body">'+
+  var ph=fmtPhone(m.phone);
+  const h='<div class="modal-overlay show" id="moEditMem"><div class="modal" style="max-width:560px"><div class="modal-head"><h3>✏️ แก้ไขสมาชิก '+m.id+'</h3><button class="modal-close" onclick="document.getElementById(\'moEditMem\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="overflow-y:auto">'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input id="em-name" value="'+m.name+'"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="em-nick" value="'+(m.nick||'')+'"></div></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">เบอร์โทร</label><input id="em-phone" value="'+m.phone+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">เบอร์โทร</label><input id="em-phone" value="'+ph+'"></div>'+
     '<div class="form-group"><label class="form-label">LINE ID</label><input id="em-line" value="'+(m.lineId||'')+'"></div></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">แต้มสะสม</label><input id="em-pts" type="number" value="'+m.pts+'"></div>'+
+    '<div class="form-group"><label class="form-label">LINE User ID</label><input id="em-line-uid" value="'+(m.lineUserId||'')+'" placeholder="Uxxxxxxxx (ได้จาก webhook/LIFF)"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="em-addr"><option value="condo"'+(m.addrType==='condo'?' selected':'')+'>คอนโด</option><option value="house"'+(m.addrType==='house'?' selected':'')+'>บ้าน/หมู่บ้าน</option></select></div>'+
+    '<div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="em-proj" value="'+(m.proj||'')+'"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="em-room" value="'+(m.room||m.houseNo||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ระดับ</label><select id="em-level"><option'+(m.level==='ทั่วไป'?' selected':'')+'>ทั่วไป</option><option'+(m.level==='Silver'?' selected':'')+'>Silver</option><option'+(m.level==='Gold'?' selected':'')+'>Gold</option><option'+(m.level==='VIP'?' selected':'')+'>VIP</option></select></div></div>'+
+    '<div class="form-group"><label class="form-label">แต้มสะสม</label><input id="em-pts" type="number" value="'+m.pts+'"></div>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moEditMem\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveEditMember(\''+mid+'\')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function saveEditMember(mid){
   const m=gM(mid);if(!m) return;
   m.name=$('em-name').value.trim()||m.name;m.nick=$('em-nick').value.trim();
-  m.phone=$('em-phone').value.trim()||m.phone;m.lineId=$('em-line').value.trim();
+  var rawPhone=$('em-phone').value.trim().replace(/[^0-9]/g,'');
+  if(rawPhone&&rawPhone.charAt(0)!=='0') rawPhone='0'+rawPhone;
+  m.phone=rawPhone||m.phone;
+  m.lineId=$('em-line').value.trim();
+  m.lineUserId=$('em-line-uid')?$('em-line-uid').value.trim():'';
+  m.addrType=$('em-addr')?$('em-addr').value:'condo';
+  m.proj=$('em-proj')?$('em-proj').value.trim():'';
+  m.room=$('em-room')?$('em-room').value.trim():'';
   m.pts=parseInt($('em-pts').value)||0;m.level=$('em-level').value;
   saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);toast('แก้ไขสำเร็จ ✅');
   const mo=$('moEditMem');if(mo) mo.remove();renderPage(curPage);
@@ -3576,7 +3604,7 @@ function startDailyReportSchedule(){
         sendDailyReport();
       }
     }
-  },60000);
+  },30000);
 }
 async function sendDailyReport(){
   var s=getShopSettings();
@@ -4027,7 +4055,7 @@ saveDB=function(){
   if(syncTimer) clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     if(getApiUrl()&&curUser) syncPushAll();
-  },10000);
+  },5000);
 };
 
 // ── Auto-pull every 60 seconds ──
@@ -4037,7 +4065,7 @@ function startAutoPull(){
   autoPullInterval=setInterval(function(){
     if(!getApiUrl()||!curUser||syncStatus==='syncing') return;
     syncPullSilent();
-  },60000);
+  },30000);
 }
 async function syncPullSilent(){
   try{
@@ -4046,7 +4074,8 @@ async function syncPullSilent(){
     var d=data.data;var changed=false;
     // CRITICAL: only update if cloud has data (never overwrite with empty!)
     if(d.orders&&d.orders.length>0&&d.orders.length!==(DB.orders||[]).length){DB.orders=d.orders.map(fixOrder);changed=true}
-    if(d.members&&d.members.length>0&&d.members.length!==(DB.members||[]).length){DB.members=d.members;changed=true}
+    if(d.members&&d.members.length>0&&d.members.length!==(DB.members||[]).length){
+      DB.members=d.members.map(function(m){var p=String(m.phone||'').replace(/^'+/,'').replace(/[^0-9]/g,'');if(p&&p.charAt(0)!=='0')p='0'+p;m.phone=p;return m});changed=true}
     if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
     if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
     if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
@@ -4123,10 +4152,21 @@ async function syncTestConnection(){
 
 // ═══ BOOTSTRAP ═══
 loadDB();initDarkMode();
-// Check public register page BEFORE login
 if(location.search.includes('page=register')||location.search.includes('r=1')){
   document.body.style.overflow='auto';document.body.style.height='auto';
   renderPublicRegister();
+}else if(location.search.includes('setup=')){
+  var setupApi=new URLSearchParams(location.search).get('setup')||'';
+  if(setupApi){
+    var s=getShopSettings();s.apiUrl=setupApi;saveDB();
+    document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--ff)"><div style="text-align:center"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังตั้งค่าอุปกรณ์ใหม่...</div><div style="font-size:13px;color:#888;margin-top:8px">Sync ข้อมูลจาก Cloud</div></div></div>';
+    setTimeout(function(){
+      syncPullAll().then(function(){
+        history.replaceState(null,'',location.pathname);
+        location.reload();
+      });
+    },1500);
+  }
 }else{
   initLockScreen();
 }
