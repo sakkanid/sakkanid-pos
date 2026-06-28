@@ -742,35 +742,46 @@ function savePublicRegister(){
     room:$('pr-room')?$('pr-room').value.trim():'',
     pdpaConsent:'yes'
   };
-  // Show loading
   var el=$('publicRegPage');
   if(el) el.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
   if(apiUrl){
-    // Send directly to Google Sheets via Apps Script
-    fetch(apiUrl+'?action=registerMember',{method:'POST',mode:'no-cors',body:JSON.stringify(memberData)});
-    // Show success after short delay (no-cors can't read response)
-    setTimeout(function(){showRegSuccess(name,phone)},2000);
+    // Use JSONP (script tag) to bypass CORS — encode data in URL
+    var cbName='_regcb_'+Date.now();
+    var dataStr=encodeURIComponent(JSON.stringify(memberData));
+    var url=apiUrl+'?action=registerMember&callback='+cbName+'&data='+dataStr;
+    window[cbName]=function(result){
+      delete window[cbName];
+      if(result&&result.ok){
+        showRegSuccess(name,phone,result.memberId||'');
+      }else{
+        showRegSuccess(name,phone,'');
+      }
+    };
+    var sc=document.createElement('script');
+    sc.src=url;
+    sc.onerror=function(){delete window[cbName];showRegSuccess(name,phone,'')};
+    document.head.appendChild(sc);
+    // Timeout fallback
+    setTimeout(function(){if(window[cbName]){delete window[cbName];showRegSuccess(name,phone,'')}},8000);
   }else{
-    // Fallback: old method (generate code for staff)
-    var s=getShopSettings();
     var regJSON=JSON.stringify(memberData);
     var regCode=btoa(unescape(encodeURIComponent(regJSON)));
     window._regMsg='🫧 สมัครสมาชิกใหม่\n\n👤 '+name+'\n📱 '+phone+'\n\n##REG##'+regCode+'##END##';
     showRegSuccessFallback(name,phone);
   }
 }
-function showRegSuccess(name,phone){
+function showRegSuccess(name,phone,memberId){
   var shopName=new URLSearchParams(location.search).get('s')||'SAKKANID';
   var el=$('publicRegPage');
   if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
     '<div style="font-size:56px;margin-bottom:8px">🎉</div>'+
     '<div style="font-size:22px;font-weight:800;color:#0D8A6A;margin-bottom:8px">สมัครสมาชิกสำเร็จ!</div>'+
-    '<div style="font-size:14px;color:#6B7A88;margin-bottom:20px">ข้อมูลถูกบันทึกในระบบอัตโนมัติ</div>'+
+    (memberId?'<div style="font-size:15px;color:#006F98;margin-bottom:16px">รหัสสมาชิก: <strong>'+memberId+'</strong></div>':'')+
     '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
     '<div style="font-weight:700;font-size:16px;color:#0D8A6A">'+name+'</div>'+
     '<div style="font-size:13px;color:#6B7A88;margin-top:4px">📱 '+phone+'</div>'+
-    '<div style="font-size:13px;color:#0D8A6A;margin-top:8px">✅ ข้อมูลเข้าระบบอัตโนมัติ<br>✅ LINE แจ้งเตือนสมัครสำเร็จ<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
-    '<div style="font-size:14px;color:#666;margin-bottom:8px">ขอบคุณที่สมัครสมาชิก '+shopName+' ค่ะ 🫧</div></div>';
+    '<div style="font-size:13px;color:#0D8A6A;margin-top:8px">✅ ข้อมูลเข้าระบบอัตโนมัติ<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
+    '<div style="font-size:14px;color:#666">ขอบคุณที่สมัครสมาชิก '+shopName+' ค่ะ 🫧</div></div>';
 }
 function showRegSuccessFallback(name,phone){
   var el=$('publicRegPage');
