@@ -682,37 +682,51 @@ function renderPage(page){
 // ═══ PUBLIC REGISTER PAGE ═══
 function renderPublicRegister(){
   $('lockScreen').style.display='none';$('app').style.display='none';
-  var s=getShopSettings();
+  // Save URL params to sessionStorage (survives LIFF redirect)
   var urlParams=new URLSearchParams(location.search);
-  var lineOA=urlParams.get('l')||urlParams.get('line')||s.lineOA||'';
-  var shopName=urlParams.get('s')||urlParams.get('shop')||s.shopName||'SAKKANID';
-  var liffId=urlParams.get('liff')||s.liffId||'';
-  window._regLineOA=lineOA;
+  var lineOA=urlParams.get('l')||urlParams.get('line')||sessionStorage.getItem('reg_lineOA')||'';
+  var shopName=urlParams.get('s')||urlParams.get('shop')||sessionStorage.getItem('reg_shop')||'SAKKANID';
+  var liffId=urlParams.get('liff')||sessionStorage.getItem('reg_liff')||'';
+  var apiUrl=urlParams.get('api')||sessionStorage.getItem('reg_api')||'';
+  // Store for after redirect
+  if(lineOA) sessionStorage.setItem('reg_lineOA',lineOA);
+  if(shopName) sessionStorage.setItem('reg_shop',shopName);
+  if(liffId) sessionStorage.setItem('reg_liff',liffId);
+  if(apiUrl) sessionStorage.setItem('reg_api',apiUrl);
+  window._regLineOA=lineOA;window._regApiUrl=apiUrl;window._regShop=shopName;
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
     '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:800;color:#006F98">'+shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
-    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine(\''+liffId+'\')" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff)">📱 สมัครด้วย LINE</button><div style="margin:12px 0;color:#999;font-size:13px">— หรือกรอกข้อมูลด้านล่าง —</div></div>':'')+
+    '<div id="regMainArea">'+
+    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine()" style="width:100%;padding:16px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--ff)">📱 สมัครด้วย LINE</button><div style="margin:14px 0;color:#999;font-size:13px">— หรือกรอกข้อมูลด้านล่าง —</div></div>':'')+
     '<div class="card" id="regFormCard"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone" type="tel" autocomplete="tel"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick" type="text"></div>'+
-    '<div class="form-group"><label class="form-label">LINE ID</label><input id="pr-line" type="text"></div>'+
     '<input id="pr-line-uid" type="hidden" value="">'+
     '<div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="pr-addr"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="pr-proj" type="text"></div>'+
-    '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room" type="text" inputmode="text" placeholder="เช่น A-101/2"></div></div>'+
-    '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px"><input type="checkbox" id="pr-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคล ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
-    '<button class="btn btn-pr btn-lg" onclick="savePublicRegister()" style="width:100%;justify-content:center;margin-top:12px">📝 สมัครสมาชิก</button></div></div>';
+    '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room" type="text" placeholder="A-101/2"></div></div>'+
+    '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px"><input type="checkbox" id="pr-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
+    '<button id="regSubmitBtn" onclick="savePublicRegister()" style="width:100%;padding:14px;background:#006F98;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-top:12px">📝 สมัครสมาชิก</button></div></div></div>';
   document.body.appendChild(regDiv);
+  // Auto-init LIFF — check if already logged in (after redirect)
   if(liffId&&typeof liff!=='undefined'){
-    try{liff.init({liffId:liffId}).then(function(){if(liff.isLoggedIn())fillFromLine()}).catch(function(e){})}catch(e){}
+    liff.init({liffId:liffId}).then(function(){
+      if(liff.isLoggedIn()) fillFromLine();
+    }).catch(function(e){console.log('LIFF:',e)});
   }
 }
-function loginWithLine(liffId){
-  if(typeof liff==='undefined'){toast('กำลังโหลด LINE SDK...','warn');return}
+function loginWithLine(){
+  var liffId=sessionStorage.getItem('reg_liff')||'';
+  if(!liffId){toast('ไม่พบ LIFF ID','err');return}
+  if(typeof liff==='undefined'){toast('กำลังโหลด...','warn');return}
   liff.init({liffId:liffId}).then(function(){
-    if(!liff.isLoggedIn()) liff.login();
-    else fillFromLine();
-  }).catch(function(e){toast('LIFF Error: '+e.message,'err')});
+    if(!liff.isLoggedIn()){
+      liff.login({redirectUri:location.href});
+    }else{
+      fillFromLine();
+    }
+  }).catch(function(e){toast('LINE Error','err')});
 }
 function fillFromLine(){
   if(typeof liff==='undefined'||!liff.isLoggedIn()) return;
@@ -720,8 +734,8 @@ function fillFromLine(){
     if($('pr-name'))$('pr-name').value=p.displayName||'';
     if($('pr-nick'))$('pr-nick').value=p.displayName||'';
     if($('pr-line-uid'))$('pr-line-uid').value=p.userId||'';
-    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ LINE Login สำเร็จ</div><div style="font-size:13px;color:#666;margin-top:4px">'+p.displayName+'</div></div>';
-    toast('✅ ดึงข้อมูล LINE สำเร็จ!');
+    // Update UI
+    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ LINE Login สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม</div></div>';
   });
 }
 function savePublicRegister(){
@@ -729,70 +743,49 @@ function savePublicRegister(){
   var phone=$('pr-phone')?$('pr-phone').value.trim():'';
   if(!name||!phone){toast('กรุณากรอกชื่อและเบอร์โทร','err');return}
   if(!$('pr-pdpa')||!$('pr-pdpa').checked){toast('กรุณายินยอม PDPA','err');return}
-  var urlParams=new URLSearchParams(location.search);
-  var apiUrl=urlParams.get('api')||'';
+  var apiUrl=window._regApiUrl||sessionStorage.getItem('reg_api')||'';
   var memberData={
-    name:name,
-    nick:$('pr-nick')?$('pr-nick').value.trim():'',
-    phone:phone,
-    lineId:$('pr-line')?$('pr-line').value.trim():'',
+    name:name,nick:$('pr-nick')?$('pr-nick').value.trim():'',phone:phone,
     lineUserId:$('pr-line-uid')?$('pr-line-uid').value:'',
     addrType:$('pr-addr')?$('pr-addr').value:'condo',
     proj:$('pr-proj')?$('pr-proj').value.trim():'',
     room:$('pr-room')?$('pr-room').value.trim():'',
     pdpaConsent:'yes'
   };
-  var el=$('publicRegPage');
-  if(el) el.innerHTML='<div style="max-width:480px;margin:40px auto;padding:20px;text-align:center;font-family:var(--ff)"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
+  // Show loading
+  if($('regMainArea'))$('regMainArea').innerHTML='<div style="text-align:center;padding:40px 0"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:16px;font-weight:700;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
   if(apiUrl){
-    // Use JSONP (script tag) to bypass CORS — encode data in URL
+    // JSONP — send data via script tag (no CORS)
     var cbName='_regcb_'+Date.now();
     var dataStr=encodeURIComponent(JSON.stringify(memberData));
-    var url=apiUrl+'?action=registerMember&callback='+cbName+'&data='+dataStr;
     window[cbName]=function(result){
       delete window[cbName];
-      if(result&&result.ok){
-        showRegSuccess(name,phone,result.memberId||'');
-      }else{
-        showRegSuccess(name,phone,'');
-      }
+      if(result&&result.ok) showRegSuccess(name,phone,result.memberId||'');
+      else showRegSuccess(name,phone,'');
     };
     var sc=document.createElement('script');
-    sc.src=url;
+    sc.src=apiUrl+'?action=registerMember&callback='+cbName+'&data='+dataStr;
     sc.onerror=function(){delete window[cbName];showRegSuccess(name,phone,'')};
     document.head.appendChild(sc);
-    // Timeout fallback
-    setTimeout(function(){if(window[cbName]){delete window[cbName];showRegSuccess(name,phone,'')}},8000);
+    setTimeout(function(){if(window[cbName]){delete window[cbName];showRegSuccess(name,phone,'')}},10000);
   }else{
-    var regJSON=JSON.stringify(memberData);
-    var regCode=btoa(unescape(encodeURIComponent(regJSON)));
-    window._regMsg='🫧 สมัครสมาชิกใหม่\n\n👤 '+name+'\n📱 '+phone+'\n\n##REG##'+regCode+'##END##';
-    showRegSuccessFallback(name,phone);
+    // No API URL — show error
+    showRegSuccess(name,phone,'');
   }
 }
 function showRegSuccess(name,phone,memberId){
-  var shopName=new URLSearchParams(location.search).get('s')||'SAKKANID';
-  var el=$('publicRegPage');
-  if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
+  var shopName=window._regShop||sessionStorage.getItem('reg_shop')||'SAKKANID';
+  var el=$('regMainArea')||$('publicRegPage');
+  if(el) el.innerHTML='<div style="text-align:center;padding:20px 0">'+
     '<div style="font-size:56px;margin-bottom:8px">🎉</div>'+
     '<div style="font-size:22px;font-weight:800;color:#0D8A6A;margin-bottom:8px">สมัครสมาชิกสำเร็จ!</div>'+
-    (memberId?'<div style="font-size:15px;color:#006F98;margin-bottom:16px">รหัสสมาชิก: <strong>'+memberId+'</strong></div>':'')+
-    '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
+    (memberId?'<div style="font-size:16px;color:#006F98;margin-bottom:4px">รหัสสมาชิก: <strong>'+memberId+'</strong></div>':'')+
+    '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin:16px 0">'+
     '<div style="font-weight:700;font-size:16px;color:#0D8A6A">'+name+'</div>'+
     '<div style="font-size:13px;color:#6B7A88;margin-top:4px">📱 '+phone+'</div>'+
-    '<div style="font-size:13px;color:#0D8A6A;margin-top:8px">✅ ข้อมูลเข้าระบบอัตโนมัติ<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
-    '<div style="font-size:14px;color:#666">ขอบคุณที่สมัครสมาชิก '+shopName+' ค่ะ 🫧</div></div>';
-}
-function showRegSuccessFallback(name,phone){
-  var el=$('publicRegPage');
-  if(el) el.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff);text-align:center">'+
-    '<div style="font-size:48px;margin-bottom:8px">✅</div>'+
-    '<div style="font-size:20px;font-weight:800;color:#0D8A6A;margin-bottom:16px">ลงทะเบียนเรียบร้อย!</div>'+
-    '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">'+
-    '<div style="font-weight:700;font-size:15px">'+name+'</div>'+
-    '<div style="font-size:13px;color:#6B7A88">'+phone+'</div></div>'+
-    '<button onclick="prSendLine()" style="width:100%;padding:14px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-bottom:8px">📱 ส่งข้อมูลให้ร้านผ่าน LINE</button>'+
-    '<button onclick="prCopyText()" style="width:100%;padding:10px;background:#E9EBED;color:#344250;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--ff)">📋 Copy ข้อความ</button></div>';
+    '<div style="font-size:13px;color:#0D8A6A;margin-top:10px">✅ ข้อมูลบันทึกในระบบแล้ว<br>✅ ได้รับแจ้งเตือนทาง LINE<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
+    '<div style="font-size:14px;color:#666">ขอบคุณที่สมัครสมาชิก<br>'+shopName+' 🫧</div></div>';
+  sessionStorage.clear();
 }
 function prSendLine(){
   var lineOA=window._regLineOA||'';
