@@ -3807,15 +3807,22 @@ function exportDocsCSV(){
 // ═══ LINE MESSAGING ═══
 async function sendLineMessage(userId,messages){
   var apiUrl=getApiUrl();
-  if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน — ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return{ok:false}}
-  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID — ลูกค้าต้อง Add LINE OA ก่อน','err');return{ok:false}}
-  var token=getShopSettings().lineChannelToken||'';
-  if(!token){toast('⚠️ ยังไม่ได้ตั้งค่า LINE Channel Token — ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return{ok:false}}
+  if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','err');return{ok:false}}
   try{
-    var url=apiUrl+'?action=linePush';
-    await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({token:token,to:userId,messages:messages})});
-    toast('📱 ส่ง LINE สำเร็จ ✅');
-    return{ok:true};
+    // Use JSONP to bypass CORS (token is read from settings sheet on server)
+    var data=encodeURIComponent(JSON.stringify({to:userId,messages:messages}));
+    var result=await new Promise(function(resolve,reject){
+      var cbName='_lncb_'+Date.now();
+      window[cbName]=function(r){delete window[cbName];resolve(r)};
+      var sc=document.createElement('script');
+      sc.src=apiUrl+'?action=linePush&callback='+cbName+'&data='+data;
+      sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
+      document.head.appendChild(sc);
+      setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
+    });
+    if(result&&result.ok){toast('📱 ส่ง LINE สำเร็จ ✅');return{ok:true}}
+    else{toast('❌ LINE: '+(result.error||'ไม่ทราบสาเหตุ'),'err');return{ok:false}}
   }catch(e){
     toast('❌ ส่ง LINE ล้มเหลว: '+e.message,'err');
     return{ok:false,error:e.message};
