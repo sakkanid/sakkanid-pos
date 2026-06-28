@@ -122,6 +122,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip:hover{border-color:var(--pr);color:var(--pr)}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:50%;top:0;transform:translateX(-50%);width:80mm;font-size:12px}#printArea.print-a4{width:190mm;font-size:13px}#printArea.print-a5{width:138mm;font-size:11px}@page{margin:10mm}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
@@ -212,6 +213,7 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
         <div class="topbar-right">
           <div class="search-box" style="width:200px"><input id="globalSearchInput" placeholder="🔍 ค้นหาออเดอร์/สมาชิก..." onkeydown="if(event.key==='Enter')globalSearch(this.value)" style="font-size:12px;padding:6px 10px 6px 32px"></div>
           <span id="clockEl" style="font-family:var(--fm);font-size:12px;color:var(--t3)"></span>
+          <span id="btnRefresh" onclick="refreshPage()" style="cursor:pointer;font-size:13px;padding:4px 8px;border-radius:6px;transition:background .2s" onmouseover="this.style.background='var(--b1)'" onmouseout="this.style.background=''" title="รีเฟรชข้อมูล">🔄</span>
           <span id="syncIndicator" style="cursor:pointer" onclick="openSyncPanel()"><span style="font-size:11px">☁️ Cloud</span></span>
         </div>
       </div>
@@ -640,6 +642,15 @@ function toggleSidebar(force){
   const sb=$('sidebar'),ov=$('sbOverlay');
   const open=force!==undefined?force:!sb.classList.contains('open');
   sb.classList.toggle('open',open);ov.classList.toggle('show',open);
+}
+function refreshPage(){
+  var btn=$('btnRefresh');
+  if(btn){btn.style.animation='spin .6s';setTimeout(function(){btn.style.animation=''},700)}
+  // Pull from cloud if connected
+  if(getApiUrl()){syncPullSilent()}
+  // Re-render current page
+  renderPage(curPage);updBadges();
+  toast('🔄 รีเฟรชข้อมูลแล้ว');
 }
 function startClock(){setInterval(()=>{const d=new Date();$('clockEl').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')},1000)}
 
@@ -2424,7 +2435,10 @@ function renderSettingsConnect(s){
     '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
     '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
-    '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    (lineOk?'<button class="btn btn-gn btn-sm" onclick="fetchLineUsers()">📱 จับคู่ LINE Users</button>':'')+
+    '</div>'+
+    (lineOk?'<div style="margin-top:8px;padding:8px;background:var(--prl);border-radius:6px;font-size:11px"><strong>Webhook URL (ตั้งค่าใน LINE Developers):</strong><br><code style="font-size:10px;word-break:break-all">'+(s.apiUrl||'[ตั้งค่า API URL ก่อน]')+'?action=lineWebhook</code></div>':'')+
     '</div></div>'+
     // Daily Report
     '<div class="card"><div class="card-title">📊 รายงานประจำวันทาง LINE</div>'+
@@ -3351,13 +3365,23 @@ function mcDeletePreset(i){
 }
 function mcExportPNG(){
   var el=$('memberCardEl');if(!el) return;
-  toast('กำลัง Export PNG... (ต้องการ html2canvas)','info');
+  toast('กำลัง Export PNG...','info');
+  var qrCanvas=$('memberQR')?$('memberQR').querySelector('canvas'):null;
   if(typeof html2canvas!=='undefined'){
-    html2canvas(el).then(function(canvas){
+    html2canvas(el,{scale:2,backgroundColor:null,useCORS:true}).then(function(canvas){
+      // If QR was missed by html2canvas, draw it manually
+      if(qrCanvas){
+        var ctx=canvas.getContext('2d');
+        var qrEl=$('memberQR');
+        var rect=qrEl.getBoundingClientRect();var elRect=el.getBoundingClientRect();
+        var x=(rect.left-elRect.left)*2,y=(rect.top-elRect.top)*2;
+        ctx.fillStyle='#fff';ctx.fillRect(x,y,qrCanvas.width*2+16,qrCanvas.height*2+16);
+        ctx.drawImage(qrCanvas,x+8,y+8,qrCanvas.width*2,qrCanvas.height*2);
+      }
       var a=document.createElement('a');a.href=canvas.toDataURL('image/png');
       a.download='member_card_'+window._mcMid+'.png';a.click();toast('Export PNG สำเร็จ ✅');
     });
-  }else{printMemberCard()}
+  }else{toast('ไม่พบ html2canvas','err')}
 }
 
 // ═══ MISSING — CRM/MEMBER ═══
@@ -3739,6 +3763,46 @@ async function sendStatusViaLine(oid){
 
   await sendLineMessage(userId,[{type:'text',text:msg}]);
   logAction('SEND_LINE_STATUS',o.id+' → '+o.status);
+}
+
+// ── Fetch LINE Users from webhook & match with members ──
+async function fetchLineUsers(){
+  var apiUrl=getApiUrl();if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return}
+  toast('📱 กำลังดึงข้อมูล LINE Users...','info');
+  try{
+    var data=await jsonpCall('getLineUsers','');
+    if(!data.ok||!data.data){toast('❌ ดึงข้อมูลไม่ได้','err');return}
+    var lineUsers=data.data;
+    if(!lineUsers.length){toast('ยังไม่มี LINE Users — ลูกค้าต้องส่งข้อความหา LINE OA ก่อน','warn');return}
+    // Show matching UI
+    var matched=0;
+    var h='<div class="modal-overlay show" id="moLineUsers"><div class="modal" style="max-width:600px"><div class="modal-head"><h3>📱 LINE Users ('+lineUsers.length+' คน)</h3><button class="modal-close" onclick="document.getElementById(\'moLineUsers\').remove()">&times;</button></div>'+
+      '<div class="modal-body" style="overflow-y:auto;max-height:60vh"><table><tr><th>LINE Name</th><th>User ID</th><th>สมาชิกในระบบ</th><th></th></tr>';
+    lineUsers.forEach(function(lu){
+      var uid=lu.userId||'';var name=lu.displayName||'';
+      var existingMember=DB.members.find(function(m){return m.lineUserId===uid});
+      if(existingMember) matched++;
+      h+='<tr><td><strong>'+name+'</strong></td><td style="font-size:10px;font-family:var(--fm)">'+uid.substring(0,12)+'...</td>';
+      if(existingMember){
+        h+='<td><span class="badge bg-gn">✅ '+existingMember.name+'</span></td><td>เชื่อมแล้ว</td>';
+      }else{
+        h+='<td><select id="lnk-'+uid.substring(0,8)+'" style="font-size:12px"><option value="">— เลือกสมาชิก —</option>'+DB.members.filter(function(m){return !m.lineUserId}).map(function(m){return '<option value="'+m.id+'">'+m.name+' ('+String(m.phone||'')+')</option>'}).join('')+'</select></td>';
+        h+='<td><button class="btn btn-pr btn-sm" onclick="linkLineUser(\''+uid+'\',\'lnk-'+uid.substring(0,8)+'\')">เชื่อม</button></td>';
+      }
+      h+='</tr>';
+    });
+    h+='</table></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moLineUsers\').remove()">ปิด</button><div style="font-size:12px;color:var(--t3)">เชื่อมแล้ว '+matched+'/'+lineUsers.length+'</div></div></div></div>';
+    document.body.insertAdjacentHTML('beforeend',h);
+  }catch(e){toast('❌ '+e.message,'err')}
+}
+function linkLineUser(userId,selectId){
+  var sel=$(selectId);if(!sel||!sel.value){toast('เลือกสมาชิกก่อน','err');return}
+  var m=gM(sel.value);if(!m){toast('ไม่พบสมาชิก','err');return}
+  m.lineUserId=userId;
+  saveDB();
+  toast('✅ เชื่อม LINE User กับ '+m.name+' สำเร็จ!');
+  document.getElementById('moLineUsers').remove();
+  fetchLineUsers();
 }
 
 // ═══ GOOGLE SHEETS SYNC ═══
