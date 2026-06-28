@@ -748,10 +748,11 @@ function loginWithLine(){
 function fillFromLine(){
   if(typeof liff==='undefined'||!liff.isLoggedIn()) return;
   liff.getProfile().then(function(p){
+    sessionStorage.setItem('reg_lineUserId',p.userId||'');
+    sessionStorage.setItem('reg_lineName',p.displayName||'');
     if($('pr-name'))$('pr-name').value=p.displayName||'';
     if($('pr-nick'))$('pr-nick').value=p.displayName||'';
     if($('pr-line-uid'))$('pr-line-uid').value=p.userId||'';
-    // Update UI
     if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ LINE Login สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม</div></div>';
   });
 }
@@ -761,9 +762,10 @@ function savePublicRegister(){
   if(!name||!phone){toast('กรุณากรอกชื่อและเบอร์โทร','err');return}
   if(!$('pr-pdpa')||!$('pr-pdpa').checked){toast('กรุณายินยอม PDPA','err');return}
   var apiUrl=window._regApiUrl||sessionStorage.getItem('reg_api')||'';
+  var lineUserId=($('pr-line-uid')?$('pr-line-uid').value:'')||sessionStorage.getItem('reg_lineUserId')||'';
   var memberData={
     name:name,nick:$('pr-nick')?$('pr-nick').value.trim():'',phone:phone,
-    lineUserId:$('pr-line-uid')?$('pr-line-uid').value:'',
+    lineUserId:lineUserId,
     addrType:$('pr-addr')?$('pr-addr').value:'condo',
     proj:$('pr-proj')?$('pr-proj').value.trim():'',
     room:$('pr-room')?$('pr-room').value.trim():'',
@@ -3329,15 +3331,16 @@ function sendBillCollect(oid){
 function renderLineTemplates(){
   var s=getShopSettings();var tpl=s.lineTemplates||{};
   return '<div class="card"><div class="card-title">📱 LINE Message Templates</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date}</p>'+
-    '<div class="form-group"><label class="form-label">แจ้งสถานะ</label><textarea id="lt-status" rows="3" style="font-size:12px">'+(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
-    '<div class="form-group"><label class="form-label">เรียกเก็บเงิน</label><textarea id="lt-bill" rows="3" style="font-size:12px">'+(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏')+'</textarea></div>'+
-    '<div class="form-group"><label class="form-label">ผ้าพร้อมส่ง</label><textarea id="lt-ready" rows="3" style="font-size:12px">'+(tpl.ready||'สวัสดีค่ะ {name} 🫧\nผ้าของคุณพร้อมส่งแล้วค่ะ!\nออเดอร์: {id}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts}</p>'+
+    '<div class="form-group"><label class="form-label">🎉 ต้อนรับสมาชิกใหม่</label><textarea id="lt-welcome" rows="4" style="font-size:12px">'+(tpl.welcome||'สวัสดีค่ะ {name} 🫧\n\nยินดีต้อนรับสู่ {shop}\nสมัครสมาชิกสำเร็จแล้ว ✅\n\nรหัสสมาชิก: {id}\nระดับ: {level}\nแต้มต้อนรับ: {pts} แต้ม 🎉\n\nขอบคุณที่ใช้บริการค่ะ 💙')+'</textarea></div>'+
+    '<div class="form-group"><label class="form-label">📋 แจ้งสถานะ</label><textarea id="lt-status" rows="3" style="font-size:12px">'+(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
+    '<div class="form-group"><label class="form-label">💰 เรียกเก็บเงิน</label><textarea id="lt-bill" rows="3" style="font-size:12px">'+(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏')+'</textarea></div>'+
+    '<div class="form-group"><label class="form-label">✅ ผ้าพร้อมส่ง</label><textarea id="lt-ready" rows="3" style="font-size:12px">'+(tpl.ready||'สวัสดีค่ะ {name} 🫧\nผ้าของคุณพร้อมส่งแล้วค่ะ!\nออเดอร์: {id}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
     '<button class="btn btn-pr" onclick="saveLineTemplates()">💾 บันทึก Templates</button></div>';
 }
 function saveLineTemplates(){
   var s=getShopSettings();
-  s.lineTemplates={statusUpdate:$('lt-status')?$('lt-status').value:'',billCollect:$('lt-bill')?$('lt-bill').value:'',ready:$('lt-ready')?$('lt-ready').value:''};
+  s.lineTemplates={welcome:$('lt-welcome')?$('lt-welcome').value:'',statusUpdate:$('lt-status')?$('lt-status').value:'',billCollect:$('lt-bill')?$('lt-bill').value:'',ready:$('lt-ready')?$('lt-ready').value:''};
   saveDB();toast('บันทึก LINE Templates สำเร็จ ✅');
 }
 
@@ -3867,17 +3870,16 @@ async function sendStatusViaLine(oid){
   var m=gM(o.mid);
   var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
-  var s=getShopSettings();
-  var msg=s.shopName+'\n📋 แจ้งสถานะออเดอร์\n\n';
-  msg+='เลขที่: '+o.id+'\n';
-  msg+='ลูกค้า: '+o.mname+'\n';
-  msg+='สถานะ: '+o.status+'\n';
-  if(o.pickupDate) msg+='📅 วันนัดรับ: '+fmtISO(o.pickupDate)+'\n';
-  if(!isPaidCheck(o)) msg+='\n❌ ค้างชำระ: '+thb(remaining(o))+'\n';
-  msg+='\n'+s.shopName+' · '+fmtPhone(s.phone);
+  var s=getShopSettings();var tpl=s.lineTemplates||{};
+  var msg=(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')
+    .replace(/\{name\}/g,o.mname).replace(/\{shop\}/g,s.shopName).replace(/\{id\}/g,o.id)
+    .replace(/\{status\}/g,o.status).replace(/\{amount\}/g,thb(remaining(o)))
+    .replace(/\{date\}/g,o.pickupDate?fmtJoinDate(o.pickupDate):'');
+  if(!isPaidCheck(o)) msg+='\n\n❌ ค้างชำระ: '+thb(remaining(o));
 
   await sendLineMessage(userId,[{type:'text',text:msg}]);
   logAction('SEND_LINE_STATUS',o.id+' → '+o.status);
+  toast('📱 ส่ง LINE แจ้งสถานะสำเร็จ ✅');
 }
 
 // ── Fetch LINE Users from webhook & match with members ──
