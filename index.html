@@ -1249,6 +1249,12 @@ function advanceStatus(oid){
   o.status=nextSt;saveDB();
   logAction('CHANGE_STATUS',oid+' → '+nextSt);
   toast(oid+' → '+nextSt);renderPage(curPage);
+  // Auto-send LINE notification
+  var m=gM(o.mid);
+  if(m&&m.lineUserId){
+    var s=getShopSettings();
+    sendFlexStatus(m.lineUserId,o,s);
+  }
 }
 
 // ═══ PAY MODAL ═══
