@@ -3328,8 +3328,16 @@ function sendBillCollect(oid){
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moLineBill\').remove()">ปิด</button>'+
     '<button class="btn btn-out" onclick="navigator.clipboard.writeText(\''+msg.replace(/'/g,"\\'")+'\');toast(\'Copy สำเร็จ ✅\')">📋 Copy</button>'+
-    (userId?'<button class="btn btn-gn" onclick="document.getElementById(\'moLineBill\').remove();sendLineMessage(\''+userId+'\',[{type:\'text\',text:\''+msg.replace(/'/g,"\\'").replace(/\n/g,"\\n")+'\'}])">📱 ส่ง LINE</button>':'')+'</div></div></div>';
+    (userId?'<button class="btn btn-gn" onclick="document.getElementById(\'moLineBill\').remove();doBillCollectLine(\''+oid+'\')">📱 ส่ง LINE (Flex)</button>':'')+'</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
+}
+async function doBillCollectLine(oid){
+  var o=gO(oid);if(!o) return;
+  var m=gM(o.mid);var userId=m?m.lineUserId:'';
+  if(!userId){toast('⚠️ ไม่มี LINE User ID','err');return}
+  var s=getShopSettings();
+  await sendFlexBill(userId,o,s,'');
+  logAction('SEND_LINE_COLLECT',o.id);
 }
 
 // ═══ LINE TEMPLATE SETTINGS ═══
@@ -3863,14 +3871,8 @@ async function sendStatusViaLine(oid){
   var m=gM(o.mid);
   var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
-  var s=getShopSettings();var tpl=s.lineTemplates||{};
-  var msg=(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')
-    .replace(/\{name\}/g,o.mname).replace(/\{shop\}/g,s.shopName).replace(/\{id\}/g,o.id)
-    .replace(/\{status\}/g,o.status).replace(/\{amount\}/g,thb(remaining(o)))
-    .replace(/\{date\}/g,o.pickupDate?fmtJoinDate(o.pickupDate):'');
-  if(!isPaidCheck(o)) msg+='\n\n❌ ค้างชำระ: '+thb(remaining(o));
-
-  await sendLineMessage(userId,[{type:'text',text:msg}]);
+  var s=getShopSettings();
+  await sendFlexStatus(userId,o,s);
   logAction('SEND_LINE_STATUS',o.id+' → '+o.status);
   toast('📱 ส่ง LINE แจ้งสถานะสำเร็จ ✅');
 }
@@ -3883,52 +3885,106 @@ async function sendDocViaLine(oid,docNum){
 }
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
-  var items=(o.items||[]).map(function(it){
-    return {type:'box',layout:'horizontal',contents:[
-      {type:'text',text:(it.t||'')+(it.o?' · '+it.o:''),size:'sm',color:'#555555',flex:4},
-      {type:'text',text:'x'+it.qty,size:'sm',color:'#888888',flex:1,align:'center'},
-      {type:'text',text:thb(it.p*it.qty),size:'sm',color:'#111111',flex:2,align:'end'}
-    ]};
+  var items=[];
+  (o.items||[]).forEach(function(it){
+    items.push({type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:(it.t||'')+(it.o?' · '+it.o:''),size:'xs',color:'#555555',flex:5,wrap:true},
+      {type:'text',text:'x'+it.qty,size:'xs',color:'#888888',flex:1,align:'center'},
+      {type:'text',text:thb(it.p*it.qty),size:'xs',color:'#111111',flex:2,align:'end'}
+    ]});
+    // English name
+    if(it.k){items.push({type:'text',text:it.k,size:'xxs',color:'#AAAAAA',margin:'none'})}
   });
-  var bodyContents=[
-    {type:'box',layout:'horizontal',contents:[
-      {type:'text',text:'ลูกค้า',size:'sm',color:'#888888',flex:2},
-      {type:'text',text:o.mname,size:'sm',color:'#111111',flex:4}
-    ]},
-    {type:'box',layout:'horizontal',margin:'sm',contents:[
-      {type:'text',text:'วันที่',size:'sm',color:'#888888',flex:2},
-      {type:'text',text:formatBillDate(o.createdAt),size:'sm',color:'#111111',flex:4}
-    ]},
-    {type:'separator',margin:'lg'},
-    {type:'text',text:'รายการ',size:'sm',color:'#888888',margin:'lg'}
-  ].concat(items).concat([
-    {type:'separator',margin:'lg'},
-    {type:'box',layout:'horizontal',margin:'lg',contents:[
-      {type:'text',text:'ยอดสุทธิ',size:'md',weight:'bold',flex:3},
-      {type:'text',text:thb(o.net),size:'md',weight:'bold',color:'#006F98',flex:2,align:'end'}
-    ]},
-    paid?{type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm'}
-      :{type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold',margin:'sm'}
-  ]);
+  if(o.delCost>0){items.push({type:'box',layout:'horizontal',margin:'sm',contents:[
+    {type:'text',text:'🚗 ค่าจัดส่ง',size:'xs',color:'#555555',flex:6},
+    {type:'text',text:thb(o.delCost),size:'xs',color:'#111111',flex:2,align:'end'}
+  ]})}
+  var footerContents=[
+    {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xs',color:'#888888',align:'center'},
+    {type:'text',text:s.shopName,size:'xs',color:'#AAAAAA',align:'center',margin:'xs'},
+    {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:''),size:'xxs',color:'#BBBBBB',align:'center',margin:'xs'}
+  ];
   var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
     type:'bubble',size:'kilo',
-    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'14px',contents:[
       {type:'text',text:s.shopName,color:'#ffffff',size:'lg',weight:'bold'},
-      {type:'text',text:docNum||o.id,color:'#B8E0F0',size:'xs',margin:'xs'}
+      {type:'text',text:(docNum?docNum:paid?'🧾 ใบเสร็จรับเงิน':'📋 แจ้งยอดชำระ'),color:'#B8E0F0',size:'xs',margin:'xs'}
     ]},
-    body:{type:'box',layout:'vertical',contents:bodyContents},
-    footer:{type:'box',layout:'vertical',contents:[
-      {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:''),size:'xs',color:'#AAAAAA',align:'center'}
-    ]}
+    body:{type:'box',layout:'vertical',paddingAll:'14px',contents:[
+      {type:'box',layout:'horizontal',contents:[
+        {type:'text',text:'เลขที่',size:'xs',color:'#888888',flex:2},
+        {type:'text',text:docNum||o.id,size:'xs',color:'#111111',flex:4,weight:'bold'}
+      ]},
+      {type:'box',layout:'horizontal',margin:'xs',contents:[
+        {type:'text',text:'ลูกค้า',size:'xs',color:'#888888',flex:2},
+        {type:'text',text:o.mname,size:'xs',color:'#111111',flex:4}
+      ]},
+      {type:'box',layout:'horizontal',margin:'xs',contents:[
+        {type:'text',text:'วันที่',size:'xs',color:'#888888',flex:2},
+        {type:'text',text:formatBillDate(o.createdAt),size:'xs',color:'#111111',flex:4}
+      ]},
+      {type:'separator',margin:'md'},
+      {type:'text',text:'รายการ',size:'xs',color:'#888888',margin:'md'}
+    ].concat(items).concat([
+      {type:'separator',margin:'md'},
+      {type:'box',layout:'horizontal',margin:'md',contents:[
+        {type:'text',text:'ยอดสุทธิ',size:'md',weight:'bold',flex:3},
+        {type:'text',text:thb(o.net),size:'md',weight:'bold',color:'#006F98',flex:2,align:'end'}
+      ]},
+      paid?{type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm',weight:'bold'}
+        :{type:'box',layout:'vertical',margin:'sm',contents:[
+          {type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold'},
+          {type:'text',text:'กรุณาชำระเงินด้วยนะคะ 🙏',size:'xs',color:'#DC2626',margin:'xs'}
+        ]}
+    ])},
+    footer:{type:'box',layout:'vertical',paddingAll:'12px',contents:footerContents}
   }};
   var messages=[flex];
   // Add QR PromptPay image if unpaid and URL is set
   if(!paid&&s.payQrUrl){
     messages.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
   }
-  toast('📱 กำลังส่ง LINE Flex...','info');
+  toast('📱 กำลังส่ง LINE...','info');
   await sendLineMessage(userId,messages);
-  toast('📱 ส่ง LINE Flex สำเร็จ ✅');
+}
+async function sendFlexStatus(userId,o,s){
+  var paid=isPaidCheck(o);
+  var statusColor=o.status.includes('พร้อมส่ง')?'#1D9E75':o.status.includes('ซัก')?'#D97706':'#006F98';
+  var flex={type:'flex',altText:s.shopName+' '+o.id+' สถานะ: '+o.status,contents:{
+    type:'bubble',size:'kilo',
+    header:{type:'box',layout:'vertical',backgroundColor:statusColor,paddingAll:'14px',contents:[
+      {type:'text',text:s.shopName,color:'#ffffff',size:'md',weight:'bold'},
+      {type:'text',text:'📋 แจ้งสถานะออเดอร์',color:'#ffffffCC',size:'xs',margin:'xs'}
+    ]},
+    body:{type:'box',layout:'vertical',paddingAll:'14px',contents:[
+      {type:'box',layout:'horizontal',contents:[
+        {type:'text',text:'เลขที่',size:'sm',color:'#888888',flex:2},
+        {type:'text',text:o.id,size:'sm',color:'#111111',flex:4,weight:'bold'}
+      ]},
+      {type:'box',layout:'horizontal',margin:'sm',contents:[
+        {type:'text',text:'ลูกค้า',size:'sm',color:'#888888',flex:2},
+        {type:'text',text:o.mname,size:'sm',color:'#111111',flex:4}
+      ]},
+      {type:'separator',margin:'md'},
+      {type:'box',layout:'vertical',margin:'md',backgroundColor:statusColor+'15',cornerRadius:'8px',paddingAll:'10px',contents:[
+        {type:'text',text:'สถานะ',size:'xs',color:'#888888'},
+        {type:'text',text:o.status,size:'lg',weight:'bold',color:statusColor,margin:'xs'}
+      ]},
+      {type:'box',layout:'horizontal',margin:'md',contents:[
+        {type:'text',text:'ยอด',size:'sm',color:'#888888',flex:2},
+        {type:'text',text:thb(o.net),size:'sm',color:'#111111',flex:4,weight:'bold'}
+      ]}
+    ].concat(!paid?[{type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',margin:'sm',weight:'bold'}]:[])
+    .concat(o.pickupDate?[{type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:'📅 นัดรับ',size:'sm',color:'#888888',flex:2},
+      {type:'text',text:fmtJoinDate(o.pickupDate),size:'sm',color:'#111111',flex:4}
+    ]}]:[])},
+    footer:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xs',color:'#888888',align:'center'},
+      {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:''),size:'xxs',color:'#BBBBBB',align:'center',margin:'xs'}
+    ]}
+  }};
+  await sendLineMessage(userId,[flex]);
 }
 
 // ── Fetch LINE Users from webhook & match with members ──
