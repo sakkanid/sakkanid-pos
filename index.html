@@ -3944,25 +3944,34 @@ async function sendBillImageViaLine(oid){
   var o=gO(oid);if(!o) return;
   var m=gM(o.mid);var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
-  // Capture bill as image using html2canvas
   var billEl=document.getElementById('printArea');
   if(!billEl){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
   toast('📸 กำลังจับภาพบิล...','info');
   try{
     var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
     var base64=canvas.toDataURL('image/png');
-    toast('📤 กำลังอัปโหลดรูป...','info');
-    // Upload to Drive via Apps Script POST
+    toast('📤 กำลังอัปโหลด + ส่ง LINE...','info');
     var apiUrl=getApiUrl();
-    var resp=await fetch(apiUrl+'?action=uploadImage',{method:'POST',mode:'no-cors',body:JSON.stringify({base64:base64,fileName:'SAKKANID_'+o.id+'_'+Date.now()})});
-    // Since no-cors can't read response, use JSONP with smaller data
-    // Actually, base64 is too large for JSONP. Use fire-and-forget POST + send known URL pattern
-    toast('📸 อัปโหลดเสร็จ! กำลังส่ง LINE...','info');
-    // Send text with instructions since we can't get URL from no-cors
     var s=getShopSettings();
-    var msg=s.shopName+'\n📸 บิล '+o.id+'\nลูกค้า: '+o.mname+'\nยอด: '+thb(o.net)+'\n\n✅ รูปบิลถูกบันทึกใน Google Drive แล้ว';
-    await sendLineMessage(userId,[{type:'text',text:msg}]);
-    logAction('SEND_BILL_IMAGE',o.id);
+    // POST to Apps Script — server uploads to Drive + sends LINE
+    var payload=JSON.stringify({
+      base64:base64,
+      fileName:'SAKKANID_'+o.id+'_'+Date.now(),
+      sendLine:true,
+      userId:userId,
+      shopName:s.shopName||'SAKKANID',
+      orderId:o.id,
+      mname:o.mname,
+      net:o.net,
+      phone:s.phone||'',
+      lineOA:s.lineOA||'',
+      isPaid:isPaidCheck(o),
+      remaining:remaining(o),
+      payQrUrl:s.payQrUrl||''
+    });
+    await fetch(apiUrl+'?action=uploadImage',{method:'POST',mode:'no-cors',body:payload});
+    toast('📱 ส่งรูปบิลทาง LINE แล้ว ✅ (ตรวจสอบใน LINE)');
+    logAction('SEND_BILL_IMAGE',o.id+' → '+o.mname);
   }catch(e){toast('❌ '+e.message,'err')}
 }
 async function sendFlexBill(userId,o,s,docNum){
