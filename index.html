@@ -3950,42 +3950,35 @@ async function sendBillImageViaLine(oid){
   try{
     var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
     if(canvas.width===0||canvas.height===0){toast('❌ จับภาพไม่ได้','err');return}
-    // Resize to max 400px wide for smaller base64
-    var maxW=400;
-    var ratio=maxW/canvas.width;
+    var maxW=400;var ratio=maxW/canvas.width;
     var small=document.createElement('canvas');
     small.width=maxW;small.height=Math.round(canvas.height*ratio);
-    var ctx=small.getContext('2d');
-    ctx.drawImage(canvas,0,0,small.width,small.height);
-    var base64=small.toDataURL('image/jpeg',0.6);
+    small.getContext('2d').drawImage(canvas,0,0,small.width,small.height);
+    var base64=small.toDataURL('image/jpeg',0.5);
     var sizeKB=Math.round(base64.length/1024);
-    toast('📤 อัปโหลดรูป ('+sizeKB+'KB)...','info');
-    var apiUrl=getApiUrl();
-    var s=getShopSettings();
-    var payload={
-      base64:base64,
-      fileName:'SAKKANID_'+o.id,
-      sendLine:true,userId:userId,
-      isPaid:isPaidCheck(o),remaining:remaining(o),
-      payQrUrl:s.payQrUrl||''
-    };
-    var data=encodeURIComponent(JSON.stringify(payload));
-    // If small enough for JSONP (< 50KB encoded), use JSONP
-    if(data.length<50000){
+    var apiUrl=getApiUrl();var s=getShopSettings();
+    // Split into chunks of 4000 chars (each chunk URL ~6KB — within Google limit)
+    var chunkSize=4000;var uid='img_'+Date.now();
+    var chunks=[];
+    for(var i=0;i<base64.length;i+=chunkSize) chunks.push(base64.substring(i,i+chunkSize));
+    toast('📤 ส่งรูป '+sizeKB+'KB ('+chunks.length+' ชิ้น)...','info');
+    for(var c=0;c<chunks.length;c++){
+      var isLast=c===chunks.length-1;
+      var cd={id:uid,idx:c,chunk:chunks[c],total:chunks.length};
+      if(isLast){cd.last=1;cd.fn='SAKKANID_'+o.id;cd.sl=1;cd.to=userId;cd.ip=isPaidCheck(o)?1:0;cd.rm=remaining(o);cd.qr=s.payQrUrl||''}
+      var enc=encodeURIComponent(JSON.stringify(cd));
       var result=await new Promise(function(resolve,reject){
-        var cbName='_imgcb_'+Date.now();
-        window[cbName]=function(r){delete window[cbName];resolve(r)};
+        var cb='_c'+Date.now()+'_'+c;
+        window[cb]=function(r){delete window[cb];resolve(r)};
         var sc=document.createElement('script');
-        sc.src=apiUrl+'?action=uploadImage&callback='+cbName+'&data='+data;
-        sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
+        sc.src=apiUrl+'?action=uploadChunk&callback='+cb+'&data='+enc;
+        sc.onerror=function(){delete window[cb];reject(new Error('Chunk '+(c+1)+' failed'))};
         document.head.appendChild(sc);
-        setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout 30s'))}},30000);
+        setTimeout(function(){if(window[cb]){delete window[cb];reject(new Error('Timeout'))}},20000);
       });
-      if(result&&result.ok) toast('📱 ส่งรูปบิลทาง LINE สำเร็จ ✅');
-      else toast('❌ '+(result?result.error:'ไม่ทราบสาเหตุ'),'err');
-    }else{
-      toast('⚠️ รูปใหญ่เกินไป ('+sizeKB+'KB) — ลองบันทึกรูปแล้วส่งเองใน LINE','warn');
+      if(!result||!result.ok){toast('❌ ชิ้นที่ '+(c+1)+': '+(result?result.error:''),'err');return}
     }
+    toast('📱 ส่งรูปบิลทาง LINE สำเร็จ ✅');
     logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
 }
