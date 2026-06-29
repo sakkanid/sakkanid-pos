@@ -3821,7 +3821,12 @@ function exportDocsCSV(){
 async function sendLineMessage(userId,messages){
   var apiUrl=getApiUrl();
   if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
-  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','err');return{ok:false}}
+  // Validate userId
+  userId=String(userId||'').trim();
+  if(!userId||userId.length<30||userId.charAt(0)!=='U'){
+    toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+userId+'" (ต้องขึ้นต้นด้วย U + 32 ตัวอักษร)','err');
+    return{ok:false};
+  }
   try{
     var payload=JSON.stringify({to:userId,messages:messages});
     var data=encodeURIComponent(payload);
@@ -3878,33 +3883,56 @@ async function sendDocViaLine(oid,docNum){
 }
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
-  var itemLines=(o.items||[]).map(function(it){
-    return (it.t||'')+(it.o?' '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty);
+  // Build item elements with Thai+English
+  var itemEls=[];
+  (o.items||[]).forEach(function(it){
+    var name=(it.t||'')+(it.o?' '+it.o:'');
+    var en=it.k?(' / '+it.k):'';
+    itemEls.push({type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:name+en,size:'xxs',color:'#555555',flex:5,wrap:true},
+      {type:'text',text:'x'+it.qty,size:'xxs',color:'#888888',flex:1,align:'center'},
+      {type:'text',text:thb(it.p*it.qty),size:'xxs',color:'#111111',flex:2,align:'end'}
+    ]});
   });
-  if(o.delCost>0) itemLines.push('ค่าจัดส่ง '+thb(o.delCost));
-  // Build item elements (one per line, not joined with \n)
-  var itemEls=itemLines.map(function(line){return {type:'text',text:line,size:'xs',color:'#555555'}});
+  if(o.delCost>0) itemEls.push({type:'box',layout:'horizontal',margin:'sm',contents:[
+    {type:'text',text:'ค่าจัดส่ง Delivery',size:'xxs',color:'#555555',flex:6},
+    {type:'text',text:thb(o.delCost),size:'xxs',color:'#111111',flex:2,align:'end'}
+  ]});
+  // Status color
+  var stColor=paid?'#1D9E75':o.status.includes('พร้อม')?'#1D9E75':o.status.includes('ซัก')?'#D97706':'#006F98';
+  var headerColor=paid?'#1D9E75':'#006F98';
   var bodyC=[
-    {type:'text',text:'#'+(docNum||o.id),weight:'bold',size:'sm',color:'#006F98'},
-    {type:'text',text:o.mname+' | '+formatBillDate(o.createdAt),size:'xs',color:'#999999'},
+    {type:'box',layout:'horizontal',contents:[
+      {type:'text',text:docNum||o.id,weight:'bold',size:'sm',color:'#006F98',flex:3},
+      {type:'text',text:formatBillDate(o.createdAt),size:'xxs',color:'#999999',flex:3,align:'end'}
+    ]},
+    {type:'text',text:o.mname,size:'sm',color:'#333333',margin:'sm'},
+    {type:'text',text:o.status,size:'xxs',color:stColor,weight:'bold',margin:'xs'},
     {type:'separator',margin:'md'}
   ].concat(itemEls).concat([
     {type:'separator',margin:'md'},
     {type:'box',layout:'horizontal',margin:'md',contents:[
-      {type:'text',text:'ยอดสุทธิ',weight:'bold',size:'md',flex:3},
+      {type:'text',text:'ยอดสุทธิ / Total',weight:'bold',size:'md',flex:4},
       {type:'text',text:thb(o.net),weight:'bold',size:'md',color:'#006F98',flex:2,align:'end'}
     ]},
-    paid?{type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm'}
-      :{type:'text',text:'❌ ค้างชำระ '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold',margin:'sm'}
+    paid?{type:'text',text:'✅ ชำระครบแล้ว / Paid',size:'xs',color:'#1D9E75',margin:'sm'}
+      :{type:'text',text:'❌ ค้างชำระ '+thb(remaining(o))+' / Unpaid',size:'xs',color:'#DC2626',weight:'bold',margin:'sm'}
   ]);
+  // Quota info if applicable
+  if(o.type==='quota'&&o.quotaId){
+    var q=(DB.quotas||[]).find(function(qt){return qt.id===o.quotaId});
+    if(q) bodyC.push({type:'text',text:'📦 โควต้าคงเหลือ: '+q.remain+'/'+q.total+' ('+q.pkgName+')',size:'xxs',color:'#7C3AED',margin:'sm'});
+  }
   var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
     type:'bubble',
-    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
-      {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'}
+    header:{type:'box',layout:'vertical',backgroundColor:headerColor,paddingAll:'12px',contents:[
+      {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'},
+      {type:'text',text:paid?'Receipt':'Invoice',color:'#ffffffCC',size:'xxs'}
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you 🫧',size:'xxs',color:'#aaaaaa',align:'center'},
+      {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' LINE:'+s.lineOA:''),size:'xxs',color:'#bbbbbb',align:'center'}
     ]}
   }};
   var msgs=[flex];
@@ -3913,14 +3941,28 @@ async function sendFlexBill(userId,o,s,docNum){
 }
 async function sendFlexStatus(userId,o,s){
   var paid=isPaidCheck(o);
-  var sc=o.status.includes('พร้อม')?'#1D9E75':o.status.includes('ซัก')?'#D97706':'#006F98';
+  // Color per status
+  var sc='#006F98';
+  if(o.status.includes('รับผ้า')) sc='#2563EB';
+  else if(o.status.includes('ซัก')||o.status.includes('ดำเนินการ')) sc='#D97706';
+  else if(o.status.includes('พร้อมส่ง')) sc='#1D9E75';
+  else if(o.status.includes('จัดส่ง')) sc='#7C3AED';
+  else if(o.status.includes('เสร็จ')||o.status.includes('ปิดงาน')) sc='#6B7280';
   var bodyC=[
-    {type:'text',text:'#'+o.id+' | '+o.mname,size:'sm'},
+    {type:'text',text:o.id+' | '+o.mname,size:'sm',color:'#333333'},
     {type:'separator',margin:'md'},
     {type:'text',text:o.status,weight:'bold',size:'lg',color:sc,margin:'md'},
-    {type:'text',text:'ยอด '+thb(o.net)+(paid?' ✅ ชำระแล้ว':' ❌ ค้าง '+thb(remaining(o))),size:'sm',color:paid?'#1D9E75':'#DC2626',margin:'sm'}
+    {type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:'ยอด / Total',size:'xs',color:'#888888',flex:3},
+      {type:'text',text:thb(o.net),size:'sm',weight:'bold',flex:2,align:'end'}
+    ]}
   ];
+  if(!paid) bodyC.push({type:'text',text:'❌ ค้างชำระ '+thb(remaining(o)),size:'xs',color:'#DC2626',weight:'bold',margin:'sm'});
   if(o.pickupDate) bodyC.push({type:'text',text:'📅 นัดรับ '+fmtJoinDate(o.pickupDate),size:'xs',color:'#888888',margin:'sm'});
+  if(o.type==='quota'&&o.quotaId){
+    var q=(DB.quotas||[]).find(function(qt){return qt.id===o.quotaId});
+    if(q) bodyC.push({type:'text',text:'📦 โควต้า: '+q.remain+'/'+q.total,size:'xxs',color:'#7C3AED',margin:'sm'});
+  }
   var flex={type:'flex',altText:s.shopName+' '+o.id+' '+o.status,contents:{
     type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:sc,paddingAll:'12px',contents:[
@@ -3931,7 +3973,9 @@ async function sendFlexStatus(userId,o,s){
       {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
     ]}
   }};
-  await sendLineMessage(userId,[flex]);
+  var msgs=[flex];
+  if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
+  await sendLineMessage(userId,msgs);
 }
 
 // ── Fetch LINE Users from webhook & match with members ──
