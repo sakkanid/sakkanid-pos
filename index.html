@@ -1506,7 +1506,7 @@ function generateDocument(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="sendDocViaLine(\''+oid+'\',\''+docNum+'\')">📱 ส่ง LINE</button><button class="btn btn-am" onclick="sendPdfViaLine(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📄 ส่ง PDF</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="sendDocViaLine(\''+oid+'\',\''+docNum+'\')">📱 ส่ง LINE</button><button class="btn btn-am" onclick="sendDocImageViaLine(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📸 ส่งรูป LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
   // Remove doc modal
   var docMo=$('moDoc');if(docMo) docMo.remove();
   // Save to document history
@@ -3940,17 +3940,15 @@ async function sendPdfViaLine(oid,docNum,docType){
     logAction('SEND_PDF_LINE',docNum+' → '+o.mname);
   }catch(e){toast('❌ '+e.message,'err')}
 }
-async function sendBillImageViaLine(oid){
+async function uploadBillToLine(billEl,oid,docNum,docType){
   var o=gO(oid);if(!o) return;
   var m=gM(o.mid);var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
-  var billEl=document.querySelector('#moBill .modal-body')||document.getElementById('printArea');
   if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อน','err');return}
   toast('📸 จับภาพบิล...','info');
   try{
     var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
     if(canvas.width===0){toast('❌ จับภาพไม่ได้','err');return}
-    // Resize to 1200px wide max
     var w=Math.min(1200,canvas.width);var r=w/canvas.width;
     var sm=document.createElement('canvas');sm.width=w;sm.height=Math.round(canvas.height*r);
     sm.getContext('2d').drawImage(canvas,0,0,sm.width,sm.height);
@@ -3965,7 +3963,7 @@ async function sendBillImageViaLine(oid){
     for(var c=0;c<chunks.length;c++){
       var isLast=c===chunks.length-1;
       var cd={id:uid,idx:c,chunk:chunks[c],total:chunks.length};
-      if(isLast){cd.last=1;cd.fn='SAKKANID_'+o.id}
+      if(isLast){cd.last=1;cd.fn='SAKKANID_'+(docNum||o.id)}
       var enc=encodeURIComponent(JSON.stringify(cd));
       var res=await new Promise(function(ok,no){
         var cb='_c'+Date.now()+'_'+c;
@@ -3980,12 +3978,38 @@ async function sendBillImageViaLine(oid){
       if(isLast) finalResult=res;
     }
     if(finalResult&&finalResult.url){
-      var msgs=[{type:'image',originalContentUrl:finalResult.url,previewImageUrl:finalResult.url}];
+      toast('📱 กำลังส่ง LINE...','info');
+      var dtLabel=docType==='invoice'?'ใบแจ้งหนี้':docType==='receipt'?'ใบเสร็จ':docType==='quotation'?'ใบเสนอราคา':'บิล';
+      var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
+        type:'bubble',
+        header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
+          {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'}
+        ]},
+        body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
+          {type:'text',text:'📄 '+dtLabel,weight:'bold',size:'sm',color:'#006F98'},
+          {type:'text',text:(docNum||o.id),size:'xs',color:'#888888'},
+          {type:'text',text:o.mname,size:'sm',margin:'sm'},
+          {type:'text',text:'ยอด: '+thb(o.net),size:'sm',weight:'bold',margin:'xs'},
+          {type:'button',action:{type:'uri',label:'📄 เปิดดูบิล',uri:finalResult.url},style:'primary',color:'#006F98',margin:'lg'}
+        ]},
+        footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
+          {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}
+        ]}
+      }};
+      var msgs=[flex];
       if(!isPaidCheck(o)&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
       await sendLineMessage(userId,msgs);
+      logAction('SEND_IMG_LINE',(docNum||o.id));
     }else{toast('❌ ไม่ได้ URL','err')}
-    logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
+}
+async function sendBillImageViaLine(oid){
+  var billEl=document.querySelector('#moBill .modal-body');
+  await uploadBillToLine(billEl,oid,null,'receipt');
+}
+async function sendDocImageViaLine(oid,docNum,docType){
+  var billEl=document.querySelector('#moBill .modal-body');
+  await uploadBillToLine(billEl,oid,docNum,docType);
 }
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
