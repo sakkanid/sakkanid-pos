@@ -4357,50 +4357,170 @@ function startAutoPull(){
     syncPullSilent();
   },30000);
 }
+// ═══════════════════════════════════════════════════════════════
+// SAKKANID POS — Frontend Patch: syncPullSilent()
+// ═══════════════════════════════════════════════════════════════
+// วิธีใช้: ค้นหา "async function syncPullSilent" ใน index.html
+//          แล้วแทนที่ function ทั้งตัวด้วยโค้ดด้านล่าง
+// ═══════════════════════════════════════════════════════════════
+
 async function syncPullSilent(){
   try{
     var data=await jsonpCall('getFullDB','');
     if(!data.ok||!data.data) return;
     var d=data.data;var changed=false;
-    // CRITICAL: only update if cloud has data (never overwrite with empty!)
-    if(d.orders&&d.orders.length>0){var newOrders=d.orders.map(fixOrder);if(JSON.stringify(newOrders.map(function(o){return o.id}))!==JSON.stringify((DB.orders||[]).map(function(o){return o.id}))){DB.orders=newOrders;changed=true}}
+
+    // ── orders: ต้องมี > 0 rows ถึงจะ update ──
+    if(d.orders&&d.orders.length>0){
+      var cloudIds=d.orders.map(function(o){return o.id}).sort().join(',');
+      var localIds=(DB.orders||[]).map(function(o){return o.id}).sort().join(',');
+      if(cloudIds!==localIds){DB.orders=d.orders.map(fixOrder);changed=true}
+    }
+
+    // ── members: ต้องมี > 0 rows ถึงจะ update ──
     if(d.members&&d.members.length>0){
-      var newMem=d.members.map(function(m){
-        var p=String(m.phone||'').replace(/^'+/,'').replace(/[^0-9]/g,'');if(p&&p.charAt(0)!=='0')p='0'+p;m.phone=p;
-        if(m.joinDate&&String(m.joinDate).includes('T')){var dt=new Date(m.joinDate);if(!isNaN(dt.getTime())){var yr=dt.getFullYear();if(yr>2500)yr-=543;m.joinDate=String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+yr}}
-        return m});
-      if(newMem.length!==(DB.members||[]).length||JSON.stringify(newMem.map(function(m){return m.id}))!==JSON.stringify((DB.members||[]).map(function(m){return m.id}))){DB.members=newMem;changed=true}}
-    if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
-    if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
-    if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
+      var cmIds=d.members.map(function(m){return m.id}).sort().join(',');
+      var lmIds=(DB.members||[]).map(function(m){return m.id}).sort().join(',');
+      if(cmIds!==lmIds){
+        DB.members=d.members.map(function(m){
+          m.phone=String(m.phone||'');
+          if(m.joinDate) m.joinDate=fmtJoinDate(m.joinDate);
+          return m;
+        });
+        changed=true;
+      }
+    }
+
+    // ── quotas: ต้องมี > 0 rows ──
+    if(d.quotas&&d.quotas.length>0){
+      var cqIds=d.quotas.map(function(q){return q.id}).sort().join(',');
+      var lqIds=(DB.quotas||[]).map(function(q){return q.id}).sort().join(',');
+      if(cqIds!==lqIds){DB.quotas=d.quotas;changed=true}
+    }
+
+    // ── promos: ต้องมี > 0 rows ──
+    if(d.promos&&d.promos.length>0){
+      var cpIds=d.promos.map(function(p){return p.name}).sort().join(',');
+      var lpIds=(DB.promos||[]).map(function(p){return p.name}).sort().join(',');
+      if(cpIds!==lpIds){DB.promos=d.promos;changed=true}
+    }
+
+    // ── expenses: ต้องมี > 0 rows ──
+    if(d.expenses&&d.expenses.length>0){
+      var ceIds=d.expenses.map(function(x){return x.id||x.date}).sort().join(',');
+      var leIds=(DB.expenses||[]).map(function(x){return x.id||x.date}).sort().join(',');
+      if(ceIds!==leIds){DB.expenses=d.expenses;changed=true}
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 🛡️ PRICELIST (CAT) — ป้องกันข้อมูลราคาหาย
+    // ══════════════════════════════════════════════════════
+    // Rule 1: Cloud ต้องมี > 0 rows
+    // Rule 2: ถ้า local มี > 50 items แต่ Cloud มี < 10 → skip (ป้องกัน wipe)
+    // Rule 3: ทุก row ต้องมี field c และ p (category + price)
     if(d.pricelist&&d.pricelist.length>0){
-      var newP=d.pricelist.some(function(it,i){var o=CAT[i];return !o||Number(it.p)!==o.p});
-      if(newP){CAT.length=0;d.pricelist.forEach(function(it){CAT.push({c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:Number(it.p)||0,k:Number(it.k)||0,pt:it.pt||'fixed',sku:it.sku||''})});CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});changed=true}
+      // Guard: ป้องกัน Cloud ข้อมูลน้อยผิดปกติทับ local ที่มีเยอะ
+      var localCatCount=CAT.length;
+      var cloudCatCount=d.pricelist.length;
+      if(localCatCount>50&&cloudCatCount<10){
+        console.warn('⚠️ syncPull: pricelist Cloud มี '+cloudCatCount+' items แต่ local มี '+localCatCount+' — SKIP เพื่อป้องกันข้อมูลหาย');
+      }else{
+        // Guard: ตรวจ data integrity — ต้องมี c, p อย่างน้อย
+        var validRows=d.pricelist.filter(function(it){return it.c&&(it.p!==undefined&&it.p!==null&&it.p!=='')});
+        if(validRows.length===0){
+          console.warn('⚠️ syncPull: pricelist Cloud ไม่มี row ที่มี c + p ครบ — SKIP');
+        }else{
+          var newP=validRows.some(function(it,i){var o=CAT[i];return !o||Number(it.p)!==o.p||it.c!==o.c});
+          if(newP){
+            CAT.length=0;
+            validRows.forEach(function(it){
+              CAT.push({
+                c:it.c, ce:it.ce||'', t:it.t, te:it.te||'',
+                o:it.o||'', oe:it.oe||'',
+                p:Number(it.p)||0, k:Number(it.k)||0,
+                pt:it.pt||'fixed',
+                sku:it.sku||'',
+                active:it.active!==false&&it.active!=='FALSE'
+              });
+            });
+            changed=true;
+            console.log('✅ syncPull: CAT updated — '+CAT.length+' items');
+          }
+        }
+      }
     }
+
+    // ══════════════════════════════════════════════════════
+    // 🛡️ BED_SETS — ป้องกันเหมือน CAT
+    // ══════════════════════════════════════════════════════
     if(d.bed_sets&&d.bed_sets.length>0){
-      var bc=d.bed_sets.some(function(b,i){var o=BED_SETS[i];return !o||Number(b.price)!==o.price});
-      if(bc){BED_SETS.length=0;d.bed_sets.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});changed=true}
+      // Guard: ต้องมี field label + price
+      var validBeds=d.bed_sets.filter(function(s){return s.label&&(s.price!==undefined&&s.price!=='')});
+      if(validBeds.length>0){
+        var bc=validBeds.some(function(s,i){var o=BED_SETS[i];return !o||Number(s.price)!==o.price});
+        if(bc){
+          BED_SETS.length=0;
+          validBeds.forEach(function(s){
+            BED_SETS.push({size:s.size,label:s.label,price:Number(s.price)||0,cost:Number(s.cost)||0});
+          });
+          changed=true;
+          console.log('✅ syncPull: BED_SETS updated — '+BED_SETS.length+' items');
+        }
+      }
     }
+
+    // ══════════════════════════════════════════════════════
+    // 🛡️ CLN_SVCS — ป้องกันเหมือน CAT
+    // ══════════════════════════════════════════════════════
     if(d.cln_svcs&&d.cln_svcs.length>0){
-      var cc=d.cln_svcs.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice});
-      if(cc){CLN_SVCS.length=0;d.cln_svcs.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});changed=true}
+      var validCln=d.cln_svcs.filter(function(s){return s.type&&(s.minPrice!==undefined&&s.minPrice!=='')});
+      if(validCln.length>0){
+        var cc=validCln.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice});
+        if(cc){
+          CLN_SVCS.length=0;
+          validCln.forEach(function(s){
+            CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0});
+          });
+          changed=true;
+          console.log('✅ syncPull: CLN_SVCS updated — '+CLN_SVCS.length+' items');
+        }
+      }
     }
+
+    // ══════════════════════════════════════════════════════
+    // 🛡️ PKGS — ป้องกันเหมือน CAT
+    // ══════════════════════════════════════════════════════
     if(d.packages&&d.packages.length>0){
-      var pc=d.packages.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price});
-      if(pc){PKGS.length=0;d.packages.forEach(function(p){PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});changed=true}
+      var validPkg=d.packages.filter(function(p){return p.type&&(p.price!==undefined&&p.price!=='')});
+      if(validPkg.length>0){
+        var pc=validPkg.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price});
+        if(pc){
+          PKGS.length=0;
+          validPkg.forEach(function(p){
+            PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90});
+          });
+          changed=true;
+          console.log('✅ syncPull: PKGS updated — '+PKGS.length+' items');
+        }
+      }
     }
+
+    // ── settings: merge ไม่ลบ ──
     if(d.settings&&d.settings.length>0){
       d.settings.forEach(function(s){
-        if(s.key&&s.value!==undefined){try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}}
+        if(s.key&&s.value!==undefined){
+          try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}
+        }
       });
     }
+
     if(changed){
       originalSaveDB();syncStatus='success';lastSyncTime=new Date();updSyncUI();
       toast('🔄 ข้อมูลอัปเดตจาก Cloud','info');
       var rp=['orders','history','members','pricelist','report','dashboard','promo','expense'];
       if(rp.indexOf(curPage)>=0) renderPage(curPage);
     }else{syncStatus='success';lastSyncTime=new Date();updSyncUI()}
-  }catch(e){/* silent */}
+  }catch(e){console.error('syncPullSilent error:',e)}
 }
 
 // ── Sync UI indicator ──
