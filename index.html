@@ -3949,28 +3949,33 @@ async function sendBillImageViaLine(oid){
   toast('📸 กำลังจับภาพบิล...','info');
   try{
     var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
-    var base64=canvas.toDataURL('image/png');
-    toast('📤 กำลังอัปโหลด + ส่ง LINE...','info');
+    // Use JPEG for smaller size
+    var base64=canvas.toDataURL('image/jpeg',0.85);
+    toast('📤 กำลังอัปโหลด + ส่ง LINE... (รอสักครู่)','info');
     var apiUrl=getApiUrl();
     var s=getShopSettings();
-    // POST to Apps Script — server uploads to Drive + sends LINE
     var payload=JSON.stringify({
       base64:base64,
       fileName:'SAKKANID_'+o.id+'_'+Date.now(),
-      sendLine:true,
-      userId:userId,
-      shopName:s.shopName||'SAKKANID',
-      orderId:o.id,
-      mname:o.mname,
-      net:o.net,
-      phone:s.phone||'',
-      lineOA:s.lineOA||'',
-      isPaid:isPaidCheck(o),
-      remaining:remaining(o),
+      sendLine:true,userId:userId,
+      shopName:s.shopName||'SAKKANID',orderId:o.id,
+      mname:o.mname,net:o.net,
+      isPaid:isPaidCheck(o),remaining:remaining(o),
       payQrUrl:s.payQrUrl||''
     });
-    await fetch(apiUrl+'?action=uploadImage',{method:'POST',mode:'no-cors',body:payload});
-    toast('📱 ส่งรูปบิลทาง LINE แล้ว ✅ (ตรวจสอบใน LINE)');
+    // Use hidden form POST (fetch no-cors loses body on 302 redirect)
+    var ifrName='_imgif_'+Date.now();
+    var ifr=document.createElement('iframe');ifr.name=ifrName;ifr.style.display='none';
+    document.body.appendChild(ifr);
+    var form=document.createElement('form');
+    form.method='POST';form.action=apiUrl;form.target=ifrName;
+    form.enctype='multipart/form-data';
+    var ta=document.createElement('textarea');ta.name='data';ta.value=payload;ta.style.display='none';
+    form.appendChild(ta);document.body.appendChild(form);
+    form.submit();
+    setTimeout(function(){ifr.remove();form.remove()},10000);
+    // Wait a moment then show success
+    setTimeout(function(){toast('📱 ส่งรูปบิลทาง LINE แล้ว ✅')},3000);
     logAction('SEND_BILL_IMAGE',o.id+' → '+o.mname);
   }catch(e){toast('❌ '+e.message,'err')}
 }
