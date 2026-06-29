@@ -1500,7 +1500,7 @@ function generateDocument(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="sendDocViaLine(\''+oid+'\',\''+docNum+'\')">📱 ส่ง LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
   // Remove doc modal
   var docMo=$('moDoc');if(docMo) docMo.remove();
   // Save to document history
@@ -3867,12 +3867,8 @@ async function sendBillViaLine(oid){
   msg+='\n'+s.shopName+' · '+fmtPhone(s.phone);
 
   var messages=[{type:'text',text:msg}];
-  // Add QR PromptPay image if unpaid and available
-  if(!paid&&s.payQR){
-    messages.push({type:'text',text:'💳 สแกน QR PromptPay เพื่อชำระเงิน'});
-  }
   toast('📱 กำลังส่ง LINE...','info');
-  await sendLineMessage(userId,messages);
+  await sendFlexBill(userId,o,s,'');
   logAction('SEND_LINE',o.id+' → '+o.mname);
 }
 
@@ -3891,6 +3887,60 @@ async function sendStatusViaLine(oid){
   await sendLineMessage(userId,[{type:'text',text:msg}]);
   logAction('SEND_LINE_STATUS',o.id+' → '+o.status);
   toast('📱 ส่ง LINE แจ้งสถานะสำเร็จ ✅');
+}
+async function sendDocViaLine(oid,docNum){
+  var o=gO(oid);if(!o) return;
+  var m=gM(o.mid);var userId=m?m.lineUserId:'';
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
+  var s=getShopSettings();
+  await sendFlexBill(userId,o,s,docNum);
+}
+async function sendFlexBill(userId,o,s,docNum){
+  var paid=isPaidCheck(o);
+  var items=(o.items||[]).map(function(it){
+    return {type:'box',layout:'horizontal',contents:[
+      {type:'text',text:(it.t||'')+(it.o?' · '+it.o:''),size:'sm',color:'#555555',flex:4},
+      {type:'text',text:'x'+it.qty,size:'sm',color:'#888888',flex:1,align:'center'},
+      {type:'text',text:thb(it.p*it.qty),size:'sm',color:'#111111',flex:2,align:'end'}
+    ]};
+  });
+  var flex={type:'flex',altText:s.shopName+' — '+(docNum||o.id)+' ยอด '+thb(o.net),contents:{
+    type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'14px',contents:[
+      {type:'text',text:s.shopName,color:'#ffffff',size:'lg',weight:'bold'},
+      {type:'text',text:docNum||o.id,color:'#B8E0F0',size:'xs',margin:'xs'}
+    ]},
+    body:{type:'box',layout:'vertical',contents:[
+      {type:'box',layout:'horizontal',contents:[
+        {type:'text',text:'ลูกค้า',size:'sm',color:'#888888',flex:2},
+        {type:'text',text:o.mname,size:'sm',color:'#111111',flex:4}
+      ]},
+      {type:'box',layout:'horizontal',margin:'sm',contents:[
+        {type:'text',text:'วันที่',size:'sm',color:'#888888',flex:2},
+        {type:'text',text:formatBillDate(o.createdAt),size:'sm',color:'#111111',flex:4}
+      ]},
+      {type:'separator',margin:'lg'},
+      {type:'text',text:'รายการ',size:'sm',color:'#888888',margin:'lg'}
+    ].concat(items).concat([
+      {type:'separator',margin:'lg'},
+      {type:'box',layout:'horizontal',margin:'lg',contents:[
+        {type:'text',text:'ยอดสุทธิ',size:'md',weight:'bold',color:'#111111',flex:3},
+        {type:'text',text:thb(o.net),size:'md',weight:'bold',color:'#006F98',flex:2,align:'end'}
+      ]},
+      paid?{type:'box',layout:'horizontal',margin:'sm',contents:[
+        {type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75'}
+      ]}:{type:'box',layout:'horizontal',margin:'sm',contents:[
+        {type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold'}
+      ]}
+    ])},
+    footer:{type:'box',layout:'vertical',contents:[
+      {type:'text',text:s.shopName+' · '+fmtPhone(s.phone),size:'xs',color:'#AAAAAA',align:'center'}
+    ]}
+  }};
+  toast('📱 กำลังส่ง LINE Flex...','info');
+  await sendLineMessage(userId,[flex]);
+  logAction('SEND_LINE_FLEX',(docNum||o.id));
+  toast('📱 ส่ง LINE Flex สำเร็จ ✅');
 }
 
 // ── Fetch LINE Users from webhook & match with members ──
