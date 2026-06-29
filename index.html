@@ -3948,13 +3948,13 @@ async function sendBillImageViaLine(oid){
   if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
   toast('📸 กำลังจับภาพบิล...','info');
   try{
-    var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
+    var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
     if(canvas.width===0||canvas.height===0){toast('❌ จับภาพไม่ได้','err');return}
-    var maxW=400;var ratio=maxW/canvas.width;
+    var maxW=800;var ratio=maxW/canvas.width;
     var small=document.createElement('canvas');
     small.width=maxW;small.height=Math.round(canvas.height*ratio);
     small.getContext('2d').drawImage(canvas,0,0,small.width,small.height);
-    var base64=small.toDataURL('image/jpeg',0.5);
+    var base64=small.toDataURL('image/jpeg',0.8);
     var sizeKB=Math.round(base64.length/1024);
     var apiUrl=getApiUrl();var s=getShopSettings();
     // Split into chunks of 4000 chars (each chunk URL ~6KB — within Google limit)
