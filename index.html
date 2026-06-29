@@ -3879,34 +3879,32 @@ async function sendDocViaLine(oid,docNum){
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
   var itemLines=(o.items||[]).map(function(it){
-    return (it.t||'')+(it.o?' · '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty);
+    return (it.t||'')+(it.o?' '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty);
   });
-  if(o.delCost>0) itemLines.push('🚗 ค่าส่ง '+thb(o.delCost));
-  var itemText=itemLines.join('\n');
+  if(o.delCost>0) itemLines.push('ค่าจัดส่ง '+thb(o.delCost));
+  // Build item elements (one per line, not joined with \n)
+  var itemEls=itemLines.map(function(line){return {type:'text',text:line,size:'xs',color:'#555555'}});
   var bodyC=[
-    {type:'box',layout:'horizontal',contents:[
-      {type:'text',text:'#'+(docNum||o.id),weight:'bold',size:'sm',color:'#006F98',flex:3},
-      {type:'text',text:formatBillDate(o.createdAt),size:'xs',color:'#999',flex:3,align:'end'}
-    ]},
-    {type:'text',text:o.mname,size:'sm',margin:'sm'},
-    {type:'separator',margin:'md'},
-    {type:'text',text:itemText,size:'xs',color:'#555',margin:'md',wrap:true},
+    {type:'text',text:'#'+(docNum||o.id),weight:'bold',size:'sm',color:'#006F98'},
+    {type:'text',text:o.mname+' | '+formatBillDate(o.createdAt),size:'xs',color:'#999999'},
+    {type:'separator',margin:'md'}
+  ].concat(itemEls).concat([
     {type:'separator',margin:'md'},
     {type:'box',layout:'horizontal',margin:'md',contents:[
       {type:'text',text:'ยอดสุทธิ',weight:'bold',size:'md',flex:3},
       {type:'text',text:thb(o.net),weight:'bold',size:'md',color:'#006F98',flex:2,align:'end'}
-    ]}
-  ];
-  if(paid) bodyC.push({type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm'});
-  else bodyC.push({type:'text',text:'❌ ค้างชำระ '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold',margin:'sm'});
+    ]},
+    paid?{type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm'}
+      :{type:'text',text:'❌ ค้างชำระ '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold',margin:'sm'}
+  ]);
   var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
-    type:'bubble',size:'kilo',
+    type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
-      {type:'text',text:s.shopName,color:'#fff',weight:'bold',size:'lg'}
+      {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'}
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaa',align:'center'}
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
     ]}
   }};
   var msgs=[flex];
@@ -3917,20 +3915,20 @@ async function sendFlexStatus(userId,o,s){
   var paid=isPaidCheck(o);
   var sc=o.status.includes('พร้อม')?'#1D9E75':o.status.includes('ซัก')?'#D97706':'#006F98';
   var bodyC=[
-    {type:'text',text:'#'+o.id+' | '+o.mname,size:'sm',margin:'sm'},
+    {type:'text',text:'#'+o.id+' | '+o.mname,size:'sm'},
     {type:'separator',margin:'md'},
     {type:'text',text:o.status,weight:'bold',size:'lg',color:sc,margin:'md'},
     {type:'text',text:'ยอด '+thb(o.net)+(paid?' ✅ ชำระแล้ว':' ❌ ค้าง '+thb(remaining(o))),size:'sm',color:paid?'#1D9E75':'#DC2626',margin:'sm'}
   ];
-  if(o.pickupDate) bodyC.push({type:'text',text:'📅 นัดรับ '+fmtJoinDate(o.pickupDate),size:'xs',color:'#888',margin:'sm'});
+  if(o.pickupDate) bodyC.push({type:'text',text:'📅 นัดรับ '+fmtJoinDate(o.pickupDate),size:'xs',color:'#888888',margin:'sm'});
   var flex={type:'flex',altText:s.shopName+' '+o.id+' '+o.status,contents:{
-    type:'bubble',size:'kilo',
+    type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:sc,paddingAll:'12px',contents:[
-      {type:'text',text:s.shopName+' 📋',color:'#fff',weight:'bold'}
+      {type:'text',text:s.shopName,color:'#ffffff',weight:'bold'}
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaa',align:'center'}
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
     ]}
   }};
   await sendLineMessage(userId,[flex]);
