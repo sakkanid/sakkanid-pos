@@ -3948,27 +3948,44 @@ async function sendBillImageViaLine(oid){
   if(!billEl){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
   toast('📸 กำลังจับภาพบิล...','info');
   try{
-    var canvas=await html2canvas(billEl,{scale:1.5,useCORS:true,backgroundColor:'#ffffff'});
-    var base64=canvas.toDataURL('image/jpeg',0.7);
+    // Small scale + low quality to fit in JSONP URL
+    var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
+    // Resize to max 400px wide for smaller base64
+    var maxW=400;
+    var ratio=maxW/canvas.width;
+    var small=document.createElement('canvas');
+    small.width=maxW;small.height=Math.round(canvas.height*ratio);
+    var ctx=small.getContext('2d');
+    ctx.drawImage(canvas,0,0,small.width,small.height);
+    var base64=small.toDataURL('image/jpeg',0.6);
     var sizeKB=Math.round(base64.length/1024);
-    toast('📤 อัปโหลดรูป ('+sizeKB+'KB)... รอสักครู่','info');
+    toast('📤 อัปโหลดรูป ('+sizeKB+'KB)...','info');
     var apiUrl=getApiUrl();
     var s=getShopSettings();
-    // Use fetch no-cors POST — same pattern as syncPush (which works!)
-    await fetch(apiUrl+'?action=uploadImage',{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({
-        base64:base64,
-        fileName:'SAKKANID_'+o.id+'_'+Date.now(),
-        sendLine:true,userId:userId,
-        isPaid:isPaidCheck(o),remaining:remaining(o),
-        payQrUrl:s.payQrUrl||''
-      })
-    });
-    // fetch no-cors can't confirm success — wait and inform
-    toast('📱 รูปบิลกำลังส่งทาง LINE... (รอ 10 วินาที ตรวจสอบใน LINE)');
+    var payload={
+      base64:base64,
+      fileName:'SAKKANID_'+o.id,
+      sendLine:true,userId:userId,
+      isPaid:isPaidCheck(o),remaining:remaining(o),
+      payQrUrl:s.payQrUrl||''
+    };
+    var data=encodeURIComponent(JSON.stringify(payload));
+    // If small enough for JSONP (< 50KB encoded), use JSONP
+    if(data.length<50000){
+      var result=await new Promise(function(resolve,reject){
+        var cbName='_imgcb_'+Date.now();
+        window[cbName]=function(r){delete window[cbName];resolve(r)};
+        var sc=document.createElement('script');
+        sc.src=apiUrl+'?action=uploadImage&callback='+cbName+'&data='+data;
+        sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
+        document.head.appendChild(sc);
+        setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout 30s'))}},30000);
+      });
+      if(result&&result.ok) toast('📱 ส่งรูปบิลทาง LINE สำเร็จ ✅');
+      else toast('❌ '+(result?result.error:'ไม่ทราบสาเหตุ'),'err');
+    }else{
+      toast('⚠️ รูปใหญ่เกินไป ('+sizeKB+'KB) — ลองบันทึกรูปแล้วส่งเองใน LINE','warn');
+    }
     logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
 }
