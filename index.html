@@ -3825,31 +3825,24 @@ async function sendLineMessage(userId,messages){
   try{
     var payload=JSON.stringify({to:userId,messages:messages});
     var data=encodeURIComponent(payload);
-    // If data is small enough, use JSONP (get real response)
-    if(data.length<6000){
-      var result=await new Promise(function(resolve,reject){
-        var cbName='_lncb_'+Date.now();
-        window[cbName]=function(r){delete window[cbName];resolve(r)};
-        var sc=document.createElement('script');
-        sc.src=apiUrl+'?action=linePush&callback='+cbName+'&data='+data;
-        sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
-        document.head.appendChild(sc);
-        setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
-      });
-      if(result&&result.ok) return{ok:true};
-      else{toast('❌ LINE: '+(result.error||'ไม่ทราบสาเหตุ'),'err');return{ok:false}}
-    }else{
-      // Large payload (Flex): use hidden form POST to iframe
-      var ifrName='_lnif_'+Date.now();
-      var ifr=document.createElement('iframe');ifr.name=ifrName;ifr.style.display='none';
-      document.body.appendChild(ifr);
-      var form=document.createElement('form');
-      form.method='POST';form.action=apiUrl+'?action=linePush';form.target=ifrName;
-      var inp=document.createElement('input');inp.type='hidden';inp.name='data';inp.value=payload;
-      form.appendChild(inp);document.body.appendChild(form);form.submit();
-      setTimeout(function(){ifr.remove();form.remove()},5000);
-      return{ok:true};
+    // If URL is too long for JSONP (>8000), simplify to text
+    if(data.length>8000){
+      var altText=messages[0]&&messages[0].altText?messages[0].altText:'ข้อความจากร้าน';
+      payload=JSON.stringify({to:userId,messages:[{type:'text',text:altText}]});
+      data=encodeURIComponent(payload);
+      toast('⚠️ ข้อความยาวเกิน — ส่งแบบข้อความแทน','warn');
     }
+    var result=await new Promise(function(resolve,reject){
+      var cbName='_lncb_'+Date.now();
+      window[cbName]=function(r){delete window[cbName];resolve(r)};
+      var sc=document.createElement('script');
+      sc.src=apiUrl+'?action=linePush&callback='+cbName+'&data='+data;
+      sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
+      document.head.appendChild(sc);
+      setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
+    });
+    if(result&&result.ok){toast('📱 ส่ง LINE สำเร็จ ✅');return{ok:true}}
+    else{toast('❌ LINE: '+(result.error||'ไม่ทราบสาเหตุ'),'err');return{ok:false}}
   }catch(e){
     toast('❌ ส่ง LINE ล้มเหลว: '+e.message,'err');
     return{ok:false};
