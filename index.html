@@ -3946,26 +3946,22 @@ async function sendBillImageViaLine(oid){
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
   var billEl=document.querySelector('#moBill .modal-body')||document.getElementById('printArea');
   if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
-  toast('📸 กำลังจับภาพบิล...','info');
+  toast('📸 กำลังจับภาพบิล (คุณภาพสูง)...','info');
   try{
     var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
     if(canvas.width===0||canvas.height===0){toast('❌ จับภาพไม่ได้','err');return}
-    var maxW=800;var ratio=maxW/canvas.width;
-    var small=document.createElement('canvas');
-    small.width=maxW;small.height=Math.round(canvas.height*ratio);
-    small.getContext('2d').drawImage(canvas,0,0,small.width,small.height);
-    var base64=small.toDataURL('image/jpeg',0.8);
+    var base64=canvas.toDataURL('image/png');
     var sizeKB=Math.round(base64.length/1024);
     var apiUrl=getApiUrl();var s=getShopSettings();
-    // Split into chunks of 4000 chars (each chunk URL ~6KB — within Google limit)
-    var chunkSize=4000;var uid='img_'+Date.now();
+    var chunkSize=5000;var uid='img_'+Date.now();
     var chunks=[];
     for(var i=0;i<base64.length;i+=chunkSize) chunks.push(base64.substring(i,i+chunkSize));
-    toast('📤 ส่งรูป '+sizeKB+'KB ('+chunks.length+' ชิ้น)...','info');
+    toast('📤 อัปโหลดรูป '+sizeKB+'KB ('+chunks.length+' ชิ้น) รอสักครู่...','info');
+    var finalResult=null;
     for(var c=0;c<chunks.length;c++){
       var isLast=c===chunks.length-1;
       var cd={id:uid,idx:c,chunk:chunks[c],total:chunks.length};
-      if(isLast){cd.last=1;cd.fn='SAKKANID_'+o.id;cd.sl=1;cd.to=userId;cd.ip=isPaidCheck(o)?1:0;cd.rm=remaining(o);cd.qr=s.payQrUrl||''}
+      if(isLast){cd.last=1;cd.fn='SAKKANID_'+o.id}
       var enc=encodeURIComponent(JSON.stringify(cd));
       var result=await new Promise(function(resolve,reject){
         var cb='_c'+Date.now()+'_'+c;
@@ -3977,8 +3973,15 @@ async function sendBillImageViaLine(oid){
         setTimeout(function(){if(window[cb]){delete window[cb];reject(new Error('Timeout'))}},20000);
       });
       if(!result||!result.ok){toast('❌ ชิ้นที่ '+(c+1)+': '+(result?result.error:''),'err');return}
+      if(isLast) finalResult=result;
+      if(c%5===0&&c>0) toast('📤 '+Math.round((c/chunks.length)*100)+'%...','info');
     }
-    toast('📱 ส่งรูปบิลทาง LINE สำเร็จ ✅');
+    if(finalResult&&finalResult.url){
+      toast('📱 กำลังส่งรูปทาง LINE...','info');
+      var msgs=[{type:'image',originalContentUrl:finalResult.url,previewImageUrl:finalResult.url}];
+      if(!isPaidCheck(o)&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
+      await sendLineMessage(userId,msgs);
+    }else{toast('❌ ไม่ได้ URL จาก Drive','err')}
     logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
 }
