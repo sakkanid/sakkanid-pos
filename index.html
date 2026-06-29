@@ -3944,12 +3944,12 @@ async function sendBillImageViaLine(oid){
   var o=gO(oid);if(!o) return;
   var m=gM(o.mid);var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
-  var billEl=document.getElementById('printArea');
-  if(!billEl){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
+  var billEl=document.querySelector('#moBill .modal-body')||document.getElementById('printArea');
+  if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
   toast('📸 กำลังจับภาพบิล...','info');
   try{
-    // Small scale + low quality to fit in JSONP URL
     var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
+    if(canvas.width===0||canvas.height===0){toast('❌ จับภาพไม่ได้','err');return}
     // Resize to max 400px wide for smaller base64
     var maxW=400;
     var ratio=maxW/canvas.width;
