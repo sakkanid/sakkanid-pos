@@ -3935,7 +3935,7 @@ async function sendFlexBill(userId,o,s,docNum){
   else bodyC.push({type:'text',text:'❌ ค้างชำระ '+thb(remaining(o))+' Unpaid',size:'xs',color:'#DC2626',weight:'bold',margin:'sm'});
   // Quota
   var m=gM(o.mid);
-  if(m){var aq=(DB.quotas||[]).filter(function(qt){return qt.mid===m.id&&qt.remain>0});aq.forEach(function(qt){bodyC.push({type:'text',text:'📦 '+qt.pkgName+' ใช้ '+qt.used+' คงเหลือ '+qt.remain+'/'+qt.total,size:'xxs',color:'#7C3AED',margin:'xs'})})}
+  if(m){var aq=(DB.quotas||[]).filter(function(qt){return qt.mid===m.id&&qt.remain>0});var hasQ=aq.length>0;if(hasQ)bodyC.push({type:'text',text:'───────────',size:'xxs',color:'#cccccc',margin:'sm'},{type:'text',text:'แจ้งข้อมูลโควต้า Package',size:'xxs',color:'#7C3AED',weight:'bold',margin:'xs'});aq.forEach(function(qt){bodyC.push({type:'text',text:'📦 '+qt.pkgName+' ใช้ '+qt.used+' คงเหลือ '+qt.remain+'/'+qt.total,size:'xxs',color:'#7C3AED',margin:'xs'})})}
   var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
     type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:paid?'#1D9E75':'#006F98',paddingAll:'12px',contents:[
@@ -3944,7 +3944,7 @@ async function sendFlexBill(userId,o,s,docNum){
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'Thank you 🫧',size:'xxs',color:'#aaaaaa',align:'center'},
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'},
       {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' LINE:'+s.lineOA:''),size:'xxs',color:'#bbbbbb',align:'center'}
     ]}
   }};
@@ -3962,8 +3962,8 @@ async function sendFlexBill(userId,o,s,docNum){
   if(o.disc>0) txt+='ส่วนลด: -'+thb(o.disc)+'\n';
   txt+='ยอดสุทธิ: '+thb(o.net)+'\n';
   if(paid) txt+='✅ ชำระครบแล้ว\n'; else txt+='❌ ค้างชำระ '+thb(remaining(o))+'\n';
-  if(m){var aq2=(DB.quotas||[]).filter(function(qt){return qt.mid===m.id&&qt.remain>0});aq2.forEach(function(qt){txt+='📦 '+qt.pkgName+' ใช้ '+qt.used+' คงเหลือ '+qt.remain+'/'+qt.total+'\n'})}
-  txt+='\n'+s.shopName+' · '+fmtPhone(s.phone);
+  if(m){var aq2=(DB.quotas||[]).filter(function(qt){return qt.mid===m.id&&qt.remain>0});if(aq2.length){txt+='───────────\nแจ้งข้อมูลโควต้า Package ที่ซื้อไว้\n';aq2.forEach(function(qt){txt+='📦 '+qt.pkgName+' ใช้แล้ว '+qt.used+' / คงเหลือ '+qt.remain+'/'+qt.total+'\n'})}}
+  txt+='\nขอบคุณที่ใช้บริการค่ะ Thank you.\n'+s.shopName+' · '+fmtPhone(s.phone);
   flex._textFallback=txt;
   var msgs=[flex];
   if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
@@ -4000,13 +4000,13 @@ async function sendFlexStatus(userId,o,s){
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
+      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}
     ]}
   }};
   var stxt=s.shopName+'\n📋 แจ้งสถานะ\nเลขที่: '+o.id+'\nลูกค้า: '+o.mname+'\nสถานะ: '+o.status+'\nยอด: '+thb(o.net);
   if(!paid) stxt+='\n❌ ค้างชำระ '+thb(remaining(o));
   if(o.pickupDate) stxt+='\n📅 นัดรับ '+fmtJoinDate(o.pickupDate);
-  stxt+='\n\n'+s.shopName+' · '+fmtPhone(s.phone);
+  stxt+='\n\nขอบคุณที่ใช้บริการค่ะ Thank you.\n'+s.shopName+' · '+fmtPhone(s.phone);
   flex._textFallback=stxt;
   var msgs=[flex];
   if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
