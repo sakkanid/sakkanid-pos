@@ -3883,55 +3883,73 @@ async function sendDocViaLine(oid,docNum){
 }
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
-  // Build item elements with Thai+English
-  var itemEls=[];
+  // Group items by category
+  var cats={};
   (o.items||[]).forEach(function(it){
-    var name=(it.t||'')+(it.o?' '+it.o:'');
-    var en=it.k?(' / '+it.k):'';
-    itemEls.push({type:'box',layout:'horizontal',margin:'sm',contents:[
-      {type:'text',text:name+en,size:'xxs',color:'#555555',flex:5,wrap:true},
-      {type:'text',text:'x'+it.qty,size:'xxs',color:'#888888',flex:1,align:'center'},
-      {type:'text',text:thb(it.p*it.qty),size:'xxs',color:'#111111',flex:2,align:'end'}
-    ]});
+    var cat=it.c||'อื่นๆ';
+    if(!cats[cat]) cats[cat]=[];
+    cats[cat].push(it);
+  });
+  var itemEls=[];
+  Object.keys(cats).forEach(function(cat){
+    itemEls.push({type:'text',text:'▸ '+cat,size:'xxs',color:'#006F98',weight:'bold',margin:'sm'});
+    cats[cat].forEach(function(it){
+      var name=(it.t||'')+(it.o?' '+it.o:'');
+      itemEls.push({type:'box',layout:'horizontal',margin:'xs',contents:[
+        {type:'text',text:'  '+name,size:'xxs',color:'#555555',flex:5},
+        {type:'text',text:'x'+it.qty,size:'xxs',color:'#888888',flex:1,align:'center'},
+        {type:'text',text:thb(it.p*it.qty),size:'xxs',color:'#111111',flex:2,align:'end'}
+      ]});
+      if(it.k) itemEls.push({type:'text',text:'  '+it.k,size:'xxs',color:'#aaaaaa'});
+    });
   });
   if(o.delCost>0) itemEls.push({type:'box',layout:'horizontal',margin:'sm',contents:[
     {type:'text',text:'ค่าจัดส่ง Delivery',size:'xxs',color:'#555555',flex:6},
     {type:'text',text:thb(o.delCost),size:'xxs',color:'#111111',flex:2,align:'end'}
   ]});
-  // Status color
   var stColor=paid?'#1D9E75':o.status.includes('พร้อม')?'#1D9E75':o.status.includes('ซัก')?'#D97706':'#006F98';
-  var headerColor=paid?'#1D9E75':'#006F98';
   var bodyC=[
     {type:'box',layout:'horizontal',contents:[
       {type:'text',text:docNum||o.id,weight:'bold',size:'sm',color:'#006F98',flex:3},
       {type:'text',text:formatBillDate(o.createdAt),size:'xxs',color:'#999999',flex:3,align:'end'}
     ]},
-    {type:'text',text:o.mname,size:'sm',color:'#333333',margin:'sm'},
-    {type:'text',text:o.status,size:'xxs',color:stColor,weight:'bold',margin:'xs'},
+    {type:'text',text:o.mname,size:'sm',color:'#333333',margin:'xs'},
+    {type:'text',text:o.status,size:'xxs',color:stColor,weight:'bold'},
     {type:'separator',margin:'md'}
   ].concat(itemEls).concat([
     {type:'separator',margin:'md'},
     {type:'box',layout:'horizontal',margin:'md',contents:[
-      {type:'text',text:'ยอดสุทธิ / Total',weight:'bold',size:'md',flex:4},
+      {type:'text',text:'ยอดสุทธิ Total',weight:'bold',size:'md',flex:4},
       {type:'text',text:thb(o.net),weight:'bold',size:'md',color:'#006F98',flex:2,align:'end'}
     ]},
-    paid?{type:'text',text:'✅ ชำระครบแล้ว / Paid',size:'xs',color:'#1D9E75',margin:'sm'}
-      :{type:'text',text:'❌ ค้างชำระ '+thb(remaining(o))+' / Unpaid',size:'xs',color:'#DC2626',weight:'bold',margin:'sm'}
+    paid?{type:'text',text:'✅ ชำระครบแล้ว Paid',size:'xs',color:'#1D9E75',margin:'sm'}
+      :{type:'text',text:'❌ ค้างชำระ '+thb(remaining(o))+' Unpaid',size:'xs',color:'#DC2626',weight:'bold',margin:'sm'}
   ]);
-  // Quota info if applicable
-  if(o.type==='quota'&&o.quotaId){
-    var q=(DB.quotas||[]).find(function(qt){return qt.id===o.quotaId});
-    if(q) bodyC.push({type:'text',text:'📦 โควต้าคงเหลือ: '+q.remain+'/'+q.total+' ('+q.pkgName+')',size:'xxs',color:'#7C3AED',margin:'sm'});
+  // Quota info
+  if(o.type==='quota'||o.quotaId){
+    var qid=o.quotaId||'';
+    var q=qid?(DB.quotas||[]).find(function(qt){return qt.id===qid}):null;
+    if(q) bodyC.push({type:'text',text:'📦 '+q.pkgName+' ใช้แล้ว '+q.used+' / คงเหลือ '+q.remain+' ชิ้น',size:'xxs',color:'#7C3AED',margin:'sm'});
+  }
+  // Check member quotas for display
+  var m=gM(o.mid);
+  if(m){
+    var activeQ=(DB.quotas||[]).filter(function(qt){return qt.mid===m.id&&qt.remain>0});
+    if(activeQ.length&&!o.quotaId){
+      activeQ.forEach(function(qt){
+        bodyC.push({type:'text',text:'📦 '+qt.pkgName+' คงเหลือ '+qt.remain+'/'+qt.total,size:'xxs',color:'#7C3AED',margin:'xs'});
+      });
+    }
   }
   var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
     type:'bubble',
-    header:{type:'box',layout:'vertical',backgroundColor:headerColor,paddingAll:'12px',contents:[
+    header:{type:'box',layout:'vertical',backgroundColor:paid?'#1D9E75':'#006F98',paddingAll:'12px',contents:[
       {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'},
       {type:'text',text:paid?'Receipt':'Invoice',color:'#ffffffCC',size:'xxs'}
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
-      {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you 🫧',size:'xxs',color:'#aaaaaa',align:'center'},
+      {type:'text',text:'Thank you 🫧',size:'xxs',color:'#aaaaaa',align:'center'},
       {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' LINE:'+s.lineOA:''),size:'xxs',color:'#bbbbbb',align:'center'}
     ]}
   }};
