@@ -2480,7 +2480,7 @@ function renderSettingsShop(s){
     '<div class="form-group"><label class="form-label">ความหนาตัวอักษร</label><select id="bc-fontweight"><option value="400" '+((s.billConfig||{}).fontWeight==='400'?'selected':'')+'>ปกติ (400)</option><option value="500" '+((s.billConfig||{}).fontWeight==='500'?'selected':'')+'>กลาง (500)</option><option value="600" '+(!(s.billConfig||{}).fontWeight||(s.billConfig||{}).fontWeight==='600'?'selected':'')+'>หนา (600)</option><option value="700" '+((s.billConfig||{}).fontWeight==='700'?'selected':'')+'>หนามาก (700)</option></select></div>'+
     '<div class="form-group"><label class="form-label">DPI เครื่องพิมพ์</label><select id="bc-dpi"><option value="203" '+((s.billConfig||{}).dpi==='203'||!(s.billConfig||{}).dpi?'selected':'')+'>203 DPI (ทั่วไป)</option><option value="300" '+((s.billConfig||{}).dpi==='300'?'selected':'')+'>300 DPI (คมชัด)</option></select></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">🖼️ รูปท้ายบิล (แนะนำ 300x100px)</label><input type="file" accept="image/*" onchange="bcUploadFooterImg(event)" style="font-size:12px"></div>'+
-    '<div class="form-group"><label class="form-label">💳 QR PromptPay (แนบในบิล LINE)</label><input type="file" accept="image/*" onchange="bcUploadPayQR(event)" style="font-size:12px"></div></div>'+
+    '<div class="form-group"><label class="form-label">💳 QR PromptPay (แนบในบิล LINE)</label><input type="file" accept="image/*" onchange="bcUploadPayQR(event)" style="font-size:12px"><div style="margin-top:6px"><label class="form-label">🔗 URL รูป QR (สำหรับส่ง LINE)</label><input id="bc-qr-url" type="url" value="'+(s.payQrUrl||'')+'" placeholder="https://drive.google.com/..."></div></div></div>'+
     '<div class="grid g3"><div class="form-group"><label class="form-label">ขนาดโลโก้หน้า Login: <span id="ll-val">'+(s.loginLogoSize||80)+'</span>px</label><input type="range" id="bc-login-logo" min="40" max="160" value="'+(s.loginLogoSize||80)+'" oninput="$(\'ll-val\').textContent=this.value" style="width:100%"><div style="font-size:10px;color:var(--t3)">แนะนำ: ภาพ PNG ขนาด 200×200px ขึ้นไป</div></div>'+
     '<div class="form-group"><label class="form-label">ขนาด QR PromptPay ในบิล</label><select id="bc-qr-size"><option value="60" '+((s.billConfig||{}).qrPaySize==='60'?'selected':'')+'>เล็ก (60px)</option><option value="80" '+(!(s.billConfig||{}).qrPaySize||(s.billConfig||{}).qrPaySize==='80'?'selected':'')+'>กลาง (80px) — แนะนำ</option><option value="120" '+((s.billConfig||{}).qrPaySize==='120'?'selected':'')+'>ใหญ่ (120px)</option></select></div>'+
     '<div class="form-group"><label class="form-label">ขนาดโลโก้ในบิล: <span id="bc-logo-val">'+((s.billConfig||{}).logoSize||50)+'</span>px</label><input type="range" id="bc-logosize" min="20" max="120" value="'+((s.billConfig||{}).logoSize||50)+'" oninput="$(\'bc-logo-val\').textContent=this.value" style="width:100%"></div></div>'+
@@ -2768,6 +2768,7 @@ function saveBillConfig(){
   s.billConfig.showPoints=$('bc-pts')?$('bc-pts').checked:true;
   s.billConfig.receiptShowAllPay=$('bc-allpay')?$('bc-allpay').checked:true;
   s.billConfig.logoSize=parseInt($('bc-logosize')?$('bc-logosize').value:50)||50;
+  s.payQrUrl=$('bc-qr-url')?$('bc-qr-url').value.trim():'';
   s.billConfig.fontSize=parseInt($('bc-fontsize')?$('bc-fontsize').value:12)||12;
   s.billConfig.fontWeight=$('bc-fontweight')?$('bc-fontweight').value:'600';
   s.billConfig.dpi=$('bc-dpi')?$('bc-dpi').value:'203';
@@ -3814,22 +3815,36 @@ async function sendLineMessage(userId,messages){
   if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','err');return{ok:false}}
   try{
-    // Use JSONP to bypass CORS (token is read from settings sheet on server)
-    var data=encodeURIComponent(JSON.stringify({to:userId,messages:messages}));
-    var result=await new Promise(function(resolve,reject){
-      var cbName='_lncb_'+Date.now();
-      window[cbName]=function(r){delete window[cbName];resolve(r)};
-      var sc=document.createElement('script');
-      sc.src=apiUrl+'?action=linePush&callback='+cbName+'&data='+data;
-      sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
-      document.head.appendChild(sc);
-      setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
-    });
-    if(result&&result.ok){toast('📱 ส่ง LINE สำเร็จ ✅');return{ok:true}}
-    else{toast('❌ LINE: '+(result.error||'ไม่ทราบสาเหตุ'),'err');return{ok:false}}
+    var payload=JSON.stringify({to:userId,messages:messages});
+    var data=encodeURIComponent(payload);
+    // If data is small enough, use JSONP (get real response)
+    if(data.length<6000){
+      var result=await new Promise(function(resolve,reject){
+        var cbName='_lncb_'+Date.now();
+        window[cbName]=function(r){delete window[cbName];resolve(r)};
+        var sc=document.createElement('script');
+        sc.src=apiUrl+'?action=linePush&callback='+cbName+'&data='+data;
+        sc.onerror=function(){delete window[cbName];reject(new Error('Network error'))};
+        document.head.appendChild(sc);
+        setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
+      });
+      if(result&&result.ok) return{ok:true};
+      else{toast('❌ LINE: '+(result.error||'ไม่ทราบสาเหตุ'),'err');return{ok:false}}
+    }else{
+      // Large payload (Flex): use hidden form POST to iframe
+      var ifrName='_lnif_'+Date.now();
+      var ifr=document.createElement('iframe');ifr.name=ifrName;ifr.style.display='none';
+      document.body.appendChild(ifr);
+      var form=document.createElement('form');
+      form.method='POST';form.action=apiUrl+'?action=linePush';form.target=ifrName;
+      var inp=document.createElement('input');inp.type='hidden';inp.name='data';inp.value=payload;
+      form.appendChild(inp);document.body.appendChild(form);form.submit();
+      setTimeout(function(){ifr.remove();form.remove()},5000);
+      return{ok:true};
+    }
   }catch(e){
     toast('❌ ส่ง LINE ล้มเหลว: '+e.message,'err');
-    return{ok:false,error:e.message};
+    return{ok:false};
   }
 }
 
@@ -3837,37 +3852,8 @@ async function sendBillViaLine(oid){
   var o=gO(oid);if(!o) return;
   var m=gM(o.mid);
   var userId=m?m.lineUserId:'';
-  if(!userId){
-    toast('⚠️ ลูกค้ายังไม่มี LINE User ID — ลูกค้าต้อง Add LINE OA ก่อน','warn');
-    return;
-  }
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
   var s=getShopSettings();
-  // Build text message
-  var paid=isPaidCheck(o);
-  var msg=s.shopName+'\n';
-  msg+=(paid?'🧾 ใบเสร็จรับเงิน':'📋 แจ้งยอดชำระ')+'\n';
-  msg+='เลขที่: '+o.id+'\n';
-  msg+='ลูกค้า: '+o.mname+'\n';
-  msg+='วันที่: '+formatBillDate(o.createdAt)+'\n';
-  msg+='───────────\n';
-  (o.items||[]).forEach(function(it){
-    msg+=it.t+(it.o?' · '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty)+'\n';
-  });
-  if(o.extras&&o.extras.length){
-    o.extras.forEach(function(e){msg+=e.name+' = '+thb(e.price)+'\n'});
-  }
-  msg+='───────────\n';
-  msg+='ยอดสุทธิ: '+thb(o.net)+'\n';
-  if(paid){
-    msg+='✅ ชำระเงินครบแล้ว\n';
-    if(o.payHist&&o.payHist.length){msg+='ชำระโดย: '+o.payHist.map(function(p){return p.method}).join(', ')+'\n'}
-  }else{
-    msg+='❌ ค้างชำระ: '+thb(remaining(o))+'\n';
-  }
-  msg+='\n'+s.shopName+' · '+fmtPhone(s.phone);
-
-  var messages=[{type:'text',text:msg}];
-  toast('📱 กำลังส่ง LINE...','info');
   await sendFlexBill(userId,o,s,'');
   logAction('SEND_LINE',o.id+' → '+o.mname);
 }
@@ -3904,42 +3890,44 @@ async function sendFlexBill(userId,o,s,docNum){
       {type:'text',text:thb(it.p*it.qty),size:'sm',color:'#111111',flex:2,align:'end'}
     ]};
   });
-  var flex={type:'flex',altText:s.shopName+' — '+(docNum||o.id)+' ยอด '+thb(o.net),contents:{
-    type:'bubble',
-    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'14px',contents:[
+  var bodyContents=[
+    {type:'box',layout:'horizontal',contents:[
+      {type:'text',text:'ลูกค้า',size:'sm',color:'#888888',flex:2},
+      {type:'text',text:o.mname,size:'sm',color:'#111111',flex:4}
+    ]},
+    {type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:'วันที่',size:'sm',color:'#888888',flex:2},
+      {type:'text',text:formatBillDate(o.createdAt),size:'sm',color:'#111111',flex:4}
+    ]},
+    {type:'separator',margin:'lg'},
+    {type:'text',text:'รายการ',size:'sm',color:'#888888',margin:'lg'}
+  ].concat(items).concat([
+    {type:'separator',margin:'lg'},
+    {type:'box',layout:'horizontal',margin:'lg',contents:[
+      {type:'text',text:'ยอดสุทธิ',size:'md',weight:'bold',flex:3},
+      {type:'text',text:thb(o.net),size:'md',weight:'bold',color:'#006F98',flex:2,align:'end'}
+    ]},
+    paid?{type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75',margin:'sm'}
+      :{type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold',margin:'sm'}
+  ]);
+  var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
+    type:'bubble',size:'kilo',
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
       {type:'text',text:s.shopName,color:'#ffffff',size:'lg',weight:'bold'},
       {type:'text',text:docNum||o.id,color:'#B8E0F0',size:'xs',margin:'xs'}
     ]},
-    body:{type:'box',layout:'vertical',contents:[
-      {type:'box',layout:'horizontal',contents:[
-        {type:'text',text:'ลูกค้า',size:'sm',color:'#888888',flex:2},
-        {type:'text',text:o.mname,size:'sm',color:'#111111',flex:4}
-      ]},
-      {type:'box',layout:'horizontal',margin:'sm',contents:[
-        {type:'text',text:'วันที่',size:'sm',color:'#888888',flex:2},
-        {type:'text',text:formatBillDate(o.createdAt),size:'sm',color:'#111111',flex:4}
-      ]},
-      {type:'separator',margin:'lg'},
-      {type:'text',text:'รายการ',size:'sm',color:'#888888',margin:'lg'}
-    ].concat(items).concat([
-      {type:'separator',margin:'lg'},
-      {type:'box',layout:'horizontal',margin:'lg',contents:[
-        {type:'text',text:'ยอดสุทธิ',size:'md',weight:'bold',color:'#111111',flex:3},
-        {type:'text',text:thb(o.net),size:'md',weight:'bold',color:'#006F98',flex:2,align:'end'}
-      ]},
-      paid?{type:'box',layout:'horizontal',margin:'sm',contents:[
-        {type:'text',text:'✅ ชำระครบแล้ว',size:'sm',color:'#1D9E75'}
-      ]}:{type:'box',layout:'horizontal',margin:'sm',contents:[
-        {type:'text',text:'❌ ค้างชำระ: '+thb(remaining(o)),size:'sm',color:'#DC2626',weight:'bold'}
-      ]}
-    ])},
+    body:{type:'box',layout:'vertical',contents:bodyContents},
     footer:{type:'box',layout:'vertical',contents:[
-      {type:'text',text:s.shopName+' · '+fmtPhone(s.phone),size:'xs',color:'#AAAAAA',align:'center'}
+      {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:''),size:'xs',color:'#AAAAAA',align:'center'}
     ]}
   }};
+  var messages=[flex];
+  // Add QR PromptPay image if unpaid and URL is set
+  if(!paid&&s.payQrUrl){
+    messages.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
+  }
   toast('📱 กำลังส่ง LINE Flex...','info');
-  await sendLineMessage(userId,[flex]);
-  logAction('SEND_LINE_FLEX',(docNum||o.id));
+  await sendLineMessage(userId,messages);
   toast('📱 ส่ง LINE Flex สำเร็จ ✅');
 }
 
