@@ -3945,43 +3945,45 @@ async function sendBillImageViaLine(oid){
   var m=gM(o.mid);var userId=m?m.lineUserId:'';
   if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
   var billEl=document.querySelector('#moBill .modal-body')||document.getElementById('printArea');
-  if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
-  toast('📸 กำลังจับภาพบิล (คุณภาพสูง)...','info');
+  if(!billEl||billEl.offsetHeight===0){toast('⚠️ เปิดบิลก่อน','err');return}
+  toast('📸 จับภาพบิล...','info');
   try{
-    var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
-    if(canvas.width===0||canvas.height===0){toast('❌ จับภาพไม่ได้','err');return}
-    var base64=canvas.toDataURL('image/png');
+    var canvas=await html2canvas(billEl,{scale:1,useCORS:true,backgroundColor:'#ffffff'});
+    if(canvas.width===0){toast('❌ จับภาพไม่ได้','err');return}
+    // Resize to 1200px wide max
+    var w=Math.min(1200,canvas.width);var r=w/canvas.width;
+    var sm=document.createElement('canvas');sm.width=w;sm.height=Math.round(canvas.height*r);
+    sm.getContext('2d').drawImage(canvas,0,0,sm.width,sm.height);
+    var base64=sm.toDataURL('image/jpeg',0.75);
     var sizeKB=Math.round(base64.length/1024);
     var apiUrl=getApiUrl();var s=getShopSettings();
-    var chunkSize=5000;var uid='img_'+Date.now();
+    var chunkSize=5000;var uid='i'+Date.now();
     var chunks=[];
     for(var i=0;i<base64.length;i+=chunkSize) chunks.push(base64.substring(i,i+chunkSize));
-    toast('📤 อัปโหลดรูป '+sizeKB+'KB ('+chunks.length+' ชิ้น) รอสักครู่...','info');
+    toast('📤 อัปโหลด '+sizeKB+'KB ('+chunks.length+' ชิ้น)...','info');
     var finalResult=null;
     for(var c=0;c<chunks.length;c++){
       var isLast=c===chunks.length-1;
       var cd={id:uid,idx:c,chunk:chunks[c],total:chunks.length};
       if(isLast){cd.last=1;cd.fn='SAKKANID_'+o.id}
       var enc=encodeURIComponent(JSON.stringify(cd));
-      var result=await new Promise(function(resolve,reject){
+      var res=await new Promise(function(ok,no){
         var cb='_c'+Date.now()+'_'+c;
-        window[cb]=function(r){delete window[cb];resolve(r)};
+        window[cb]=function(r){delete window[cb];ok(r)};
         var sc=document.createElement('script');
         sc.src=apiUrl+'?action=uploadChunk&callback='+cb+'&data='+enc;
-        sc.onerror=function(){delete window[cb];reject(new Error('Chunk '+(c+1)+' failed'))};
+        sc.onerror=function(){delete window[cb];no(new Error('Chunk '+(c+1)))};
         document.head.appendChild(sc);
-        setTimeout(function(){if(window[cb]){delete window[cb];reject(new Error('Timeout'))}},20000);
+        setTimeout(function(){if(window[cb]){delete window[cb];no(new Error('Timeout'))}},15000);
       });
-      if(!result||!result.ok){toast('❌ ชิ้นที่ '+(c+1)+': '+(result?result.error:''),'err');return}
-      if(isLast) finalResult=result;
-      if(c%5===0&&c>0) toast('📤 '+Math.round((c/chunks.length)*100)+'%...','info');
+      if(!res||!res.ok){toast('❌ ชิ้นที่ '+(c+1)+' ล้มเหลว','err');return}
+      if(isLast) finalResult=res;
     }
     if(finalResult&&finalResult.url){
-      toast('📱 กำลังส่งรูปทาง LINE...','info');
       var msgs=[{type:'image',originalContentUrl:finalResult.url,previewImageUrl:finalResult.url}];
       if(!isPaidCheck(o)&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
       await sendLineMessage(userId,msgs);
-    }else{toast('❌ ไม่ได้ URL จาก Drive','err')}
+    }else{toast('❌ ไม่ได้ URL','err')}
     logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
 }
