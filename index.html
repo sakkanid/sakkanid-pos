@@ -3948,26 +3948,28 @@ async function sendBillImageViaLine(oid){
   if(!billEl){toast('⚠️ เปิดบิลก่อนแล้วค่อยกดส่งรูป','err');return}
   toast('📸 กำลังจับภาพบิล...','info');
   try{
-    var canvas=await html2canvas(billEl,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
-    var base64=canvas.toDataURL('image/jpeg',0.8);
-    toast('📤 กำลังอัปโหลด + ส่ง LINE... (รอสักครู่)','info');
+    var canvas=await html2canvas(billEl,{scale:1.5,useCORS:true,backgroundColor:'#ffffff'});
+    var base64=canvas.toDataURL('image/jpeg',0.7);
+    var sizeKB=Math.round(base64.length/1024);
+    toast('📤 อัปโหลดรูป ('+sizeKB+'KB)... รอสักครู่','info');
     var apiUrl=getApiUrl();
     var s=getShopSettings();
-    var payload=JSON.stringify({
-      base64:base64,
-      fileName:'SAKKANID_'+o.id+'_'+Date.now(),
-      sendLine:true,userId:userId,
-      isPaid:isPaidCheck(o),remaining:remaining(o),
-      payQrUrl:s.payQrUrl||''
+    // Use fetch no-cors POST — same pattern as syncPush (which works!)
+    await fetch(apiUrl+'?action=uploadImage',{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({
+        base64:base64,
+        fileName:'SAKKANID_'+o.id+'_'+Date.now(),
+        sendLine:true,userId:userId,
+        isPaid:isPaidCheck(o),remaining:remaining(o),
+        payQrUrl:s.payQrUrl||''
+      })
     });
-    // sendBeacon follows redirects + sends body correctly
-    var sent=navigator.sendBeacon(apiUrl,new Blob([payload],{type:'text/plain'}));
-    if(sent){
-      toast('📱 กำลังส่งรูปบิลทาง LINE... (รอ 5-10 วินาที)');
-      logAction('SEND_BILL_IMAGE',o.id+' → '+o.mname);
-    }else{
-      toast('❌ ส่งไม่สำเร็จ — ลองใหม่อีกครั้ง','err');
-    }
+    // fetch no-cors can't confirm success — wait and inform
+    toast('📱 รูปบิลกำลังส่งทาง LINE... (รอ 10 วินาที ตรวจสอบใน LINE)');
+    logAction('SEND_BILL_IMAGE',o.id);
   }catch(e){toast('❌ '+e.message,'err')}
 }
 async function sendFlexBill(userId,o,s,docNum){
