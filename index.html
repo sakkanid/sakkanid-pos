@@ -3821,21 +3821,22 @@ function exportDocsCSV(){
 async function sendLineMessage(userId,messages){
   var apiUrl=getApiUrl();
   if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
-  // Validate userId
   userId=String(userId||'').trim();
   if(!userId||userId.length<30||userId.charAt(0)!=='U'){
-    toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+userId+'" (ต้องขึ้นต้นด้วย U + 32 ตัวอักษร)','err');
+    toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+userId.substring(0,20)+'"','err');
     return{ok:false};
   }
   try{
     var payload=JSON.stringify({to:userId,messages:messages});
     var data=encodeURIComponent(payload);
-    // If URL is too long for JSONP (>8000), simplify to text
-    if(data.length>8000){
+    // If too large for JSONP, fallback to text
+    if(data.length>7000){
       var altText=messages[0]&&messages[0].altText?messages[0].altText:'ข้อความจากร้าน';
-      payload=JSON.stringify({to:userId,messages:[{type:'text',text:altText}]});
+      var textMsgs=messages.filter(function(m){return m.type!=='flex'}).concat([{type:'text',text:altText}]);
+      // Keep non-flex messages (like QR image) + use altText
+      if(messages[0]&&messages[0]._textFallback) textMsgs=[{type:'text',text:messages[0]._textFallback}].concat(messages.filter(function(m){return m.type==='image'}));
+      payload=JSON.stringify({to:userId,messages:textMsgs});
       data=encodeURIComponent(payload);
-      toast('⚠️ ข้อความยาวเกิน — ส่งแบบข้อความแทน','warn');
     }
     var result=await new Promise(function(resolve,reject){
       var cbName='_lncb_'+Date.now();
@@ -3953,6 +3954,20 @@ async function sendFlexBill(userId,o,s,docNum){
       {type:'text',text:fmtPhone(s.phone)+(s.lineOA?' LINE:'+s.lineOA:''),size:'xxs',color:'#bbbbbb',align:'center'}
     ]}
   }};
+  // Text fallback (when Flex is too large for JSONP URL)
+  var txt=s.shopName+'\n'+(paid?'🧾 ใบเสร็จ Receipt':'📋 แจ้งยอด Invoice')+'\nเลขที่: '+(docNum||o.id)+'\nลูกค้า: '+o.mname+'\nวันที่: '+formatBillDate(o.createdAt)+'\n───────────\n';
+  var prevCat='';
+  (o.items||[]).forEach(function(it){
+    if(it.c&&it.c!==prevCat){txt+='▸ '+it.c+'\n';prevCat=it.c}
+    txt+='  '+(it.t||'')+(it.o?' '+it.o:'')+' x'+it.qty+' = '+thb(it.p*it.qty)+'\n';
+    if(it.k) txt+='  '+it.k+'\n';
+  });
+  if(o.delCost>0) txt+='  ค่าจัดส่ง = '+thb(o.delCost)+'\n';
+  txt+='───────────\nยอดสุทธิ: '+thb(o.net)+'\n';
+  if(paid) txt+='✅ ชำระครบแล้ว\n'; else txt+='❌ ค้างชำระ '+thb(remaining(o))+'\n';
+  var m2=gM(o.mid);if(m2){var aq=(DB.quotas||[]).filter(function(qt){return qt.mid===m2.id&&qt.remain>0});aq.forEach(function(qt){txt+='📦 '+qt.pkgName+' คงเหลือ '+qt.remain+'/'+qt.total+'\n'})}
+  txt+='\n'+s.shopName+' · '+fmtPhone(s.phone);
+  flex._textFallback=txt;
   var msgs=[flex];
   if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
   await sendLineMessage(userId,msgs);
@@ -3991,6 +4006,11 @@ async function sendFlexStatus(userId,o,s){
       {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ 🫧',size:'xxs',color:'#aaaaaa',align:'center'}
     ]}
   }};
+  var stxt=s.shopName+'\n📋 แจ้งสถานะ\nเลขที่: '+o.id+'\nลูกค้า: '+o.mname+'\nสถานะ: '+o.status+'\nยอด: '+thb(o.net);
+  if(!paid) stxt+='\n❌ ค้างชำระ '+thb(remaining(o));
+  if(o.pickupDate) stxt+='\n📅 นัดรับ '+fmtJoinDate(o.pickupDate);
+  stxt+='\n\n'+s.shopName+' · '+fmtPhone(s.phone);
+  flex._textFallback=stxt;
   var msgs=[flex];
   if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
   await sendLineMessage(userId,msgs);
