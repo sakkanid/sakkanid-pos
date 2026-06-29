@@ -3922,13 +3922,13 @@ async function sendPdfViaLine(oid,docNum,docType){
     var flex={type:'flex',altText:s.shopName+' '+docNum+' PDF',contents:{
       type:'bubble',
       header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
-        {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'}
+        {type:'text',text:s.shopName||'ร้านซักรีด SAKKANID',color:'#ffffff',weight:'bold',size:'lg'}
       ]},
       body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
-        {type:'text',text:'📄 '+(docType==='invoice'?'ใบแจ้งหนี้':docType==='receipt'?'ใบเสร็จ':docType==='quotation'?'ใบเสนอราคา':'เอกสาร'),weight:'bold',size:'sm',color:'#006F98'},
+        {type:'text',text:'📄 '+(docType==='invoice'?'ใบแจ้งหนี้':docType==='receipt'?'ใบเสร็จรับเงิน':docType==='quotation'?'ใบเสนอราคา':docType==='taxinv'?'ใบกำกับภาษี':'เอกสาร'),weight:'bold',size:'sm',color:'#006F98'},
         {type:'text',text:docNum||o.id,size:'xs',color:'#888888'},
         {type:'text',text:o.mname+' · '+thb(o.net),size:'sm',margin:'sm'},
-        {type:'button',action:{type:'uri',label:'📄 เปิดดู PDF',uri:result.url},style:'primary',color:'#006F98',margin:'lg'}
+        {type:'button',action:{type:'uri',label:docType==='invoice'?'📨 เปิดดูใบแจ้งหนี้':docType==='receipt'?'🧾 เปิดดูใบเสร็จรับเงิน':docType==='quotation'?'💰 เปิดดูใบเสนอราคา':docType==='taxinv'?'📋 เปิดดูใบกำกับภาษี':'📄 เปิดดู PDF',uri:result.url},style:'primary',color:'#006F98',margin:'lg'}
       ]},
       footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
         {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}
@@ -3979,18 +3979,34 @@ async function uploadBillToLine(billEl,oid,docNum,docType){
     }
     if(finalResult&&finalResult.url){
       toast('📱 กำลังส่ง LINE...','info');
-      var dtLabel=docType==='invoice'?'ใบแจ้งหนี้':docType==='receipt'?'ใบเสร็จ':docType==='quotation'?'ใบเสนอราคา':'บิล';
+      // ═══ กำหนดชื่อปุ่มตามประเภทบิล ═══
+      var btnLabel='📄 เปิดดูบิล';
+      var dtLabel='บิล';
+      if(docType==='invoice'){btnLabel='📨 เปิดดูใบแจ้งหนี้';dtLabel='ใบแจ้งหนี้'}
+      else if(docType==='receipt'){btnLabel='🧾 เปิดดูใบเสร็จรับเงิน';dtLabel='ใบเสร็จรับเงิน'}
+      else if(docType==='quotation'){btnLabel='💰 เปิดดูใบเสนอราคา';dtLabel='ใบเสนอราคา'}
+      else if(docType==='taxinv'){btnLabel='📋 เปิดดูใบกำกับภาษี';dtLabel='ใบกำกับภาษี'}
+      else{
+        // บิลปกติ — ดูจาก isPaid
+        var isPaidNow=isPaidCheck(o);
+        if(o.type==='cleaning'){
+          dtLabel=isPaidNow?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด';
+          btnLabel=isPaidNow?'🧾 เปิดดูใบเสร็จรับเงิน':'📋 เปิดดูใบรับจอง';
+        }else{
+          dtLabel=isPaidNow?'ใบเสร็จรับเงิน':'ใบรับผ้า';
+          btnLabel=isPaidNow?'🧾 เปิดดูใบเสร็จรับเงิน':'👕 เปิดดูใบรับผ้า';
+        }
+      }
       var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+thb(o.net),contents:{
         type:'bubble',
         header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
-          {type:'text',text:s.shopName,color:'#ffffff',weight:'bold',size:'lg'}
+          {type:'text',text:s.shopName||'ร้านซักรีด SAKKANID',color:'#ffffff',weight:'bold',size:'lg'}
         ]},
         body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
           {type:'text',text:'📄 '+dtLabel,weight:'bold',size:'sm',color:'#006F98'},
           {type:'text',text:(docNum||o.id),size:'xs',color:'#888888'},
-          {type:'text',text:o.mname,size:'sm',margin:'sm'},
-          {type:'text',text:'ยอด: '+thb(o.net),size:'sm',weight:'bold',margin:'xs'},
-          {type:'button',action:{type:'uri',label:'📄 เปิดดูบิล',uri:finalResult.url},style:'primary',color:'#006F98',margin:'lg'}
+          {type:'text',text:o.mname+' · '+thb(o.net),size:'sm',margin:'sm'},
+          {type:'button',action:{type:'uri',label:btnLabel,uri:finalResult.url},style:'primary',color:'#006F98',margin:'lg'}
         ]},
         footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
           {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}
