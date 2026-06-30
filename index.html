@@ -4231,8 +4231,8 @@ async function sendPdfViaLine(oid,docNum,docType){
   };
   var dtInfo=dtLabels[dt]||{name:'เอกสาร',btn:'📄 เปิดดูเอกสาร'};
   var pdfData={
-    orderId:oid,docNum:docNum||o.id,docType:dt,
-    order:o,items:o.items||[],extras:o.extras||[],
+    orderId:oid,docNum:docNum||o.id,docType:dt,orderType:o.type||'laundry',
+    items:o.items||[],extras:o.extras||[],
     mname:o.mname,mphone:o.mphone,
     delivery:o.delivery,deliveryAddr:o.deliveryAddr||'',delCost:o.delCost||0,
     net:o.net,disc:o.disc||0,isPaid:paid,remaining:remaining(o),
@@ -4240,6 +4240,8 @@ async function sendPdfViaLine(oid,docNum,docType){
     pickupDate:o.pickupDate?fmtISO(o.pickupDate):'',cleanTime:o.cleanTime||'',
     taxId:o._taxId||'',branch:o._branch||'',custAddr:o._custAddr||'',
     whtRate:o._whtRate||0,whtAmt:o._whtAmt||0,grandTotal:o._grandTotal||o.net,
+    // ส่ง shop settings + pdfConfig ไปตรงๆ ไม่ต้องพึ่ง sync
+    shopName:s.shopName||'',shopPhone:s.phone||'',shopLine:s.lineOA||'',shopAddr:s.address||'',
     pdfConfig:s.pdfConfig||{}
   };
   try{
