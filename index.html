@@ -2071,7 +2071,7 @@ function showCalDay(dateStr){
 function renderMembersPage(c){
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button></div></div>'+
     '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
 }
 function renderMemberTable(list){
@@ -2084,12 +2084,7 @@ function filterMembersPage(){
   const list=DB.members.filter(m=>(m.name||'').toLowerCase().includes(q)||String(m.phone||"").includes(q));
   $('memPageList').innerHTML=renderMemberTable(list);
 }
-function exportMembers(){
-  let csv='ID,ชื่อ,เบอร์,แต้ม,ยอดซื้อ,ระดับ,วันสมัคร\n';
-  DB.members.forEach(m=>{csv+=m.id+','+m.name+','+m.phone+','+m.pts+','+m.spend+','+m.level+','+m.joinDate+'\n'});
-  const blob=new Blob(['\ufeff'+csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='SAKKANID_members.csv';a.click();toast('Export สำเร็จ');
-}
+// (exportMembers moved to Import/Export section above)
 
 // ═══ CRM PAGE ═══
 function renderCRMPage(c){
@@ -2410,15 +2405,16 @@ function exportReportCSV(type){
 
 function renderPricelistPage(c){
   c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
-  '<div class="card" id="priceContent"><div class="search-box" style="margin-bottom:12px"><input id="priceSearch" placeholder="ค้นหาบริการ..." oninput="filterPricelist()"></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
+  '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
 }
 function showPriceTab(el,tab){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
   var rc=$('priceContent');
-  if(tab==='cat') rc.innerHTML='<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
-  else if(tab==='bed') rc.innerHTML=renderBedPriceTable();
-  else if(tab==='cln') rc.innerHTML=renderClnPriceTable();
-  else if(tab==='pkg') rc.innerHTML=renderPkgPriceTable();
+  var eiBar='<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\''+tab+'\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\''+tab+'\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\''+tab+'\')">📥 Import CSV</button><input type="file" id="importFile_'+tab+'" accept=".csv" style="display:none" onchange="importPriceCSV(\''+tab+'\',this)"></div>';
+  if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
+  else if(tab==='bed') rc.innerHTML=eiBar+renderBedPriceTable();
+  else if(tab==='cln') rc.innerHTML=eiBar+renderClnPriceTable();
+  else if(tab==='pkg') rc.innerHTML=eiBar+renderPkgPriceTable();
 }
 function renderPriceTable(list){
   return '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+
@@ -2477,6 +2473,152 @@ function saveAddPriceItem(){
 }
 
 // ═══ SETTINGS PAGE — COMPREHENSIVE ═══
+
+// ═══ IMPORT / EXPORT — ตารางราคา & สมาชิก ═══
+function triggerImport(type){var el=$('importFile_'+type);if(el)el.click()}
+
+function exportPriceCSV(tab){
+  var csv='',filename='';
+  if(tab==='cat'){
+    csv='หมวดบริการ,หมวด(EN),ประเภทผ้า,ประเภท(EN),ตัวเลือก,ตัวเลือก(EN),ราคา,ต้นทุน,ประเภทราคา,SKU\n';
+    CAT.forEach(function(it){csv+=csvQ(it.c)+','+csvQ(it.ce||'')+','+csvQ(it.t)+','+csvQ(it.te||'')+','+csvQ(it.o||'')+','+csvQ(it.oe||'')+','+it.p+','+it.k+','+(it.pt||'fixed')+','+(it.sku||'')+'\n'});
+    filename='SAKKANID_pricelist_laundry.csv';
+  }else if(tab==='bed'){
+    csv='รหัสขนาด,ชื่อแสดง,ราคา,ต้นทุน\n';
+    BED_SETS.forEach(function(b){csv+=csvQ(b.size)+','+csvQ(b.label)+','+b.price+','+b.cost+'\n'});
+    filename='SAKKANID_pricelist_bedset.csv';
+  }else if(tab==='cln'){
+    csv='รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ,ต้นทุน\n';
+    CLN_SVCS.forEach(function(s){csv+=csvQ(s.type)+','+csvQ(s.label)+','+s.minPrice+','+s.cost+'\n'});
+    filename='SAKKANID_pricelist_cleaning.csv';
+  }else if(tab==='pkg'){
+    csv='ประเภท,จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\n';
+    PKGS.forEach(function(p){csv+=csvQ(p.type)+','+p.qty+','+p.price+','+p.cost+','+(p.expDays||90)+'\n'});
+    filename='SAKKANID_pricelist_packages.csv';
+  }
+  downloadCSV(csv,filename);
+}
+
+function downloadPriceTemplate(tab){
+  var csv='',filename='';
+  if(tab==='cat'){
+    csv='หมวดบริการ,หมวด(EN),ประเภทผ้า,ประเภท(EN),ตัวเลือก,ตัวเลือก(EN),ราคา,ต้นทุน,ประเภทราคา,SKU\nซักแห้ง,Dry Clean,เสื้อเชิ้ต,Shirt,ตัวสั้น,Short,80,30,fixed,DC-001\nซัก อบ รีด,Wash & Iron,กางเกง,Pants,ขายาว,Long,50,18,fixed,WI-002\n';
+    filename='TEMPLATE_pricelist_laundry.csv';
+  }else if(tab==='bed'){
+    csv='รหัสขนาด,ชื่อแสดง,ราคา,ต้นทุน\nsingle,Single 3.5Ft,339,120\nqueen,Queen 5Ft,439,150\nking,King 6Ft,539,180\n';
+    filename='TEMPLATE_pricelist_bedset.csv';
+  }else if(tab==='cln'){
+    csv='รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ,ต้นทุน\nstudio,Studio (1BR1B),1500,600\n1br,1 ห้องนอน 1 ห้องน้ำ,1800,700\n';
+    filename='TEMPLATE_pricelist_cleaning.csv';
+  }else if(tab==='pkg'){
+    csv='ประเภท,จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\nซัก/อบ/พับ,25,400,150,90\nซัก/อบ/พับ,60,900,350,120\n';
+    filename='TEMPLATE_pricelist_packages.csv';
+  }else if(tab==='members'){
+    csv='ชื่อ,ชื่อเล่น,เบอร์โทร,ประเภทที่อยู่,โครงการ/คอนโด,ห้อง,หมู่บ้าน,เลขบ้าน,LINE_ID\nสมชาย ใจดี,ชาย,081-234-5678,condo,Supalai Premier,A-101,,,@somchai\nสมหญิง รักงาน,หญิง,089-876-5432,house,,,พฤกษา,123/45,\n';
+    filename='TEMPLATE_members.csv';
+  }
+  downloadCSV(csv,filename);
+}
+
+function csvQ(s){s=String(s);return s.includes(',')||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s}
+function downloadCSV(csv,filename){
+  var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+  toast('📤 Export สำเร็จ — '+filename);
+}
+function parseCSV(text){
+  var lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var rows=[];
+  for(var i=0;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    var cols=[];var cur='';var inQ=false;
+    for(var j=0;j<lines[i].length;j++){
+      var ch=lines[i][j];
+      if(inQ){if(ch==='"'&&lines[i][j+1]==='"'){cur+='"';j++}else if(ch==='"'){inQ=false}else{cur+=ch}}
+      else{if(ch==='"'){inQ=true}else if(ch===','){cols.push(cur.trim());cur=''}else{cur+=ch}}
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+function importPriceCSV(tab,fileInput){
+  if(!fileInput.files||!fileInput.files[0]) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var rows=parseCSV(e.target.result);
+    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');return}
+    rows.shift(); // skip header
+    var count=0;
+    if(tab==='cat'){
+      // เพิ่มหรือแทนที่ — ถามก่อน
+      var mode=confirm('กด OK = แทนที่ทั้งหมด (ลบรายการเดิม)\nกด Cancel = เพิ่มต่อท้าย (เก็บรายการเดิม)');
+      if(mode) CAT.length=0;
+      rows.forEach(function(r){
+        if(r.length<7||!r[0]||!r[2]) return;
+        CAT.push({c:r[0],ce:r[1]||'',t:r[2],te:r[3]||'',o:r[4]||'',oe:r[5]||'',p:parseFloat(r[6])||0,k:parseFloat(r[7])||0,pt:r[8]||'fixed',sku:r[9]||''});
+        count++;
+      });
+      CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
+    }else if(tab==='bed'){
+      BED_SETS.length=0;
+      rows.forEach(function(r){
+        if(r.length<3||!r[0]) return;
+        BED_SETS.push({size:r[0],label:r[1]||r[0],price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,items:[]});count++;
+      });
+    }else if(tab==='cln'){
+      CLN_SVCS.length=0;
+      rows.forEach(function(r){
+        if(r.length<3||!r[0]) return;
+        CLN_SVCS.push({type:r[0],label:r[1]||r[0],minPrice:parseFloat(r[2])||0,cost:parseFloat(r[3])||0});count++;
+      });
+    }else if(tab==='pkg'){
+      PKGS.length=0;
+      rows.forEach(function(r){
+        if(r.length<3||!r[0]) return;
+        PKGS.push({type:r[0],qty:parseInt(r[1])||0,price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,expDays:parseInt(r[4])||90});count++;
+      });
+    }
+    saveDB();logAction('IMPORT_PRICE',tab+' '+count+' rows');
+    toast('📥 Import สำเร็จ — '+count+' รายการ ✅');
+    renderPage('pricelist');
+  };
+  reader.readAsText(fileInput.files[0]);
+  fileInput.value=''; // reset
+}
+
+function importMembersCSV(fileInput){
+  if(!fileInput.files||!fileInput.files[0]) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var rows=parseCSV(e.target.result);
+    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');return}
+    rows.shift();
+    var count=0,skip=0;
+    rows.forEach(function(r){
+      if(r.length<3||!r[0]) return;
+      var name=r[0];var nick=r[1]||'';var phone=String(r[2]||'').replace(/[^0-9]/g,'');
+      if(!phone){skip++;return}
+      // เช็คซ้ำโดยเบอร์โทร
+      var existing=DB.members.find(function(m){return m.phone.replace(/[^0-9]/g,'')===phone});
+      if(existing){skip++;return}
+      var m={id:genId('MBR'),name:name,nick:nick,phone:phone,addrType:r[3]||'condo',proj:r[4]||'',room:r[5]||'',village:r[6]||'',houseNo:r[7]||'',lineId:r[8]||'',lineUserId:'',pts:50,spend:0,level:'ทั่วไป',joinDate:fmtDate(),pdpaConsent:true};
+      DB.members.push(m);count++;
+    });
+    saveDB();logAction('IMPORT_MEMBERS',count+' new, '+skip+' skipped');
+    toast('📥 Import สมาชิก — เพิ่ม '+count+' คน'+(skip?' (ข้าม '+skip+' ซ้ำ/ไม่มีเบอร์)':''));
+    renderPage('members');
+  };
+  reader.readAsText(fileInput.files[0]);
+  fileInput.value='';
+}
+
+function exportMembers(){
+  let csv='ID,ชื่อ,ชื่อเล่น,เบอร์โทร,ประเภทที่อยู่,โครงการ,ห้อง,หมู่บ้าน,เลขบ้าน,LINE_ID,แต้ม,ยอดซื้อ,ระดับ,วันสมัคร\n';
+  DB.members.forEach(function(m){csv+=m.id+','+csvQ(m.name)+','+csvQ(m.nick||'')+','+m.phone+','+(m.addrType||'')+','+csvQ(m.proj||'')+','+csvQ(m.room||'')+','+csvQ(m.village||'')+','+csvQ(m.houseNo||'')+','+(m.lineId||'')+','+(m.pts||0)+','+(m.spend||0)+','+(m.level||'ทั่วไป')+','+(m.joinDate||'')+'\n'});
+  downloadCSV(csv,'SAKKANID_members.csv');
+}
 function renderSettingsPage(c){
   const s=getShopSettings();
   const tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
