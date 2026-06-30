@@ -2634,13 +2634,14 @@ function renderSettingsPage(c){
   const tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
   const methods=s.paymentMethods||PAY_METHODS_DEFAULT;
   const autoLock=s.autoLockMin||0;
-  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'connect\')">🔗 การเชื่อมต่อ</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'line\')">📱 LINE</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showSettingsTab(this,\'shop\')">🏪 ร้านค้า</div><div class="tab" onclick="showSettingsTab(this,\'pdf\')">📄 PDF</div><div class="tab" onclick="showSettingsTab(this,\'connect\')">🔗 การเชื่อมต่อ</div><div class="tab" onclick="showSettingsTab(this,\'delivery\')">🚗 ค่าจัดส่ง</div><div class="tab" onclick="showSettingsTab(this,\'payment\')">💳 ชำระเงิน</div><div class="tab" onclick="showSettingsTab(this,\'users\')">👥 ผู้ใช้</div><div class="tab" onclick="showSettingsTab(this,\'line\')">📱 LINE</div><div class="tab" onclick="showSettingsTab(this,\'backup\')">💾 Backup</div><div class="tab" onclick="showSettingsTab(this,\'audit\')">📜 Log</div></div>'+
   '<div id="settingsContent">'+renderSettingsShop(s)+'</div>';
 }
 function showSettingsTab(el,tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));el.classList.add('act');
   const s=getShopSettings();const rc=$('settingsContent');
   if(tab==='shop') rc.innerHTML=renderSettingsShop(s);
+  else if(tab==='pdf') rc.innerHTML=renderSettingsPdf(s);
   else if(tab==='connect') rc.innerHTML=renderSettingsConnect(s);
   else if(tab==='delivery') rc.innerHTML=renderSettingsDelivery(s);
   else if(tab==='payment') rc.innerHTML=renderSettingsPayment(s);
@@ -2692,6 +2693,99 @@ function renderSettingsShop(s){
     ((s.billConfig||{}).footerImage?'<div style="margin:4px 0"><img src="'+s.billConfig.footerImage+'" style="height:40px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">รูปท้ายบิล</span></div>':'')+
     (s.payQR?'<div style="margin:4px 0"><img src="'+s.payQR+'" style="height:50px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">QR PromptPay</span></div>':'')+
     '<button class="btn btn-pr btn-sm" onclick="saveBillConfig()">💾 บันทึกตั้งค่าบิล</button></div>';
+}
+// ═══ PDF SETTINGS — ตั้งค่า PDF พร้อม Preview ═══
+function renderSettingsPdf(s){
+  var pc=s.pdfConfig||{};
+  return '<div class="grid g2"><div class="card"><div class="card-title">📄 ตั้งค่า PDF บิล / เอกสาร</div>'+
+    '<div class="form-group"><label class="form-label">🎨 สีหลักเอกสาร</label><div class="grid g3" style="gap:4px">'+
+    '<div><label style="font-size:10px">ใบเสร็จ</label><input type="color" id="pdf-c-receipt" value="'+(pc.colorReceipt||'#0D8A6A')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div>'+
+    '<div><label style="font-size:10px">ใบรับผ้า</label><input type="color" id="pdf-c-pickup" value="'+(pc.colorPickup||'#3B82C4')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div>'+
+    '<div><label style="font-size:10px">ใบกำกับภาษี</label><input type="color" id="pdf-c-taxinv" value="'+(pc.colorTaxinv||'#006F98')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div></div>'+
+    '<div class="grid g3" style="gap:4px;margin-top:4px">'+
+    '<div><label style="font-size:10px">ใบเสนอราคา</label><input type="color" id="pdf-c-quotation" value="'+(pc.colorQuotation||'#C4820A')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div>'+
+    '<div><label style="font-size:10px">ใบแจ้งหนี้</label><input type="color" id="pdf-c-invoice" value="'+(pc.colorInvoice||'#7C3AED')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div>'+
+    '<div><label style="font-size:10px">สีตาราง header</label><input type="color" id="pdf-c-table" value="'+(pc.colorTable||'#f5f7fa')+'" onchange="pdfPreview()" style="width:100%;height:32px"></div></div></div>'+
+    '<div class="form-group"><label class="form-label">📝 ข้อความ Header</label><input id="pdf-header" value="'+(pc.headerText||s.shopName||'')+'" oninput="pdfPreview()" placeholder="ร้านซักรีด SAKKANID"></div>'+
+    '<div class="form-group"><label class="form-label">📝 ข้อความ Footer</label><input id="pdf-footer" value="'+(pc.footerText||'ขอบคุณที่ใช้บริการค่ะ Thank you.')+'" oninput="pdfPreview()"></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ขนาดฟอนต์: <span id="pdf-fs-val">'+(pc.fontSize||13)+'</span>px</label><input type="range" id="pdf-fontsize" min="10" max="18" value="'+(pc.fontSize||13)+'" oninput="$(\'pdf-fs-val\').textContent=this.value;pdfPreview()" style="width:100%"></div>'+
+    '<div class="form-group"><label class="form-label">ขนาดชื่อร้าน: <span id="pdf-ns-val">'+(pc.shopNameSize||20)+'</span>px</label><input type="range" id="pdf-namesize" min="14" max="28" value="'+(pc.shopNameSize||20)+'" oninput="$(\'pdf-ns-val\').textContent=this.value;pdfPreview()" style="width:100%"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ขนาดชื่อเอกสาร: <span id="pdf-ds-val">'+(pc.docTypeSize||22)+'</span>px</label><input type="range" id="pdf-doctsize" min="16" max="30" value="'+(pc.docTypeSize||22)+'" oninput="$(\'pdf-ds-val\').textContent=this.value;pdfPreview()" style="width:100%"></div>'+
+    '<div class="form-group"><label class="form-label">ระยะขอบ (margin)</label><select id="pdf-margin" onchange="pdfPreview()"><option value="15mm" '+(pc.margin==='15mm'?'selected':'')+'>แคบ (15mm)</option><option value="20mm" '+((!pc.margin||pc.margin==='20mm')?'selected':'')+'>ปกติ (20mm)</option><option value="25mm" '+(pc.margin==='25mm'?'selected':'')+'>กว้าง (25mm)</option></select></div></div>'+
+    '<div style="margin:8px 0;font-size:12px">'+
+    '<label><input type="checkbox" id="pdf-show-logo" '+(pc.showLogo!==false?'checked':'')+' onchange="pdfPreview()" style="width:auto"> แสดงโลโก้</label> '+
+    '<label><input type="checkbox" id="pdf-show-en" '+(pc.showEnglish!==false?'checked':'')+' onchange="pdfPreview()" style="width:auto"> แสดงชื่อ EN</label> '+
+    '<label><input type="checkbox" id="pdf-show-payhist" '+(pc.showPayHist!==false?'checked':'')+' onchange="pdfPreview()" style="width:auto"> แสดงประวัติชำระ</label> '+
+    '<label><input type="checkbox" id="pdf-show-quota" '+(pc.showQuota!==false?'checked':'')+' onchange="pdfPreview()" style="width:auto"> แสดงโควต้า</label></div>'+
+    '<div class="form-group"><label class="form-label">📄 ประเภท Preview</label><select id="pdf-preview-type" onchange="pdfPreview()"><option value="receipt">ใบเสร็จรับเงิน</option><option value="pickup">ใบรับผ้า</option><option value="taxinv">ใบกำกับภาษี</option><option value="quotation">ใบเสนอราคา</option><option value="invoice">ใบแจ้งหนี้</option></select></div>'+
+    '<button class="btn btn-gn" onclick="savePdfConfig()" style="margin-top:8px">💾 บันทึกตั้งค่า PDF</button></div>'+
+    // ═══ Preview Panel ═══
+    '<div class="card"><div class="card-title">👁️ Preview PDF</div>'+
+    '<div id="pdfPreviewBox" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;max-height:600px;overflow-y:auto;font-family:Helvetica,sans-serif;color:#333">'+
+    '</div></div></div>';
+}
+function pdfPreview(){
+  var s=getShopSettings();
+  var type=$('pdf-preview-type')?$('pdf-preview-type').value:'receipt';
+  var hText=$('pdf-header')?$('pdf-header').value:s.shopName;
+  var fText=$('pdf-footer')?$('pdf-footer').value:'';
+  var fs=$('pdf-fontsize')?$('pdf-fontsize').value:13;
+  var ns=$('pdf-namesize')?$('pdf-namesize').value:20;
+  var ds=$('pdf-doctsize')?$('pdf-doctsize').value:22;
+  var showLogo=$('pdf-show-logo')?$('pdf-show-logo').checked:true;
+  var showEn=$('pdf-show-en')?$('pdf-show-en').checked:true;
+  var showPH=$('pdf-show-payhist')?$('pdf-show-payhist').checked:true;
+  var showQ=$('pdf-show-quota')?$('pdf-show-quota').checked:true;
+  var cReceipt=$('pdf-c-receipt')?$('pdf-c-receipt').value:'#0D8A6A';
+  var cPickup=$('pdf-c-pickup')?$('pdf-c-pickup').value:'#3B82C4';
+  var cTaxinv=$('pdf-c-taxinv')?$('pdf-c-taxinv').value:'#006F98';
+  var cQuotation=$('pdf-c-quotation')?$('pdf-c-quotation').value:'#C4820A';
+  var cInvoice=$('pdf-c-invoice')?$('pdf-c-invoice').value:'#7C3AED';
+  var cTable=$('pdf-c-table')?$('pdf-c-table').value:'#f5f7fa';
+  var dtNames={receipt:'ใบเสร็จรับเงิน',pickup:'ใบรับผ้า',taxinv:'ใบกำกับภาษี',quotation:'ใบเสนอราคา',invoice:'ใบแจ้งหนี้'};
+  var dtEns={receipt:'Receipt',pickup:'Pickup Slip',taxinv:'Tax Invoice',quotation:'Quotation',invoice:'Invoice'};
+  var dtColors={receipt:cReceipt,pickup:cPickup,taxinv:cTaxinv,quotation:cQuotation,invoice:cInvoice};
+  var dtN=dtNames[type]||'ใบเสร็จ';var dtE=dtEns[type]||'Receipt';var dtC=dtColors[type]||'#3B82C4';
+  var h='<div style="font-size:'+fs+'px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+  h+='<div>'+(showLogo&&s.logo?'<img src="'+s.logo+'" style="height:40px;margin-bottom:4px"><br>':'')+'<div style="font-size:'+ns+'px;font-weight:bold">'+hText+'</div><div style="font-size:11px;color:#666">'+(s.address||'กรุงเทพฯ')+'</div><div style="font-size:11px;color:#666">'+(s.phone||'02-xxx-xxxx')+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div></div>';
+  h+='<div style="text-align:right"><div style="font-size:'+ds+'px;font-weight:bold;color:'+dtC+'">'+dtN+'</div>'+(showEn?'<div style="font-size:12px;color:'+dtC+'">'+dtE+'</div>':'')+'<div style="font-size:12px;margin-top:4px">เลขที่: RCP-0001-69</div><div style="font-size:12px">วันที่: 30/06/2026 14:30 น.</div></div></div>';
+  h+='<div style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin:10px 0"><div style="font-weight:bold;margin-bottom:4px">ข้อมูลลูกค้า / Customer</div>ชื่อ: สมชาย ใจดี<br>โทร: 081-234-5678<br>🏪 รับเอง</div>';
+  h+='<table style="width:100%;border-collapse:collapse;margin:10px 0"><tr style="background:'+cTable+'"><th style="padding:6px;text-align:center;border-bottom:2px solid #ddd;font-size:11px;width:40px">ลำดับ</th><th style="padding:6px;text-align:left;border-bottom:2px solid #ddd;font-size:11px">รายการ</th><th style="padding:6px;text-align:center;border-bottom:2px solid #ddd;font-size:11px;width:50px">จำนวน</th><th style="padding:6px;text-align:right;border-bottom:2px solid #ddd;font-size:11px;width:70px">ราคา</th><th style="padding:6px;text-align:right;border-bottom:2px solid #ddd;font-size:11px;width:70px">รวม</th></tr>';
+  h+='<tr><td style="text-align:center;padding:8px 4px;border-bottom:1px solid #eee;color:#666">1</td><td style="padding:8px 4px;border-bottom:1px solid #eee"><div>ค่าบริการ ซัก อบ รีด — เสื้อเชิ้ต</div>'+(showEn?'<div style="font-size:11px;color:#999">Shirt</div>':'')+'</td><td style="text-align:center;padding:8px 4px;border-bottom:1px solid #eee">2</td><td style="text-align:right;padding:8px 4px;border-bottom:1px solid #eee">฿50</td><td style="text-align:right;padding:8px 4px;border-bottom:1px solid #eee">฿100</td></tr>';
+  h+='<tr><td style="text-align:center;padding:8px 4px;border-bottom:1px solid #eee;color:#666">2</td><td style="padding:8px 4px;border-bottom:1px solid #eee"><div>ค่าบริการ ซักแห้ง — กางเกง · ตัวยาว</div>'+(showEn?'<div style="font-size:11px;color:#999">Pants Long</div>':'')+'</td><td style="text-align:center;padding:8px 4px;border-bottom:1px solid #eee">1</td><td style="text-align:right;padding:8px 4px;border-bottom:1px solid #eee">฿100</td><td style="text-align:right;padding:8px 4px;border-bottom:1px solid #eee">฿100</td></tr></table>';
+  h+='<div style="margin-left:auto;width:280px"><div style="border-top:3px double #333;padding-top:6px"><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;padding:3px 0"><span>ยอดรวมทั้งสิ้น</span><span>฿200</span></div></div></div>';
+  if(type==='pickup') h+='<div style="background:#FEE2E2;border:2px solid #DC2626;border-radius:8px;padding:8px 14px;text-align:center;margin:10px 0;font-size:13px;color:#991B1B;font-weight:bold">💳 ยังไม่ได้ชำระ ยอดค้าง ฿200</div>';
+  else h+='<div style="background:#E8F7F2;border-radius:8px;padding:8px 14px;text-align:center;margin:10px 0;font-size:13px;color:#0F7A59">✅ ชำระครบแล้ว / Paid in Full</div>';
+  if(showPH) h+='<div style="margin:8px 0;font-size:11px"><strong>ประวัติชำระเงิน:</strong><br>รอบ 1: QR พร้อมเพย์ ฿200 (30/06/2569 14:30 น.)</div>';
+  if(showQ) h+='<div style="margin:8px 0;padding:6px;background:#F3EEFF;border-radius:6px;font-size:11px;color:#7C3AED"><strong>โควต้า Package</strong><br>📦 ซัก/อบ/พับ 60 ชิ้น ใช้แล้ว 10 / คงเหลือ 50/60</div>';
+  h+='<div style="display:flex;justify-content:space-between;margin-top:16px;font-size:11px;color:#999"><div>'+hText+' · '+(s.phone||'')+'</div><div>'+dtN+' เลขที่ RCP-0001-69</div></div>';
+  h+='<div style="text-align:center;margin-top:8px;font-size:11px;color:#bbb">'+fText+'</div></div>';
+  var box=$('pdfPreviewBox');if(box) box.innerHTML=h;
+}
+function savePdfConfig(){
+  var s=getShopSettings();
+  s.pdfConfig={
+    colorReceipt:$('pdf-c-receipt')?$('pdf-c-receipt').value:'#0D8A6A',
+    colorPickup:$('pdf-c-pickup')?$('pdf-c-pickup').value:'#3B82C4',
+    colorTaxinv:$('pdf-c-taxinv')?$('pdf-c-taxinv').value:'#006F98',
+    colorQuotation:$('pdf-c-quotation')?$('pdf-c-quotation').value:'#C4820A',
+    colorInvoice:$('pdf-c-invoice')?$('pdf-c-invoice').value:'#7C3AED',
+    colorTable:$('pdf-c-table')?$('pdf-c-table').value:'#f5f7fa',
+    headerText:$('pdf-header')?$('pdf-header').value:'',
+    footerText:$('pdf-footer')?$('pdf-footer').value:'',
+    fontSize:parseInt($('pdf-fontsize')?$('pdf-fontsize').value:13),
+    shopNameSize:parseInt($('pdf-namesize')?$('pdf-namesize').value:20),
+    docTypeSize:parseInt($('pdf-doctsize')?$('pdf-doctsize').value:22),
+    margin:$('pdf-margin')?$('pdf-margin').value:'20mm',
+    showLogo:$('pdf-show-logo')?$('pdf-show-logo').checked:true,
+    showEnglish:$('pdf-show-en')?$('pdf-show-en').checked:true,
+    showPayHist:$('pdf-show-payhist')?$('pdf-show-payhist').checked:true,
+    showQuota:$('pdf-show-quota')?$('pdf-show-quota').checked:true
+  };
+  saveDB();toast('💾 บันทึกตั้งค่า PDF สำเร็จ ✅');logAction('SAVE_PDF_CONFIG','');
 }
 function renderSettingsConnect(s){
   var apiOk=!!s.apiUrl;var lineOk=!!s.lineChannelToken;
