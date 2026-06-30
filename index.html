@@ -1318,8 +1318,18 @@ function showOrderDetail(oid){
     (o.payHist&&o.payHist.length?'<div class="card-title" style="margin-top:12px;font-size:13px">💳 ประวัติชำระเงิน</div><table><tr><th>รอบ</th><th>วิธี</th><th>จำนวน</th><th>วันที่</th><th>โดย</th></tr>'+
     o.payHist.map(p=>'<tr><td>'+p.round+'</td><td>'+p.method+'</td><td>'+thb(p.amt)+'</td><td>'+p.date+'</td><td>'+p.by+'</td></tr>').join('')+'</table>':'')+
     (o.note?'<div style="margin-top:10px;padding:8px;background:var(--aml);border-radius:6px;font-size:12px">📝 '+o.note+'</div>':'')+
-    '</div>';
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<button class="btn btn-rd" onclick="deleteOrder(\''+oid+'\')">🗑️ ลบออเดอร์</button>':'')+'</div>';
   openMo('moDetail');
+}
+function deleteOrder(oid){
+  if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('เฉพาะเจ้าของร้านเท่านั้น','err');return}
+  var o=gO(oid);if(!o) return;
+  if(!confirm('ลบออเดอร์ '+oid+' ('+o.mname+' · '+thb(o.net)+') ?\n\nข้อมูลจะหายถาวร ไม่สามารถกู้คืนได้')) return;
+  DB.orders=DB.orders.filter(function(x){return x.id!==oid});
+  saveDB();logAction('DELETE_ORDER',oid+' '+o.mname+' '+thb(o.net));
+  toast('🗑️ ลบออเดอร์ '+oid+' แล้ว');
+  closeMo('moDetail');renderPage(curPage);
 }
 
 // ═══ BILL ═══
@@ -3348,8 +3358,8 @@ function renderExpensePage(c){
     '<div class="form-group"><label class="form-label">จำนวนเงิน (฿)</label><input id="exp-amt" type="number"></div></div>'+
     '<button class="btn btn-am" onclick="saveExpense()">💾 บันทึกค่าใช้จ่าย</button></div>'+
     '<div class="card"><div class="card-title">📋 รายการล่าสุด</div>'+
-    (expenses.length?'<table><tr><th>วันที่</th><th>หมวด</th><th>รายการ</th><th>จำนวน</th><th>โดย</th></tr>'+
-    expenses.map(function(e){return '<tr><td style="font-size:11px">'+fmtJoinDate(e.date)+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
+    (expenses.length?'<table><tr><th>วันที่</th><th>หมวด</th><th>รายการ</th><th>จำนวน</th><th>โดย</th>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<th>จัดการ</th>':'')+'</tr>'+
+    expenses.map(function(e,idx){var ri=DB.expenses.length-1-idx;return '<tr><td style="font-size:11px">'+fmtJoinDate(e.date)+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<td><button class="btn btn-out btn-sm" onclick="editExpense('+ri+')">✏️</button> <button class="btn btn-out btn-sm" onclick="deleteExpense('+ri+')">🗑️</button></td>':'')+'</tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
 }
 function saveExpense(){
   var cat=$('exp-cat')?$('exp-cat').value:'';
@@ -3373,6 +3383,34 @@ function addExpenseCategory(){
   if(getExpenseCategories().indexOf(name.trim())>=0){toast('หมวดนี้มีอยู่แล้ว','warn');return}
   s.expenseCategories.push(name.trim());saveDB();
   toast('เพิ่มหมวด "'+name.trim()+'" สำเร็จ ✅');renderPage('expense');
+}
+function editExpense(idx){
+  if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('เฉพาะเจ้าของร้าน','err');return}
+  var e=DB.expenses[idx];if(!e) return;
+  var h='<div class="modal-overlay show" id="moExpEdit"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>✏️ แก้ไขค่าใช้จ่าย</h3><button class="modal-close" onclick="document.getElementById(\'moExpEdit\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="form-group"><label class="form-label">หมวด</label><select id="ee-cat">'+getExpenseCategories().map(function(c){return '<option'+(c===e.category?' selected':'')+'>'+c+'</option>'}).join('')+'</select></div>'+
+    '<div class="form-group"><label class="form-label">รายการ</label><input id="ee-name" value="'+e.name+'"></div>'+
+    '<div class="form-group"><label class="form-label">จำนวนเงิน (฿)</label><input id="ee-amt" type="number" value="'+e.amount+'"></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moExpEdit\').remove()">ยกเลิก</button><button class="btn btn-gn" onclick="saveEditExpense('+idx+')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveEditExpense(idx){
+  var e=DB.expenses[idx];if(!e) return;
+  e.category=$('ee-cat').value;
+  e.name=$('ee-name').value.trim();
+  e.amount=parseFloat($('ee-amt').value)||0;
+  saveDB();logAction('EDIT_EXPENSE',e.id+' '+e.name+' '+thb(e.amount));
+  toast('✏️ แก้ไขค่าใช้จ่ายสำเร็จ ✅');
+  var el=document.getElementById('moExpEdit');if(el)el.remove();renderPage('expense');
+}
+function deleteExpense(idx){
+  if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('เฉพาะเจ้าของร้าน','err');return}
+  var e=DB.expenses[idx];if(!e) return;
+  if(!confirm('ลบค่าใช้จ่าย "'+e.name+'" '+thb(e.amount)+' ?')) return;
+  DB.expenses.splice(idx,1);
+  saveDB();logAction('DELETE_EXPENSE',e.name+' '+thb(e.amount));
+  toast('🗑️ ลบค่าใช้จ่ายแล้ว');renderPage('expense');
 }
 
 // ═══ IMPROVED BILL — GROUPED BY CATEGORY ═══
