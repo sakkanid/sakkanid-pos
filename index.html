@@ -445,7 +445,7 @@ function gO(oid){return DB.orders.find(o=>o.id===oid)}
 function gM(mid){return DB.members.find(m=>m.id===mid)}
 function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
-function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')}
+function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
 function fmtISO(iso){if(!iso) return '';try{return fmtDate(new Date(iso))}catch(e){return iso}}
 function thaiNow(){var d=new Date();return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function todayStr(){return new Date().toISOString().slice(0,10)}
@@ -512,17 +512,17 @@ function logAction(action,detail){
 function formatBillDate(dt){
   if(!dt) return formatBillDate(new Date().toISOString());
   try{
-    var d;
     // Already formatted dd/mm/yyyy — parse it
     if(typeof dt==='string'&&dt.match(/^\d{2}\/\d{2}\/\d{4}/)){
-      var parts=dt.split(/[\/ :]/);
+      var clean=dt.replace(/\s*น\.?\s*$/,'');// strip น. suffix
+      var parts=clean.split(/[\/ :]/);
       var yr=parseInt(parts[2]);
       if(yr>2500) yr=yr-543; // Convert Buddhist to CE
-      var timePart=parts[3]?parts[3]+':'+parts[4]:'';
+      var timePart=(parts[3]&&parts[4])?parts[3]+':'+parts[4]:'';
       return parts[0]+'/'+parts[1]+'/'+yr+(timePart?' '+timePart+' น.':'');
     }
     // ISO or other format
-    d=new Date(dt);if(isNaN(d)) return dt;
+    var d=new Date(dt);if(isNaN(d)) return dt;
     var dd=String(d.getDate()).padStart(2,'0');
     var mm=String(d.getMonth()+1).padStart(2,'0');
     var yy=d.getFullYear(); // CE year (ค.ศ.)
@@ -1702,8 +1702,55 @@ function renderPackagePage(c){
 function renderQuotaList(){
   const active=(DB.quotas||[]).filter(q=>q.remain>0);
   if(!active.length) return '<div class="empty-state"><div class="es-text">ไม่มีโควต้าที่ใช้งานได้</div></div>';
-  return '<table><tr><th>สมาชิก</th><th>Package</th><th>คงเหลือ</th><th>หมดอายุ</th></tr>'+
-    active.map(q=>{const m=gM(q.mid);return '<tr><td>'+(m?m.name:q.mid)+'</td><td>'+q.pkgName+'</td><td><strong>'+q.remain+'</strong>/'+q.total+'</td><td>'+q.exp+'</td></tr>'}).join('')+'</table>';
+  var isAdmin=curUser&&(curUser.role==='เจ้าของร้าน'||curUser.role==='ผู้จัดการ');
+  return '<table><tr><th>สมาชิก</th><th>Package</th><th>คงเหลือ</th><th>หมดอายุ</th>'+(isAdmin?'<th>จัดการ</th>':'')+'</tr>'+
+    active.map(q=>{const m=gM(q.mid);return '<tr><td>'+(m?m.name:q.mid)+'</td><td>'+q.pkgName+'</td><td><strong>'+q.remain+'</strong>/'+q.total+'</td><td>'+q.exp+'</td>'+(isAdmin?'<td><button class="btn btn-out btn-sm" onclick="openQuotaEdit(\''+q.id+'\')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>';
+}
+// ═══ แก้ไขโควต้า (Admin Only) ═══
+function openQuotaEdit(qid){
+  var q=(DB.quotas||[]).find(function(x){return x.id===qid});
+  if(!q) return;
+  var m=gM(q.mid);
+  var h='<div class="modal-overlay show" id="moQuotaEdit"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>✏️ แก้ไขโควต้า '+q.id+'</h3><button class="modal-close" onclick="document.getElementById(\'moQuotaEdit\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+(m?m.name:q.mid)+'</strong><br>📦 '+q.pkgName+'</div>'+
+    '<div class="grid g3">'+
+    '<div class="form-group"><label class="form-label">จำนวนรวม</label><input type="number" id="qe-total" value="'+q.total+'" min="0"></div>'+
+    '<div class="form-group"><label class="form-label">ใช้ไปแล้ว</label><input type="number" id="qe-used" value="'+q.used+'" min="0"></div>'+
+    '<div class="form-group"><label class="form-label">คงเหลือ</label><input type="number" id="qe-remain" value="'+q.remain+'" min="0"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ประเภท Package</label><input type="text" id="qe-type" value="'+q.pkgType+'"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อ Package</label><input type="text" id="qe-name" value="'+q.pkgName+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">วันที่ซื้อ</label><input type="text" id="qe-buy" value="'+(q.buyDate||'')+'"></div>'+
+    '<div class="form-group"><label class="form-label">วันหมดอายุ</label><input type="text" id="qe-exp" value="'+(q.exp||'')+'"></div></div>'+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moQuotaEdit\').remove()">ยกเลิก</button><button class="btn btn-rd" onclick="deleteQuota(\''+q.id+'\')">🗑️ ลบ</button><button class="btn btn-gn" onclick="saveQuotaEdit(\''+q.id+'\')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveQuotaEdit(qid){
+  var q=(DB.quotas||[]).find(function(x){return x.id===qid});
+  if(!q) return;
+  q.total=parseInt($('qe-total').value)||0;
+  q.used=parseInt($('qe-used').value)||0;
+  q.remain=parseInt($('qe-remain').value)||0;
+  q.pkgType=$('qe-type').value;
+  q.pkgName=$('qe-name').value;
+  q.buyDate=$('qe-buy').value;
+  q.exp=$('qe-exp').value;
+  saveDB();
+  logAction('EDIT_QUOTA',qid+' remain:'+q.remain);
+  toast('✏️ แก้ไขโควต้าสำเร็จ ✅');
+  var el=document.getElementById('moQuotaEdit');if(el)el.remove();
+  renderPage('package');
+}
+function deleteQuota(qid){
+  if(!confirm('ลบโควต้า '+qid+' ?')) return;
+  DB.quotas=(DB.quotas||[]).filter(function(q){return q.id!==qid});
+  saveDB();logAction('DELETE_QUOTA',qid);
+  toast('🗑️ ลบโควต้าแล้ว');
+  var el=document.getElementById('moQuotaEdit');if(el)el.remove();
+  renderPage('package');
 }
 function openBuyPkgForm(m){
   $('moBuyPkgIn').innerHTML=
