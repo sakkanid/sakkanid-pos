@@ -4230,22 +4230,47 @@ async function sendPdfViaLine(oid,docNum,docType){
     invoice:{name:'ใบแจ้งหนี้',btn:'📨 เปิดดูใบแจ้งหนี้'}
   };
   var dtInfo=dtLabels[dt]||{name:'เอกสาร',btn:'📄 เปิดดูเอกสาร'};
+  // ═══ ลดขนาด data ให้ URL ไม่เกิน 8KB ═══
+  // items: เก็บเฉพาะ field ที่ PDF ต้องใช้ (ตัด k=ต้นทุน, ce=หมวด EN ที่ซ้ำ)
+  var compactItems=(o.items||[]).map(function(it){return{c:it.c,t:it.t,o:it.o||'',te:it.te||'',oe:it.oe||'',qty:it.qty,p:it.p}});
+  var compactPH=(o.payHist||[]).map(function(p){return{round:p.round,method:p.method,amt:p.amt,date:p.date}});
+  var compactQ=quotas.map(function(q){return{pkgName:q.pkgName,used:q.used,remain:q.remain,total:q.total}});
+  // pdfConfig: เก็บเฉพาะค่าที่ตั้งไว้ (ไม่ส่ง default)
+  var pc=s.pdfConfig||{};var compactPC={};
+  if(pc.colorReceipt)compactPC.colorReceipt=pc.colorReceipt;
+  if(pc.colorPickup)compactPC.colorPickup=pc.colorPickup;
+  if(pc.colorTaxinv)compactPC.colorTaxinv=pc.colorTaxinv;
+  if(pc.colorQuotation)compactPC.colorQuotation=pc.colorQuotation;
+  if(pc.colorInvoice)compactPC.colorInvoice=pc.colorInvoice;
+  if(pc.colorTable&&pc.colorTable!=='#f5f7fa')compactPC.colorTable=pc.colorTable;
+  if(pc.headerText)compactPC.headerText=pc.headerText;
+  if(pc.footerText)compactPC.footerText=pc.footerText;
+  if(pc.fontSize&&pc.fontSize!==13)compactPC.fontSize=pc.fontSize;
+  if(pc.shopNameSize&&pc.shopNameSize!==20)compactPC.shopNameSize=pc.shopNameSize;
+  if(pc.docTypeSize&&pc.docTypeSize!==22)compactPC.docTypeSize=pc.docTypeSize;
+  if(pc.margin&&pc.margin!=='20mm')compactPC.margin=pc.margin;
+  if(pc.showLogo===false)compactPC.showLogo=false;
+  if(pc.showEnglish===false)compactPC.showEnglish=false;
+  if(pc.showPayHist===false)compactPC.showPayHist=false;
+  if(pc.showQuota===false)compactPC.showQuota=false;
   var pdfData={
     orderId:oid,docNum:docNum||o.id,docType:dt,orderType:o.type||'laundry',
-    items:o.items||[],extras:o.extras||[],
+    items:compactItems,extras:o.extras||[],
     mname:o.mname,mphone:o.mphone,
-    delivery:o.delivery,deliveryAddr:o.deliveryAddr||'',delCost:o.delCost||0,
+    delivery:o.delivery,delCost:o.delCost||0,
     net:o.net,disc:o.disc||0,isPaid:paid,remaining:remaining(o),
-    payHist:o.payHist||[],quotas:quotas,date:formatBillDate(o.createdAt),
+    payHist:compactPH,quotas:compactQ,date:formatBillDate(o.createdAt),
     pickupDate:o.pickupDate?fmtISO(o.pickupDate):'',cleanTime:o.cleanTime||'',
-    taxId:o._taxId||'',branch:o._branch||'',custAddr:o._custAddr||'',
-    whtRate:o._whtRate||0,whtAmt:o._whtAmt||0,grandTotal:o._grandTotal||o.net,
-    // ส่ง shop settings + pdfConfig ไปตรงๆ ไม่ต้องพึ่ง sync
+    grandTotal:o._grandTotal||o.net,
     shopName:s.shopName||'',shopPhone:s.phone||'',shopLine:s.lineOA||'',shopAddr:s.address||'',
-    pdfConfig:s.pdfConfig||{}
+    pdfConfig:compactPC
   };
+  // ตรวจขนาด URL — ถ้ายังเกิน ตัด quotas + payHist
+  var encoded=encodeURIComponent(JSON.stringify(pdfData));
+  if(encoded.length>6000){pdfData.quotas=[];encoded=encodeURIComponent(JSON.stringify(pdfData))}
+  if(encoded.length>6000){pdfData.payHist=[];encoded=encodeURIComponent(JSON.stringify(pdfData))}
   try{
-    var data=encodeURIComponent(JSON.stringify(pdfData));
+    var data=encoded;
     var apiUrl=getApiUrl();
     var result=await new Promise(function(resolve,reject){
       var cbName='_pdfcb_'+Date.now();
