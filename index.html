@@ -2786,6 +2786,8 @@ function savePdfConfig(){
     showQuota:$('pdf-show-quota')?$('pdf-show-quota').checked:true
   };
   saveDB();toast('💾 บันทึกตั้งค่า PDF สำเร็จ ✅');logAction('SAVE_PDF_CONFIG','');
+  // Trigger sync push ให้ pdfConfig ขึ้น Sheets
+  if(typeof syncPushSilent==='function') setTimeout(syncPushSilent,500);
 }
 function renderSettingsConnect(s){
   var apiOk=!!s.apiUrl;var lineOk=!!s.lineChannelToken;
@@ -4235,9 +4237,10 @@ async function sendPdfViaLine(oid,docNum,docType){
     delivery:o.delivery,deliveryAddr:o.deliveryAddr||'',delCost:o.delCost||0,
     net:o.net,disc:o.disc||0,isPaid:paid,remaining:remaining(o),
     payHist:o.payHist||[],quotas:quotas,date:formatBillDate(o.createdAt),
-    pickupDate:o.pickupDate||'',cleanTime:o.cleanTime||'',
+    pickupDate:o.pickupDate?fmtISO(o.pickupDate):'',cleanTime:o.cleanTime||'',
     taxId:o._taxId||'',branch:o._branch||'',custAddr:o._custAddr||'',
-    whtRate:o._whtRate||0,whtAmt:o._whtAmt||0,grandTotal:o._grandTotal||o.net
+    whtRate:o._whtRate||0,whtAmt:o._whtAmt||0,grandTotal:o._grandTotal||o.net,
+    pdfConfig:s.pdfConfig||{}
   };
   try{
     var data=encodeURIComponent(JSON.stringify(pdfData));
