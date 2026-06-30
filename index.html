@@ -1328,7 +1328,7 @@ function showBill(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>🧾 บิล '+o.id+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center">'+buildBillHTML(o)+'</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="openDocModal(\''+oid+'\')">📄 ออกเอกสาร</button><button class="btn btn-out" onclick="saveBillImage(\''+oid+'\')">📸 บันทึกรูป</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button><button class="btn btn-am" onclick="sendBillImageViaLine(\''+oid+'\')">📸 ส่งรูป LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="openDocModal(\''+oid+'\')">📄 ออกเอกสาร</button><button class="btn btn-out" onclick="saveBillImage(\''+oid+'\')">📸 บันทึกรูป</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button><button class="btn btn-gn" onclick="sendBillPdfViaLine(\''+oid+'\')" id="btnSendPdf'+oid+'">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
   openMo('moBill');
 }
 function doPrint(oid){
@@ -1506,7 +1506,7 @@ function generateDocument(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="sendDocViaLine(\''+oid+'\',\''+docNum+'\')">📱 ส่ง LINE</button><button class="btn btn-am" onclick="sendDocImageViaLine(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📸 ส่งรูป LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="sendPdfViaLine(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
   // Remove doc modal
   var docMo=$('moDoc');if(docMo) docMo.remove();
   // Save to document history
@@ -3895,13 +3895,26 @@ async function sendPdfViaLine(oid,docNum,docType){
   var s=getShopSettings();
   toast('📄 กำลังสร้าง PDF...','info');
   var quotas=(DB.quotas||[]).filter(function(qt){return qt.mid===o.mid&&qt.remain>0}).map(function(qt){return{pkgName:qt.pkgName,used:qt.used,remain:qt.remain,total:qt.total}});
+  // ── กำหนด docType + label ──
+  var dt=docType||'receipt';
+  var paid=isPaidCheck(o);
+  // ชื่อเอกสาร + ชื่อปุ่ม Flex Message (แยกตามประเภท)
+  var dtLabels={
+    receipt:{name:'ใบเสร็จรับเงิน',btn:'🧾 เปิดดูใบเสร็จรับเงิน'},
+    pickup:{name:o.type==='cleaning'?'ใบรับจองทำความสะอาด':'ใบรับผ้า',btn:o.type==='cleaning'?'📋 เปิดดูใบรับจอง':'👕 เปิดดูใบรับผ้า'},
+    taxinv:{name:'ใบกำกับภาษี',btn:'📋 เปิดดูใบกำกับภาษี'},
+    quotation:{name:'ใบเสนอราคา',btn:'💰 เปิดดูใบเสนอราคา'},
+    invoice:{name:'ใบแจ้งหนี้',btn:'📨 เปิดดูใบแจ้งหนี้'}
+  };
+  var dtInfo=dtLabels[dt]||{name:'เอกสาร',btn:'📄 เปิดดูเอกสาร'};
   var pdfData={
-    orderId:oid,docNum:docNum||o.id,docType:docType||'receipt',
+    orderId:oid,docNum:docNum||o.id,docType:dt,
     order:o,items:o.items||[],extras:o.extras||[],
     mname:o.mname,mphone:o.mphone,
     delivery:o.delivery,deliveryAddr:o.deliveryAddr||'',delCost:o.delCost||0,
-    net:o.net,disc:o.disc||0,isPaid:isPaidCheck(o),remaining:remaining(o),
+    net:o.net,disc:o.disc||0,isPaid:paid,remaining:remaining(o),
     payHist:o.payHist||[],quotas:quotas,date:formatBillDate(o.createdAt),
+    pickupDate:o.pickupDate||'',cleanTime:o.cleanTime||'',
     taxId:o._taxId||'',branch:o._branch||'',custAddr:o._custAddr||'',
     whtRate:o._whtRate||0,whtAmt:o._whtAmt||0,grandTotal:o._grandTotal||o.net
   };
@@ -3918,26 +3931,28 @@ async function sendPdfViaLine(oid,docNum,docType){
       setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout 30s'))}},30000);
     });
     if(!result||!result.ok){toast('❌ สร้าง PDF ล้มเหลว: '+(result?result.error:''),'err');return}
-    toast('📄 PDF สร้างเสร็จ! กำลังส่ง LINE...','info');
-    var flex={type:'flex',altText:s.shopName+' '+docNum+' PDF',contents:{
+    toast('✅ PDF สร้างเสร็จ! กำลังส่ง LINE...','info');
+    // ═══ Flex Message — ปุ่มตรงประเภทบิล ═══
+    var flex={type:'flex',altText:s.shopName+' '+(docNum||o.id)+' '+dtInfo.name,contents:{
       type:'bubble',
       header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[
         {type:'text',text:s.shopName||'ร้านซักรีด SAKKANID',color:'#ffffff',weight:'bold',size:'lg'}
       ]},
       body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
-        {type:'text',text:'📄 '+(docType==='invoice'?'ใบแจ้งหนี้':docType==='receipt'?'ใบเสร็จรับเงิน':docType==='quotation'?'ใบเสนอราคา':docType==='taxinv'?'ใบกำกับภาษี':'เอกสาร'),weight:'bold',size:'sm',color:'#006F98'},
-        {type:'text',text:docNum||o.id,size:'xs',color:'#888888'},
+        {type:'text',text:'📄 '+dtInfo.name,weight:'bold',size:'sm',color:'#006F98'},
+        {type:'text',text:(docNum||o.id),size:'xs',color:'#888888'},
         {type:'text',text:o.mname+' · '+thb(o.net),size:'sm',margin:'sm'},
-        {type:'button',action:{type:'uri',label:docType==='invoice'?'📨 เปิดดูใบแจ้งหนี้':docType==='receipt'?'🧾 เปิดดูใบเสร็จรับเงิน':docType==='quotation'?'💰 เปิดดูใบเสนอราคา':docType==='taxinv'?'📋 เปิดดูใบกำกับภาษี':'📄 เปิดดู PDF',uri:result.url},style:'primary',color:'#006F98',margin:'lg'}
+        {type:'button',action:{type:'uri',label:dtInfo.btn,uri:result.url},style:'primary',color:'#006F98',margin:'lg'}
       ]},
       footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
         {type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}
       ]}
     }};
     var msgs=[flex];
-    if(!isPaidCheck(o)&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
+    if(!paid&&s.payQrUrl) msgs.push({type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl});
     await sendLineMessage(userId,msgs);
-    logAction('SEND_PDF_LINE',docNum+' → '+o.mname);
+    toast('📱 ส่ง '+dtInfo.name+' ทาง LINE สำเร็จ ✅');
+    logAction('SEND_PDF_LINE',(docNum||o.id)+' → '+o.mname);
   }catch(e){toast('❌ '+e.message,'err')}
 }
 async function uploadBillToLine(billEl,oid,docNum,docType){
@@ -4026,6 +4041,17 @@ async function sendBillImageViaLine(oid){
 async function sendDocImageViaLine(oid,docNum,docType){
   var billEl=document.querySelector('#moBill .modal-body');
   await uploadBillToLine(billEl,oid,docNum,docType);
+}
+// ═══ ส่ง PDF บิลปกติทาง LINE (ไม่ต้อง chunk รูป) ═══
+async function sendBillPdfViaLine(oid){
+  var o=gO(oid);if(!o) return;
+  var m=gM(o.mid);var userId=m?m.lineUserId:'';
+  if(!userId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
+  // Auto-detect bill type
+  var paid=isPaidCheck(o);
+  var docType=paid?'receipt':'pickup';
+  if(o.type==='cleaning') docType=paid?'receipt':'pickup';
+  await sendPdfViaLine(oid,o.id,docType);
 }
 async function sendFlexBill(userId,o,s,docNum){
   var paid=isPaidCheck(o);
