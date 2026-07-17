@@ -423,6 +423,7 @@ const PAGES=[
   {id:'report',icon:'📈',label:'รายงาน',section:'วิเคราะห์'},
   {id:'pricelist',icon:'💰',label:'ตารางราคา',section:'ตั้งค่า'},
   {id:'expense',icon:'💵',label:'ค่าใช้จ่าย',section:'ตั้งค่า'},
+  {id:'shopquota',icon:'🏭',label:'โควต้าส่วนกลาง',section:'ตั้งค่า'},
   {id:'settings',icon:'⚙️',label:'ตั้งค่า',section:'ตั้งค่า'}
 ];
 
@@ -691,6 +692,7 @@ function renderPage(page){
     case 'report':renderReportPage(c);break;
     case 'pricelist':renderPricelistPage(c);break;
     case 'expense':renderExpensePage(c);break;
+    case 'shopquota':renderShopQuotaPage(c);break;
     case 'settings':renderSettingsPage(c);break;
     default:c.innerHTML='<div class="empty-state"><div class="es-icon">🔧</div><div class="es-text">หน้านี้กำลังพัฒนา</div></div>';
   }
@@ -1224,6 +1226,7 @@ function saveOrder(){
     createdAt:fmtDT(),by:curUser.nick
   };
   DB.orders.push(order);
+  var totalItems=(order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);deductShopQuota(totalItems,order.type);
   if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
   saveDB();
   logAction('CREATE_ORDER',order.id+' '+thb(net)+(promoName?' โปร:'+promoName:''));
@@ -1928,7 +1931,7 @@ function saveBedset(){
   var payTm=paidNow?($('bs-paytime')?$('bs-paytime').value:''):'';
   const method=paidNow&&$('bs-method')?$('bs-method').value:'เงินสด';
   const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo):'',items:items,extras:[],disc:disc,net:net,cost:bs.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
-  DB.orders.push(order);if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
+  DB.orders.push(order);deductShopQuota((order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0),'bedset');if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
   logAction('CREATE_ORDER',order.id+' Bedset '+bs.label+' '+total+'ชิ้น');toast('สร้างออเดอร์เครื่องนอนสำเร็จ ✅ '+bs.label);
   closeMo('moBedset');navTo('orders');
 }
@@ -1981,7 +1984,7 @@ function saveCleaning(){
   var payTm=paidNow?($('cn-paytime')?$('cn-paytime').value:''):'';
   const method=paidNow&&$('cn-method')?$('cn-method').value:'เงินสด';
   const order={id:genId('CLN'),type:'cleaning',mid:m.id,mname:m.name,mphone:m.phone,status:'รับจอง',delivery:'onsite',delCost:0,deliveryAddr:$('cn-room').value,items:[{c:'ทำความสะอาด',t:svc.label,o:'',qty:1,p:customPrice,k:svc.cost}],extras:[],disc:disc,net:net,cost:svc.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('cn-note').value,pickupDate:$('cn-date').value,cleanTime:$('cn-time')?$('cn-time').value:'',createdAt:fmtDT(),by:curUser.nick};
-  DB.orders.push(order);if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
+  DB.orders.push(order);deductShopQuota(1,'cleaning');if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
   saveDB();logAction('CREATE_ORDER',order.id+' Cleaning');toast('จองทำความสะอาดสำเร็จ ✅');
   closeMo('moCleaning');navTo('orders');
 }
@@ -4099,6 +4102,157 @@ function renderExpenseSummary(){
 }
 
 // ═══ MISSING — ORDER HELPERS ═══
+
+// ═══════════════════════════════════════════════════════════
+// 🏭 โควต้าส่วนกลาง — Shop Central Quota System
+// ═══════════════════════════════════════════════════════════
+function getShopQuotas(){return DB.shopQuotas||(DB.shopQuotas=[])}
+
+function renderShopQuotaPage(c){
+  var quotas=getShopQuotas();
+  var isOwner=curUser&&(curUser.role==='เจ้าของร้าน'||curUser.role==='ผู้จัดการ');
+  var totalRemain=quotas.reduce(function(s,q){return s+q.remain},0);
+  var totalUsed=quotas.reduce(function(s,q){return s+q.used},0);
+  c.innerHTML='<div class="card-grid g3">'+
+    '<div class="kpi"><div class="kpi-lbl">โควต้าคงเหลือ</div><div class="kpi-val" style="color:var(--gn)">'+totalRemain+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">ใช้ไปแล้ว</div><div class="kpi-val" style="color:var(--am)">'+totalUsed+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">รายการโควต้า</div><div class="kpi-val">'+quotas.length+'</div></div></div>'+
+    (isOwner?'<div style="margin:12px 0"><button class="btn btn-gn" onclick="openAddShopQuota()">➕ เพิ่มโควต้าใหม่</button></div>':'')+
+    '<div class="card"><div class="card-title">🏭 โควต้าส่วนกลาง</div>'+
+    (quotas.length?quotas.map(function(q,i){
+      var pct=q.total>0?Math.round(q.remain/q.total*100):0;
+      var barColor=pct>30?'var(--gn)':pct>10?'var(--am)':'var(--rd)';
+      var lowAlert=q.alertAt&&q.remain<=q.alertAt;
+      return '<div class="card" style="margin:8px 0;'+(lowAlert?'border:2px solid var(--rd);background:var(--rdl)':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div><strong>'+q.name+'</strong> <span class="bdg bdg-pr">'+q.type+'</span>'+(lowAlert?' <span class="bdg bdg-rd">⚠️ ใกล้หมด!</span>':'')+'</div>'+
+        (isOwner?'<div><button class="btn btn-gn btn-sm" onclick="openTopupQuota('+i+')">➕ เติม</button> <button class="btn btn-out btn-sm" onclick="editShopQuota('+i+')">✏️</button> <button class="btn btn-out btn-sm" onclick="deleteShopQuota('+i+')">🗑️</button></div>':'')+'</div>'+
+        '<div style="margin:8px 0">'+
+        '<div style="display:flex;justify-content:space-between;font-size:13px"><span>คงเหลือ <strong>'+q.remain+'</strong> / '+q.total+' ชิ้น</span><span>'+pct+'%</span></div>'+
+        '<div style="background:#e5e7eb;border-radius:4px;height:8px;margin:4px 0"><div style="background:'+barColor+';height:100%;border-radius:4px;width:'+pct+'%;transition:.3s"></div></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:16px;font-size:11px;color:var(--t3)">'+
+        '<span>💰 ต้นทุน/ชิ้น: '+thb(q.costPerUnit||0)+'</span>'+
+        '<span>📊 ต้นทุนรวม: '+thb(q.totalCost||0)+'</span>'+
+        '<span>🔔 แจ้งเตือนเมื่อ ≤ '+(q.alertAt||50)+' ชิ้น</span>'+
+        '</div>'+
+        (q.topups&&q.topups.length?'<details style="margin-top:6px;font-size:11px"><summary style="cursor:pointer;color:var(--pr)">📜 ประวัติเติม ('+q.topups.length+' ครั้ง)</summary><table style="margin-top:4px"><tr><th>วันที่</th><th>จำนวน</th><th>ต้นทุน</th><th>โดย</th></tr>'+q.topups.map(function(t){return '<tr><td>'+t.date+'</td><td>+'+t.qty+'</td><td>'+thb(t.cost)+'</td><td>'+t.by+'</td></tr>'}).join('')+'</table></details>':'')+
+        '</div>'}).join(''):'<div class="empty-state"><div class="es-text">ยังไม่มีโควต้าส่วนกลาง<br>กดปุ่ม ➕ เพิ่มโควต้าใหม่ เพื่อเริ่มต้น</div></div>')+'</div>';
+}
+
+function openAddShopQuota(){
+  var h='<div class="modal-overlay show" id="moSQ"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>➕ เพิ่มโควต้าส่วนกลาง</h3><button class="modal-close" onclick="document.getElementById(\'moSQ\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="form-group"><label class="form-label">ชื่อโควต้า</label><input id="sq-name" placeholder="เช่น โควต้าซักทั่วไป, ซักแห้ง"></div>'+
+    '<div class="form-group"><label class="form-label">ประเภทบริการ</label><select id="sq-type"><option value="ซักทั่วไป">ซักทั่วไป (ทุกบริการ)</option><option value="ซักแห้ง">ซักแห้ง</option><option value="ซัก อบ พับ">ซัก อบ พับ</option><option value="ซัก อบ รีด">ซัก อบ รีด</option><option value="เครื่องนอน">เครื่องนอน</option><option value="ทำความสะอาด">ทำความสะอาด</option></select></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="sq-qty" type="number" min="1" value="100"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุนรวม (฿)</label><input id="sq-cost" type="number" min="0" value="0"></div></div>'+
+    '<div class="form-group"><label class="form-label">🔔 แจ้งเตือนเมื่อเหลือ (ชิ้น)</label><input id="sq-alert" type="number" min="0" value="50"></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSQ\').remove()">ยกเลิก</button><button class="btn btn-gn" onclick="saveAddShopQuota()">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveAddShopQuota(){
+  var qty=parseInt($('sq-qty').value)||0;var cost=parseFloat($('sq-cost').value)||0;
+  if(!qty){toast('กรุณาระบุจำนวน','warn');return}
+  var q={
+    id:genId('SQT'),name:$('sq-name').value||'โควต้าซัก',type:$('sq-type').value,
+    total:qty,used:0,remain:qty,
+    costPerUnit:qty>0?Math.round(cost/qty*100)/100:0,totalCost:cost,
+    alertAt:parseInt($('sq-alert').value)||50,
+    topups:[{date:fmtDT(),qty:qty,cost:cost,by:curUser.nick}],
+    createdAt:fmtDT()
+  };
+  getShopQuotas().push(q);saveDB();
+  logAction('ADD_SHOP_QUOTA',q.name+' '+qty+' ชิ้น ต้นทุน '+thb(cost));
+  toast('✅ เพิ่มโควต้า "'+q.name+'" '+qty+' ชิ้น');
+  document.getElementById('moSQ').remove();renderPage('shopquota');
+}
+
+function openTopupQuota(idx){
+  var q=getShopQuotas()[idx];if(!q) return;
+  var h='<div class="modal-overlay show" id="moSQTop"><div class="modal" style="max-width:400px"><div class="modal-head"><h3>➕ เติมโควต้า</h3><button class="modal-close" onclick="document.getElementById(\'moSQTop\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>'+q.name+'</strong><br>คงเหลือ: '+q.remain+' / '+q.total+' ชิ้น</div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">จำนวนที่เติม (ชิ้น)</label><input id="sqt-qty" type="number" min="1" value="100"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sqt-cost" type="number" min="0" value="0"></div></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSQTop\').remove()">ยกเลิก</button><button class="btn btn-gn" onclick="saveTopupQuota('+idx+')">💾 เติม</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveTopupQuota(idx){
+  var q=getShopQuotas()[idx];if(!q) return;
+  var qty=parseInt($('sqt-qty').value)||0;var cost=parseFloat($('sqt-cost').value)||0;
+  if(!qty){toast('กรุณาระบุจำนวน','warn');return}
+  q.total+=qty;q.remain+=qty;q.totalCost=(q.totalCost||0)+cost;
+  q.costPerUnit=q.total>0?Math.round(q.totalCost/q.total*100)/100:0;
+  if(!q.topups) q.topups=[];
+  q.topups.push({date:fmtDT(),qty:qty,cost:cost,by:curUser.nick});
+  saveDB();logAction('TOPUP_SHOP_QUOTA',q.name+' +'+qty+' ต้นทุน '+thb(cost));
+  toast('✅ เติม '+q.name+' +'+qty+' ชิ้น');
+  document.getElementById('moSQTop').remove();renderPage('shopquota');
+}
+
+function editShopQuota(idx){
+  var q=getShopQuotas()[idx];if(!q) return;
+  var h='<div class="modal-overlay show" id="moSQEdit"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>✏️ แก้ไขโควต้า</h3><button class="modal-close" onclick="document.getElementById(\'moSQEdit\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="form-group"><label class="form-label">ชื่อ</label><input id="sqe-name" value="'+q.name+'"></div>'+
+    '<div class="grid g3">'+
+    '<div class="form-group"><label class="form-label">จำนวนรวม</label><input id="sqe-total" type="number" value="'+q.total+'"></div>'+
+    '<div class="form-group"><label class="form-label">ใช้ไปแล้ว</label><input id="sqe-used" type="number" value="'+q.used+'"></div>'+
+    '<div class="form-group"><label class="form-label">คงเหลือ</label><input id="sqe-remain" type="number" value="'+q.remain+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ต้นทุนรวม (฿)</label><input id="sqe-cost" type="number" value="'+(q.totalCost||0)+'"></div>'+
+    '<div class="form-group"><label class="form-label">🔔 แจ้งเตือนเมื่อ ≤</label><input id="sqe-alert" type="number" value="'+(q.alertAt||50)+'"></div></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSQEdit\').remove()">ยกเลิก</button><button class="btn btn-gn" onclick="saveEditShopQuota('+idx+')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveEditShopQuota(idx){
+  var q=getShopQuotas()[idx];if(!q) return;
+  q.name=$('sqe-name').value;q.total=parseInt($('sqe-total').value)||0;
+  q.used=parseInt($('sqe-used').value)||0;q.remain=parseInt($('sqe-remain').value)||0;
+  q.totalCost=parseFloat($('sqe-cost').value)||0;q.alertAt=parseInt($('sqe-alert').value)||50;
+  q.costPerUnit=q.total>0?Math.round(q.totalCost/q.total*100)/100:0;
+  saveDB();toast('✏️ แก้ไขเสร็จ');document.getElementById('moSQEdit').remove();renderPage('shopquota');
+}
+function deleteShopQuota(idx){
+  var q=getShopQuotas()[idx];if(!q) return;
+  if(!confirm('ลบโควต้า "'+q.name+'" ?')) return;
+  getShopQuotas().splice(idx,1);saveDB();toast('🗑️ ลบแล้ว');renderPage('shopquota');
+}
+
+// ═══ ตัดโควต้าส่วนกลาง — เรียกตอนสร้างออเดอร์ทุกประเภท ═══
+function deductShopQuota(itemCount,orderType){
+  var quotas=getShopQuotas();if(!quotas.length) return;
+  // หา quota ที่ตรงกับ orderType หรือ "ซักทั่วไป" (ตัดจากทุกบริการ)
+  var typeMap={'laundry':'ซักทั่วไป','bedset':'เครื่องนอน','cleaning':'ทำความสะอาด'};
+  var matchType=typeMap[orderType]||'ซักทั่วไป';
+  for(var i=0;i<quotas.length;i++){
+    var q=quotas[i];
+    if(q.remain<=0) continue;
+    // ตรงประเภท หรือเป็น "ซักทั่วไป" (ตัดจากทุกบริการ)
+    if(q.type===matchType||q.type==='ซักทั่วไป'){
+      var deduct=Math.min(itemCount,q.remain);
+      q.used+=deduct;q.remain-=deduct;itemCount-=deduct;
+      // ⚠️ แจ้งเตือนเมื่อเหลือน้อย
+      if(q.alertAt&&q.remain<=q.alertAt&&q.remain>0){
+        toast('⚠️ โควต้า "'+q.name+'" เหลือ '+q.remain+' ชิ้น กรุณาเติม!','warn');
+      }else if(q.remain<=0){
+        toast('🔴 โควต้า "'+q.name+'" หมดแล้ว! กรุณาเติมด่วน!','err');
+      }
+      if(itemCount<=0) break;
+    }
+  }
+}
+
+// ═══ เช็คโควต้าก่อนรับออเดอร์ (แจ้งเตือนแต่ไม่บล็อก) ═══
+function checkShopQuotaWarning(itemCount){
+  var quotas=getShopQuotas();if(!quotas.length) return;
+  var totalRemain=quotas.reduce(function(s,q){return s+q.remain},0);
+  if(totalRemain<=0) toast('🔴 โควต้าส่วนกลางหมดแล้ว! กรุณาเติมก่อนรับออเดอร์','err');
+  else if(totalRemain<itemCount) toast('⚠️ โควต้าเหลือ '+totalRemain+' ชิ้น อาจไม่พอ','warn');
+}
 function calcBedNet(){
   var idx=parseInt($('bs-set')?$('bs-set').value:0);
   var b=BED_SETS[idx];return b?b.price:0;
