@@ -1966,7 +1966,7 @@ function openCleaningForm(m){
     '<div class="modal-head"><h3>🧹 จองทำความสะอาด</h3><button class="modal-close" onclick="closeMo(\'moCleaning\')">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong></div>'+
-    '<div class="form-group"><label class="form-label">ประเภทห้อง</label><select id="cn-type" onchange="cnCalcNet()">'+
+    '<div class="form-group"><label class="form-label">ประเภทห้อง</label><select id="cn-type" onchange="if($(&apos;cn-price&apos;))$(&apos;cn-price&apos;)._userEdited=false;cnCalcNet()">'+
     CLN_SVCS.map((s,i)=>'<option value="'+i+'">'+s.label+' — เริ่มต้น '+thb(s.minPrice)+'</option>').join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">💰 ราคาค่าบริการ (฿) — กรอกราคาจริง</label><input id="cn-price" type="number" value="'+CLN_SVCS[0].minPrice+'" min="0" oninput="this._userEdited=true;cnCalcNet()"></div>'+
     '<div class="grid g2">'+
