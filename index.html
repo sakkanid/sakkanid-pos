@@ -3544,92 +3544,75 @@ function deleteExpense(idx){
 // ═══ IMPROVED BILL — GROUPED BY CATEGORY ═══
 function buildBillHTML(o){
   var s=getShopSettings();var bc=s.billConfig||{};var paid=isPaidCheck(o);
-  var h='<div style="width:80mm;font-family:var(--ff);font-size:'+(bc.fontSize||12)+'px;padding:8px;color:#000;background:#fff;font-weight:'+(bc.fontWeight||600)+';margin:0 auto">';
+  // ═══ Thermal-optimized receipt — ตัวเข้ม อ่านง่าย กระดาษสั้น ═══
+  var h='<div style="width:80mm;font-family:var(--ff);font-size:14px;padding:4px 6px;color:#000;background:#fff;font-weight:600;margin:0 auto;line-height:1.35">';
   // ── Header ──
   var logoH=(bc.logoSize||50);
-  if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:6px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
-  h+='<div style="text-align:center;font-weight:800;font-size:15px">'+(bc.headerText||s.shopName)+'</div>'+
-    '<div style="text-align:center;font-size:11px;color:#666;margin-bottom:2px">'+fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div>';
-  if(s.address) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:1px">'+s.address+'</div>';
-  if(bc.taxId) h+='<div style="text-align:center;font-size:10px;color:#888;margin-bottom:2px">เลขประจำตัวผู้เสียภาษี: '+bc.taxId+'</div>';
-  // ── Document type + ID + Date ──
-  h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
-    '<div style="text-align:center;font-weight:800;font-size:14px;margin:4px 0">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
-    '<div style="text-align:center;font-size:12px;font-weight:600">เลขที่: '+o.id+'</div>'+
-    '<div style="text-align:center;font-size:11px;color:#666">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
-    '<div style="text-align:left;font-size:10px;color:#888">แคชเชียร์: '+o.by+'</div>';
-  // ── Customer + Pickup date ──
-  h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>'+
-    '<div style="font-size:12px"><strong>'+o.mname+'</strong> · '+fmtPhone(o.mphone)+'</div>';
-  if(o.pickupDate) h+='<div style="font-size:11px;color:#006F98;font-weight:600">'+(o.type==='cleaning'?'🧹 วันนัดทำความสะอาด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' เวลา '+o.cleanTime:'')+'</div>';
-  h+='<div style="font-size:10px;color:#666">'+(o.delivery==='delivery'?'🚗 Delivery: '+o.deliveryAddr:o.delivery==='onsite'?'📍 สถานที่: '+(o.deliveryAddr||'-'):'🏪 รับที่ร้าน')+'</div>';
-  // ── Items grouped by category ──
-  h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>';
-  var cats={};
+  if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:4px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
+  h+='<div style="text-align:center;font-weight:900;font-size:16px">'+(bc.headerText||s.shopName)+'</div>';
+  if(s.address) h+='<div style="text-align:center;font-size:11px">'+s.address+'</div>';
+  h+='<div style="text-align:center;font-size:12px">'+fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div>';
+  if(bc.taxId) h+='<div style="text-align:center;font-size:11px">TAX ID: '+bc.taxId+'</div>';
+  // ── Document type ──
+  h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
+    '<div style="text-align:center;font-weight:900;font-size:16px">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
+    '<div style="text-align:center;font-size:13px;font-weight:700">เลขที่: '+o.id+'</div>'+
+    '<div style="text-align:center;font-size:12px">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
+    '<div style="font-size:11px">แคชเชียร์: '+o.by+'</div>';
+  // ── Customer ──
+  h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
+    '<div style="font-size:13px;font-weight:800">'+o.mname+' · '+fmtPhone(o.mphone)+'</div>';
+  if(o.pickupDate) h+='<div style="font-size:12px;font-weight:700">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</div>';
+  h+='<div style="font-size:12px">'+(o.delivery==='delivery'?'🚗 จัดส่ง: '+o.deliveryAddr:o.delivery==='onsite'?'📍 '+o.deliveryAddr:'🏪 รับที่ร้าน')+'</div>';
+  // ── Items — compact table ──
+  h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
+  h+='<div style="display:flex;font-size:11px;font-weight:800;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px"><span style="flex:5">รายการ</span><span style="flex:1;text-align:center">จำนวน</span><span style="flex:2;text-align:right">ราคา</span></div>';
   (o.items||[]).forEach(function(it){
-    var cat=it.c||'อื่นๆ';
-    if(!cats[cat]) cats[cat]=[];
-    cats[cat].push(it);
+    var name=it.t+(it.o?' · '+it.o:'');
+    h+='<div style="display:flex;font-size:13px;font-weight:700;padding:1px 0"><span style="flex:5">'+name+'</span><span style="flex:1;text-align:center">'+it.qty+'</span><span style="flex:2;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
+    var en=(it.te||'')+(it.oe?' '+it.oe:'');
+    if(en) h+='<div style="font-size:10px;color:#555;padding-left:4px">'+en+'</div>';
   });
-  var catKeys=Object.keys(cats);
-  catKeys.forEach(function(cat,ci){
-    // Category header - bilingual
-    var catItem=(o.items||[]).find(function(x){return x.c===cat});
-    var catEn=catItem&&catItem.ce?catItem.ce:'';
-    h+='<div style="font-weight:700;font-size:11px;color:#333;margin:'+(ci>0?'6':'2')+'px 0 2px;text-decoration:underline">'+cat+(catEn?' / '+catEn:'')+'</div>';
-    // Items in this category - bilingual
-    cats[cat].forEach(function(it){
-      var enName=(it.te||'')+(it.oe?' '+it.oe:'');
-      h+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0 0 8px">';
-      h+='<span>'+it.t+(it.o?' · '+it.o:'')+' x'+it.qty+'</span>';
-      h+='<span>'+thb(it.p*it.qty)+'</span></div>';
-      if(enName) h+='<div style="font-size:9px;color:#999;padding-left:8px;margin-bottom:1px">'+enName+'</div>';
-    });
-  });
-  // ── Extras section ──
+  // ── Extras ──
   if(o.extras&&o.extras.length){
-    h+='<div style="margin-top:4px;font-weight:700;font-size:11px;color:#333;text-decoration:underline">ค่าบริการเพิ่มเติม</div>';
     o.extras.forEach(function(e){
-      h+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0 1px 8px"><span>'+e.name+'</span><span>'+thb(e.price)+'</span></div>';
+      h+='<div style="display:flex;font-size:12px;padding:1px 0"><span style="flex:6">+ '+e.name+'</span><span style="flex:2;text-align:right">'+thb(e.price)+'</span></div>';
     });
   }
   // ── Totals ──
-  h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>';
-  if(o.disc) h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span>ส่วนลด</span><span style="color:red">-'+thb(o.disc)+'</span></div>';
-  if(o.delCost) h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span>ค่าจัดส่ง</span><span>'+thb(o.delCost)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;margin:6px 0"><span>ยอดสุทธิ</span><span>'+thb(o.net)+'</span></div>';
+  h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
+  if(o.disc) h+='<div style="display:flex;justify-content:space-between;font-size:12px"><span>ส่วนลด</span><span>-'+thb(o.disc)+'</span></div>';
+  if(o.delCost) h+='<div style="display:flex;justify-content:space-between;font-size:12px"><span>ค่าจัดส่ง</span><span>'+thb(o.delCost)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-weight:900;font-size:18px;margin:2px 0"><span>ยอดสุทธิ</span><span>'+thb(o.net)+'</span></div>';
   // ── Payment status ──
-  h+='<div style="text-align:center;padding:6px;border-radius:6px;font-weight:700;font-size:12px;'+(paid?'background:#E0F5EF;color:#076B52':'background:#FEE2E2;color:#C92A2A')+'">'+(paid?'✅ ชำระเงินครบแล้ว':'❌ ค้างชำระ '+thb(remaining(o)))+'</div>';
-  // ── Payment history ──
-  if(paid&&o.payHist&&o.payHist.length&&bc.receiptShowAllPay!==false){
-    h+='<div style="font-size:10px;margin-top:4px;font-weight:700;color:#333">ประวัติชำระเงิน:</div>';
-    o.payHist.forEach(function(p){
-      h+='<div style="font-size:9px;color:#666;padding-left:4px">รอบ'+p.round+': '+p.method+' '+thb(p.amt)+' ('+p.date+' · '+p.by+')</div>';
-    });
+  if(paid){
+    h+='<div style="text-align:center;font-weight:800;font-size:13px;padding:4px;border:2px solid #000;margin:4px 0">✅ ชำระเงินครบแล้ว</div>';
+    if(o.payHist&&o.payHist.length){
+      h+='<div style="font-size:11px;font-weight:700">วิธีชำระ: '+o.payHist[o.payHist.length-1].method+'</div>';
+      if(o.payHist.length>1){
+        o.payHist.forEach(function(p){h+='<div style="font-size:10px;padding-left:4px">รอบ'+p.round+': '+p.method+' '+thb(p.amt)+'</div>'});
+      }
+    }
+  }else{
+    h+='<div style="text-align:center;font-weight:900;font-size:14px;padding:4px;border:2px solid #000;margin:4px 0">❌ ค้างชำระ '+thb(remaining(o))+'</div>';
   }
   // ── Points ──
-  if(o.pts&&bc.showPoints!==false) h+='<div style="font-size:10px;margin-top:4px;color:#006F98">⭐ แต้มที่ได้รับ: +'+o.pts+' แต้ม</div>';
-  // ── Quota remaining ──
+  if(o.pts&&bc.showPoints!==false) h+='<div style="font-size:11px;font-weight:700">⭐ แต้มที่ได้รับ: +'+o.pts+' แต้ม</div>';
+  // ── Quota ──
   if(o.type==='quota'&&o.mid){
     var mQuotas=(DB.quotas||[]).filter(function(q){return q.mid===o.mid&&q.remain>=0});
     if(mQuotas.length){
-      h+='<div style="border-top:1px dashed #999;margin:4px 0"></div>';
-      h+='<div style="font-size:11px;font-weight:700;color:#333;text-align:center">📦 โควต้า Package</div>';
-      mQuotas.forEach(function(q){
-        h+='<div style="font-size:10px;color:#666;text-align:center;margin-top:2px">'+q.pkgName+'</div>';
-        h+='<div style="font-size:11px;text-align:center;font-weight:600">ใช้แล้ว '+q.used+' ชิ้น / คงเหลือ '+q.remain+' ชิ้น</div>';
-      });
+      h+='<div style="border-top:1px dashed #000;margin:3px 0"></div>';
+      mQuotas.forEach(function(q){h+='<div style="font-size:11px;text-align:center;font-weight:700">📦 '+q.pkgName+' คงเหลือ '+q.remain+'/'+q.total+'</div>'});
     }
   }
-  // ── Promo used ──
-  if(o.promo) h+='<div style="font-size:10px;margin-top:4px;color:#C4820A">🎁 โปร: '+o.promo+'</div>';
-  // ── Note ──
-  if(o.note) h+='<div style="font-size:10px;margin-top:4px;padding:3px 6px;background:#FEF3C7;border-radius:4px">📝 '+o.note+'</div>';
+  // ── Promo / Note ──
+  if(o.promo) h+='<div style="font-size:11px;font-weight:700">🎁 โปร: '+o.promo+'</div>';
+  if(o.note) h+='<div style="font-size:11px;font-weight:700;padding:2px 4px;border:1px solid #000;margin:2px 0">📝 '+o.note+'</div>';
   // ── Footer ──
-  h+='<div style="border-top:1px dashed #999;margin:6px 0"></div>';
-  h+='<div style="text-align:center;font-size:'+(bc.fontSize?bc.fontSize-2:10)+'px;color:#999">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
-  if(bc.footerImage) h+='<div style="text-align:center;margin-top:4px"><img src="'+bc.footerImage+'" style="max-height:50px;max-width:100%"></div>';
-  // QR ชำระเงิน — ไม่แสดงในบิล (ส่งแยกผ่านปุ่ม "📲 ส่ง QR ชำระ" แทน)
+  h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
+  h+='<div style="text-align:center;font-size:12px;font-weight:700">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
+  if(bc.footerImage) h+='<div style="text-align:center;margin-top:2px"><img src="'+bc.footerImage+'" style="max-height:40px;max-width:100%"></div>';
   h+='</div>';return h;
 }
 
