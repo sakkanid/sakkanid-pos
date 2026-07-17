@@ -1534,6 +1534,11 @@ function generateDocument(oid){
   h+='<div style="margin-top:20px;display:flex;justify-content:space-between;font-size:11px;color:#999"><div>'+s.shopName+' · '+(s.phone||'')+'</div><div>'+dt.name+' เลขที่ '+docNum+'</div></div>';
   if(bc.footerImage) h+='<div style="text-align:center;margin-top:8px"><img src="'+bc.footerImage+'" style="max-height:40px"></div>';
   h+='</div>';
+  // ═══ บันทึก VAT/WHT data ลง order BEFORE ลบ moDoc ═══
+  o._taxId=taxid;o._branch=branch;o._custAddr=addr;
+  o._vatMode=vatMode;o._vatAmt=vatAmt;o._baseAmt=baseAmt;
+  o._whtRate=whtRate;o._whtAmt=whtAmt;o._grandTotal=grandTotal;o._netPayable=netPayable;
+  o._docCname=cname;o._docPhone=phone;o._docRemark=remark;
   // Display in bill modal
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
@@ -2123,24 +2128,7 @@ function filterMembersPage(){
 
 // ═══ Save document VAT/WHT data to order before sending PDF ═══
 function saveDocDataThenSendPdf(oid,docNum,docType){
-  var o=gO(oid);if(!o) return;
-  // Capture current form values
-  o._taxId=$('doc-taxid')?$('doc-taxid').value:'';
-  o._branch=$('doc-branch')?$('doc-branch').value:'';
-  o._custAddr=$('doc-addr')?$('doc-addr').value:'';
-  // VAT
-  var vatSel=$('doc-vat')?$('doc-vat').value:'none';
-  o._vatMode=vatSel;
-  var net=o.net;
-  if(vatSel==='include'){o._baseAmt=Math.round(net/1.07);o._vatAmt=net-o._baseAmt;o._grandTotal=net}
-  else if(vatSel==='exclude'){o._vatAmt=Math.round(net*0.07);o._grandTotal=net+o._vatAmt;o._baseAmt=net}
-  else{o._vatAmt=0;o._baseAmt=net;o._grandTotal=net}
-  // WHT
-  var whtSel=$('doc-wht')?$('doc-wht').value:'0';
-  o._whtRate=whtSel==='custom'?(parseFloat($('doc-wht-rate')?$('doc-wht-rate').value:0)||0):parseFloat(whtSel)||0;
-  o._whtAmt=Math.round(net*o._whtRate/100);
-  o._grandTotal=o._grandTotal-o._whtAmt;
-  // Send
+  // VAT/WHT data ถูกบันทึกไว้แล้วใน generateDocument → ส่ง PDF ได้เลย
   sendPdfViaLine(oid,docNum,docType);
 }
 async function sendQrPayment(oid){
