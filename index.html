@@ -124,7 +124,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:50%;top:0;transform:translateX(-50%);width:80mm;font-size:12px}#printArea.print-a4{width:190mm;font-size:13px}#printArea.print-a5{width:138mm;font-size:11px}@page{margin:10mm}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:50%;top:0;transform:translateX(-50%);width:72mm;font-size:13px;font-weight:500;color:#000!important;line-height:1.4}#printArea.print-a4{width:190mm;font-size:13px}#printArea.print-a5{width:138mm;font-size:11px}#printArea *{color:#000!important}@page{margin:2mm 3mm}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -1226,7 +1226,7 @@ function saveOrder(){
     createdAt:fmtDT(),by:curUser.nick
   };
   DB.orders.push(order);
-  var totalItems=(order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);deductShopQuota(totalItems,order.type);
+  var totalItems=(order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);deductShopQuota(totalItems,order.type,order.items);
   if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
   saveDB();
   logAction('CREATE_ORDER',order.id+' '+thb(net)+(promoName?' โปร:'+promoName:''));
@@ -1275,7 +1275,7 @@ function openPayModal(oid){
     '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="pay-date" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="pay-time" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '</div>'+
-    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moPay\')">ยกเลิก</button><button class="btn btn-gn btn-lg" onclick="confirmPay()">✅ ยืนยันรับเงิน</button></div>';
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moPay\')">ยกเลิก</button><button class="btn btn-am" onclick="sendQrPayment(\''+oid+'\')">📲 ส่ง QR ชำระ</button><button class="btn btn-gn btn-lg" onclick="confirmPay()">✅ ยืนยันรับเงิน</button></div>';
   openMo('moPay');
 }
 function confirmPay(){
@@ -1931,7 +1931,7 @@ function saveBedset(){
   var payTm=paidNow?($('bs-paytime')?$('bs-paytime').value:''):'';
   const method=paidNow&&$('bs-method')?$('bs-method').value:'เงินสด';
   const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo):'',items:items,extras:[],disc:disc,net:net,cost:bs.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
-  DB.orders.push(order);deductShopQuota((order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0),'bedset');if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
+  DB.orders.push(order);deductShopQuota((order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0),'bedset',order.items);if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
   logAction('CREATE_ORDER',order.id+' Bedset '+bs.label+' '+total+'ชิ้น');toast('สร้างออเดอร์เครื่องนอนสำเร็จ ✅ '+bs.label);
   closeMo('moBedset');navTo('orders');
 }
@@ -1984,7 +1984,7 @@ function saveCleaning(){
   var payTm=paidNow?($('cn-paytime')?$('cn-paytime').value:''):'';
   const method=paidNow&&$('cn-method')?$('cn-method').value:'เงินสด';
   const order={id:genId('CLN'),type:'cleaning',mid:m.id,mname:m.name,mphone:m.phone,status:'รับจอง',delivery:'onsite',delCost:0,deliveryAddr:$('cn-room').value,items:[{c:'ทำความสะอาด',t:svc.label,o:'',qty:1,p:customPrice,k:svc.cost}],extras:[],disc:disc,net:net,cost:svc.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('cn-note').value,pickupDate:$('cn-date').value,cleanTime:$('cn-time')?$('cn-time').value:'',createdAt:fmtDT(),by:curUser.nick};
-  DB.orders.push(order);deductShopQuota(1,'cleaning');if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
+  DB.orders.push(order);deductShopQuota(1,'cleaning',order.items);if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
   saveDB();logAction('CREATE_ORDER',order.id+' Cleaning');toast('จองทำความสะอาดสำเร็จ ✅');
   closeMo('moCleaning');navTo('orders');
 }
@@ -3629,7 +3629,7 @@ function buildBillHTML(o){
   h+='<div style="border-top:1px dashed #999;margin:6px 0"></div>';
   h+='<div style="text-align:center;font-size:'+(bc.fontSize?bc.fontSize-2:10)+'px;color:#999">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
   if(bc.footerImage) h+='<div style="text-align:center;margin-top:4px"><img src="'+bc.footerImage+'" style="max-height:50px;max-width:100%"></div>';
-  if(!paid&&s.payQR) h+='<div style="text-align:center;margin-top:6px"><div style="font-size:10px;color:#666;margin-bottom:2px">สแกนชำระเงิน</div><img src="'+s.payQR+'" style="max-height:'+(bc.qrPaySize||80)+'px"></div>';
+  // QR ชำระเงิน — ไม่แสดงในบิล (ส่งแยกผ่านปุ่ม "📲 ส่ง QR ชำระ" แทน)
   h+='</div>';return h;
 }
 
@@ -4163,7 +4163,13 @@ function saveAddShopQuota(){
     topups:[{date:fmtDT(),qty:qty,cost:cost,by:curUser.nick}],
     createdAt:fmtDT()
   };
-  getShopQuotas().push(q);saveDB();
+  getShopQuotas().push(q);
+  // ═══ บันทึกค่าใช้จ่ายอัตโนมัติ (ต้นทุนร้าน) ═══
+  if(cost>0){
+    if(!DB.expenses) DB.expenses=[];
+    DB.expenses.push({id:genId('EXP'),category:'โควต้าส่วนกลาง',name:'ซื้อโควต้า '+q.name+' '+qty+' ชิ้น',amount:cost,date:fmtDate(),by:curUser.nick});
+  }
+  saveDB();
   logAction('ADD_SHOP_QUOTA',q.name+' '+qty+' ชิ้น ต้นทุน '+thb(cost));
   toast('✅ เพิ่มโควต้า "'+q.name+'" '+qty+' ชิ้น');
   document.getElementById('moSQ').remove();renderPage('shopquota');
@@ -4188,6 +4194,11 @@ function saveTopupQuota(idx){
   q.costPerUnit=q.total>0?Math.round(q.totalCost/q.total*100)/100:0;
   if(!q.topups) q.topups=[];
   q.topups.push({date:fmtDT(),qty:qty,cost:cost,by:curUser.nick});
+  // ═══ บันทึกค่าใช้จ่ายอัตโนมัติ ═══
+  if(cost>0){
+    if(!DB.expenses) DB.expenses=[];
+    DB.expenses.push({id:genId('EXP'),category:'โควต้าส่วนกลาง',name:'เติมโควต้า '+q.name+' +'+qty+' ชิ้น',amount:cost,date:fmtDate(),by:curUser.nick});
+  }
   saveDB();logAction('TOPUP_SHOP_QUOTA',q.name+' +'+qty+' ต้นทุน '+thb(cost));
   toast('✅ เติม '+q.name+' +'+qty+' ชิ้น');
   document.getElementById('moSQTop').remove();renderPage('shopquota');
@@ -4222,25 +4233,25 @@ function deleteShopQuota(idx){
   getShopQuotas().splice(idx,1);saveDB();toast('🗑️ ลบแล้ว');renderPage('shopquota');
 }
 
-// ═══ ตัดโควต้าส่วนกลาง — เรียกตอนสร้างออเดอร์ทุกประเภท ═══
-function deductShopQuota(itemCount,orderType){
+// ═══ ตัดโควต้าส่วนกลาง — ตัดตามหมวดบริการของ item ═══
+function deductShopQuota(itemCount,orderType,items){
   var quotas=getShopQuotas();if(!quotas.length) return;
-  // หา quota ที่ตรงกับ orderType หรือ "ซักทั่วไป" (ตัดจากทุกบริการ)
-  var typeMap={'laundry':'ซักทั่วไป','bedset':'เครื่องนอน','cleaning':'ทำความสะอาด'};
-  var matchType=typeMap[orderType]||'ซักทั่วไป';
+  // รวบรวมหมวดบริการจาก items เพื่อจับคู่กับโควต้า
+  var categories=[];
+  if(items&&items.length){items.forEach(function(it){if(it.c&&categories.indexOf(it.c)<0) categories.push(it.c)})}
   for(var i=0;i<quotas.length;i++){
     var q=quotas[i];
-    if(q.remain<=0) continue;
-    // ตรงประเภท หรือเป็น "ซักทั่วไป" (ตัดจากทุกบริการ)
-    if(q.type===matchType||q.type==='ซักทั่วไป'){
+    if(q.remain<=0||itemCount<=0) continue;
+    // จับคู่: "ซักทั่วไป" ตัดทุกบริการ, หรือตรงหมวด/ประเภท
+    var match=q.type==='ซักทั่วไป';
+    if(!match) categories.forEach(function(cat){if(cat.indexOf(q.type)>=0||q.type.indexOf(cat)>=0) match=true});
+    if(!match&&orderType==='bedset'&&q.type==='เครื่องนอน') match=true;
+    if(!match&&orderType==='cleaning'&&q.type==='ทำความสะอาด') match=true;
+    if(match){
       var deduct=Math.min(itemCount,q.remain);
       q.used+=deduct;q.remain-=deduct;itemCount-=deduct;
-      // ⚠️ แจ้งเตือนเมื่อเหลือน้อย
-      if(q.alertAt&&q.remain<=q.alertAt&&q.remain>0){
-        toast('⚠️ โควต้า "'+q.name+'" เหลือ '+q.remain+' ชิ้น กรุณาเติม!','warn');
-      }else if(q.remain<=0){
-        toast('🔴 โควต้า "'+q.name+'" หมดแล้ว! กรุณาเติมด่วน!','err');
-      }
+      if(q.alertAt&&q.remain<=q.alertAt&&q.remain>0) toast('⚠️ โควต้า "'+q.name+'" เหลือ '+q.remain+' ชิ้น กรุณาเติม!','warn');
+      else if(q.remain<=0) toast('🔴 โควต้า "'+q.name+'" หมดแล้ว! กรุณาเติมด่วน!','err');
       if(itemCount<=0) break;
     }
   }
