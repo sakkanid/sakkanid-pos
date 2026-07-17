@@ -1328,11 +1328,28 @@ function showOrderDetail(oid){
 function deleteOrder(oid){
   if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('เฉพาะเจ้าของร้านเท่านั้น','err');return}
   var o=gO(oid);if(!o) return;
-  if(!confirm('ลบออเดอร์ '+oid+' ('+o.mname+' · '+thb(o.net)+') ?\n\nข้อมูลจะหายถาวร ไม่สามารถกู้คืนได้')) return;
+  if(!confirm('ลบออเดอร์ '+oid+' ('+o.mname+' · '+thb(o.net)+') ?\n\nข้อมูลจะหายถาวร + คืนโควต้าส่วนกลาง')) return;
+  // ═══ คืนโควต้าส่วนกลาง ═══
+  var totalItems=(o.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);
+  returnShopQuota(totalItems,o.type,o.items);
   DB.orders=DB.orders.filter(function(x){return x.id!==oid});
-  saveDB();logAction('DELETE_ORDER',oid+' '+o.mname+' '+thb(o.net));
-  toast('🗑️ ลบออเดอร์ '+oid+' แล้ว');
+  saveDB();logAction('DELETE_ORDER',oid+' '+o.mname+' '+thb(o.net)+' คืนโควต้า '+totalItems+' ชิ้น');
+  toast('🗑️ ลบออเดอร์ '+oid+' + คืนโควต้า '+totalItems+' ชิ้น');
   closeMo('moDetail');renderPage(curPage);
+}
+// ═══ คืนโควต้าส่วนกลาง (เมื่อยกเลิก/ลบออเดอร์) ═══
+function returnShopQuota(itemCount,orderType,items){
+  var quotas=getShopQuotas();if(!quotas.length||!itemCount) return;
+  var categories=[];
+  if(items&&items.length) items.forEach(function(it){if(it.c&&categories.indexOf(it.c)<0) categories.push(it.c)});
+  for(var i=0;i<quotas.length;i++){
+    var q=quotas[i];if(itemCount<=0) break;
+    var match=q.type==='ซักทั่วไป';
+    if(!match) categories.forEach(function(cat){if(cat.indexOf(q.type)>=0||q.type.indexOf(cat)>=0) match=true});
+    if(!match&&orderType==='bedset'&&q.type==='เครื่องนอน') match=true;
+    if(!match&&orderType==='cleaning'&&q.type==='ทำความสะอาด') match=true;
+    if(match){var ret=Math.min(itemCount,q.used);q.used-=ret;q.remain+=ret;itemCount-=ret}
+  }
 }
 
 // ═══ BILL ═══
@@ -3185,8 +3202,8 @@ function uqSave(){
   const qty=parseInt($('uq-qty').value)||1;
   if(qty>q.remain){toast('โควต้าไม่พอ! เหลือ '+q.remain+' ชิ้น','err');return}
   q.used+=qty;q.remain-=qty;
-  const order={id:genId('LDR'),type:'quota',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'โควต้า',t:q.pkgType,o:q.pkgName,qty,p:0,k:0}],extras:[],disc:0,net:0,cost:0,payHist:[],isPaid:true,pts:0,note:'ใช้โควต้า '+q.pkgName,pickupDate:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
-  DB.orders.push(order);saveDB();
+  const order={id:genId('LDR'),type:'quota',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'ใช้โควต้า',t:q.pkgType,o:q.pkgName,qty,p:0,k:0}],extras:[],disc:0,net:0,cost:0,payHist:[],isPaid:true,pts:0,note:'ใช้โควต้า '+q.pkgName,pickupDate:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick,quotaId:q.id,quotaUsed:qty};
+  DB.orders.push(order);deductShopQuota(qty,'laundry',order.items);saveDB();
   logAction('CREATE_ORDER',order.id+' ใช้โควต้า '+qty);
   toast('ใช้โควต้าสำเร็จ ✅ เหลือ '+q.remain+' ชิ้น');
   closeMo('moUseQuota');navTo('orders');
@@ -3564,14 +3581,21 @@ function buildBillHTML(o){
     '<div style="font-size:13px;font-weight:800">'+o.mname+' · '+fmtPhone(o.mphone)+'</div>';
   if(o.pickupDate) h+='<div style="font-size:12px;font-weight:700">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</div>';
   h+='<div style="font-size:12px">'+(o.delivery==='delivery'?'🚗 จัดส่ง: '+o.deliveryAddr:o.delivery==='onsite'?'📍 '+o.deliveryAddr:'🏪 รับที่ร้าน')+'</div>';
-  // ── Items — compact table ──
+  // ── Items — grouped by category + compact ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
-  h+='<div style="display:flex;font-size:11px;font-weight:800;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px"><span style="flex:5">รายการ</span><span style="flex:1;text-align:center">จำนวน</span><span style="flex:2;text-align:right">ราคา</span></div>';
-  (o.items||[]).forEach(function(it){
-    var name=it.t+(it.o?' · '+it.o:'');
-    h+='<div style="display:flex;font-size:13px;font-weight:700;padding:1px 0"><span style="flex:5">'+name+'</span><span style="flex:1;text-align:center">'+it.qty+'</span><span style="flex:2;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
-    var en=(it.te||'')+(it.oe?' '+it.oe:'');
-    if(en) h+='<div style="font-size:10px;color:#555;padding-left:4px">'+en+'</div>';
+  h+='<div style="display:flex;font-size:11px;font-weight:800;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px"><span style="width:55%;overflow:hidden">รายการ</span><span style="width:15%;text-align:center">จำนวน</span><span style="width:30%;text-align:right">ราคา</span></div>';
+  var cats={};
+  (o.items||[]).forEach(function(it){var cat=it.c||'อื่นๆ';if(!cats[cat]) cats[cat]=[];cats[cat].push(it)});
+  Object.keys(cats).forEach(function(cat,ci){
+    var catItem=(o.items||[]).find(function(x){return x.c===cat});
+    var catEn=catItem&&catItem.ce?catItem.ce:'';
+    h+='<div style="font-weight:800;font-size:12px;margin:'+(ci>0?'4':'1')+'px 0 1px;text-decoration:underline">'+cat+(catEn?' / '+catEn:'')+'</div>';
+    cats[cat].forEach(function(it){
+      var name=it.t+(it.o?' · '+it.o:'');
+      h+='<div style="display:flex;font-size:12px;font-weight:700;padding:1px 0"><span style="width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span><span style="width:15%;text-align:center">'+it.qty+'</span><span style="width:30%;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
+      var en=(it.te||'')+(it.oe?' '+it.oe:'');
+      if(en) h+='<div style="font-size:9px;color:#555;padding-left:4px">'+en+'</div>';
+    });
   });
   // ── Extras ──
   if(o.extras&&o.extras.length){
@@ -4120,6 +4144,7 @@ function renderShopQuotaPage(c){
         '<span>🔔 แจ้งเตือนเมื่อ ≤ '+(q.alertAt||50)+' ชิ้น</span>'+
         '</div>'+
         (q.topups&&q.topups.length?'<details style="margin-top:6px;font-size:11px"><summary style="cursor:pointer;color:var(--pr)">📜 ประวัติเติม ('+q.topups.length+' ครั้ง)</summary><table style="margin-top:4px"><tr><th>วันที่</th><th>จำนวน</th><th>ต้นทุน</th><th>โดย</th></tr>'+q.topups.map(function(t){return '<tr><td>'+t.date+'</td><td>+'+t.qty+'</td><td>'+thb(t.cost)+'</td><td>'+t.by+'</td></tr>'}).join('')+'</table></details>':'')+
+        (q.usageLog&&q.usageLog.length?'<details style="margin-top:4px;font-size:11px"><summary style="cursor:pointer;color:var(--am)">📊 ประวัติตัดโควต้า ('+q.usageLog.length+' ครั้ง)</summary><table style="margin-top:4px"><tr><th>วันที่</th><th>จำนวน</th><th>หมวดบริการ</th><th>โดย</th></tr>'+q.usageLog.slice(-30).reverse().map(function(u){return '<tr><td style="font-size:10px">'+u.date+'</td><td>-'+u.qty+'</td><td>'+u.cats+'</td><td>'+u.by+'</td></tr>'}).join('')+'</table></details>':'')+
         '</div>'}).join(''):'<div class="empty-state"><div class="es-text">ยังไม่มีโควต้าส่วนกลาง<br>กดปุ่ม ➕ เพิ่มโควต้าใหม่ เพื่อเริ่มต้น</div></div>')+'</div>';
 }
 
@@ -4233,6 +4258,10 @@ function deductShopQuota(itemCount,orderType,items){
     if(match){
       var deduct=Math.min(itemCount,q.remain);
       q.used+=deduct;q.remain-=deduct;itemCount-=deduct;
+      // ═══ บันทึก log ตัดโควต้า ═══
+      if(!q.usageLog) q.usageLog=[];
+      var catNames=categories.length?categories.join(', '):(orderType||'');
+      q.usageLog.push({date:fmtDT(),qty:deduct,cats:catNames,by:curUser?curUser.nick:''});
       if(q.alertAt&&q.remain<=q.alertAt&&q.remain>0) toast('⚠️ โควต้า "'+q.name+'" เหลือ '+q.remain+' ชิ้น กรุณาเติม!','warn');
       else if(q.remain<=0) toast('🔴 โควต้า "'+q.name+'" หมดแล้ว! กรุณาเติมด่วน!','err');
       if(itemCount<=0) break;
