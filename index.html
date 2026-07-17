@@ -438,7 +438,7 @@ let DB=null;
 // ═══ CORE UTILITIES ═══
 const $=id=>document.getElementById(id);
 function genId(prefix){
-  const key=prefix==='LDR'||prefix==='BED'||prefix==='CLN'||prefix==='PKB'?'orderSeq':prefix==='MBR'?'memberSeq':'quotaSeq';
+  const key=prefix==='LDR'||prefix==='BED'||prefix==='CLN'||prefix==='PKB'?'orderSeq':prefix==='SKN'?'memberSeq':'quotaSeq';
   DB[key]=(DB[key]||0)+1;
   return prefix+'-'+String(DB[key]).padStart(4,'0');
 }
@@ -563,13 +563,13 @@ function isEditable(o){
 // ═══ SEED DEMO DATA ═══
 function seedDemo(){
   DB.members=[
-    {id:'MBR-0001',name:'คุณวิภาวดี สุขใจ',nick:'วิ',phone:'089-123-4567',addrType:'condo',proj:'Lumpini Ville',room:'A-1201',lineId:'',pts:150,spend:4500,level:'Silver',joinDate:fmtDate()},
-    {id:'MBR-0002',name:'คุณสมชาย มั่งมี',nick:'ชาย',phone:'081-987-6543',addrType:'house',proj:'',room:'',village:'หมู่บ้านพฤกษา',houseNo:'123/45',lineId:'',pts:80,spend:2400,level:'ทั่วไป',joinDate:fmtDate()},
-    {id:'MBR-0003',name:'คุณนภัส ดีงาม',nick:'นภ',phone:'092-555-7890',addrType:'condo',proj:'The Base',room:'B-805',lineId:'',pts:320,spend:9600,level:'Gold',joinDate:fmtDate()}
+    {id:'SKN-0001',name:'คุณวิภาวดี สุขใจ',nick:'วิ',phone:'089-123-4567',addrType:'condo',proj:'Lumpini Ville',room:'A-1201',lineId:'',pts:150,spend:4500,level:'Silver',joinDate:fmtDate()},
+    {id:'SKN-0002',name:'คุณสมชาย มั่งมี',nick:'ชาย',phone:'081-987-6543',addrType:'house',proj:'',room:'',village:'หมู่บ้านพฤกษา',houseNo:'123/45',lineId:'',pts:80,spend:2400,level:'ทั่วไป',joinDate:fmtDate()},
+    {id:'SKN-0003',name:'คุณนภัส ดีงาม',nick:'นภ',phone:'092-555-7890',addrType:'condo',proj:'The Base',room:'B-805',lineId:'',pts:320,spend:9600,level:'Gold',joinDate:fmtDate()}
   ];DB.memberSeq=3;
   DB.orders=[
-    {id:'LDR-0001',type:'laundry',mid:'MBR-0001',mname:'คุณวิภาวดี สุขใจ',mphone:'089-123-4567',status:'ผ้าพร้อมส่ง (รับที่ร้าน)',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'ซัก อบ รีด',t:'เสื้อเชิ้ต',o:'',qty:3,p:50,k:18},{c:'ซัก อบ รีด',t:'กางเกง',o:'ขายาว',qty:2,p:50,k:18}],extras:[],disc:0,net:250,cost:90,payHist:[{round:1,method:'QR พร้อมเพย์',amt:250,date:fmtDT(),by:'เจ้าของ'}],isPaid:true,pts:2,note:'',pickupDate:fmtDate(),createdAt:fmtDT(),by:'เจ้าของ'},
-    {id:'LDR-0002',type:'laundry',mid:'MBR-0002',mname:'คุณสมชาย มั่งมี',mphone:'081-987-6543',status:'ระหว่างการซัก',delivery:'delivery',delCost:50,deliveryAddr:'หมู่บ้านพฤกษา 123/45',items:[{c:'ซักแห้ง',t:'เสื้อสูท',o:'ตัวสั้น',qty:1,p:120,k:40},{c:'ซักแห้ง',t:'กางเกง',o:'ตัวยาว',qty:1,p:100,k:35}],extras:[],disc:0,net:270,cost:75,payHist:[],isPaid:false,pts:2,note:'ลูกค้าขอด่วน',pickupDate:fmtDate(),createdAt:fmtDT(),by:'ผู้จัดการ'}
+    {id:'LDR-0001',type:'laundry',mid:'SKN-0001',mname:'คุณวิภาวดี สุขใจ',mphone:'089-123-4567',status:'ผ้าพร้อมส่ง (รับที่ร้าน)',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'ซัก อบ รีด',t:'เสื้อเชิ้ต',o:'',qty:3,p:50,k:18},{c:'ซัก อบ รีด',t:'กางเกง',o:'ขายาว',qty:2,p:50,k:18}],extras:[],disc:0,net:250,cost:90,payHist:[{round:1,method:'QR พร้อมเพย์',amt:250,date:fmtDT(),by:'เจ้าของ'}],isPaid:true,pts:2,note:'',pickupDate:fmtDate(),createdAt:fmtDT(),by:'เจ้าของ'},
+    {id:'LDR-0002',type:'laundry',mid:'SKN-0002',mname:'คุณสมชาย มั่งมี',mphone:'081-987-6543',status:'ระหว่างการซัก',delivery:'delivery',delCost:50,deliveryAddr:'หมู่บ้านพฤกษา 123/45',items:[{c:'ซักแห้ง',t:'เสื้อสูท',o:'ตัวสั้น',qty:1,p:120,k:40},{c:'ซักแห้ง',t:'กางเกง',o:'ตัวยาว',qty:1,p:100,k:35}],extras:[],disc:0,net:270,cost:75,payHist:[],isPaid:false,pts:2,note:'ลูกค้าขอด่วน',pickupDate:fmtDate(),createdAt:fmtDT(),by:'ผู้จัดการ'}
   ];DB.orderSeq=2;
   saveDB();
 }
