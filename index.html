@@ -27,18 +27,18 @@
 body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;overflow:hidden;height:100vh}
 /* ═══ LOGIN ═══ */
 #lockScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#004E6B,#006F98 35%,#1ABBEF 70%,#7FD2FD 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
-.lock-logo{font-size:42px;font-weight:900;margin-bottom:4px;text-shadow:0 2px 20px rgba(0,0,0,.2)}
+.lock-logo{font-size:42px;font-weight:700;margin-bottom:4px;text-shadow:0 2px 20px rgba(0,0,0,.2)}
 .lock-sub{opacity:.7;font-size:14px;margin-bottom:32px}
 .user-grid{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:24px}
 .user-btn{background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);border-radius:12px;padding:14px 20px;color:#fff;cursor:pointer;text-align:center;min-width:120px;transition:.2s}
 .user-btn:hover,.user-btn.sel{background:rgba(255,255,255,.25);border-color:#fff;transform:scale(1.05)}
-.user-btn .ub-name{font-weight:900;font-size:13px}.user-btn .ub-role{font-size:11px;opacity:.7}
+.user-btn .ub-name{font-weight:700;font-size:13px}.user-btn .ub-role{font-size:11px;opacity:.7}
 .pin-area{text-align:center}
 .pin-dots{display:flex;gap:10px;justify-content:center;margin:16px 0}
 .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.5);transition:.2s}
 .pin-dot.filled{background:#fff;border-color:#fff}
 .pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:8px;justify-content:center}
-.pin-key{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;height:52px;color:#fff;font-size:20px;font-weight:900;cursor:pointer;transition:.15s;font-family:var(--fm)}
+.pin-key{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;height:52px;color:#fff;font-size:20px;font-weight:700;cursor:pointer;transition:.15s;font-family:var(--fm)}
 .pin-key:hover{background:rgba(255,255,255,.25)}
 .pin-key:active{transform:scale(.95)}
 .pin-key.del{font-size:14px;font-weight:600}
@@ -48,15 +48,15 @@ body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;l
 .app-wrap{display:flex;height:100vh}
 /* SIDEBAR */
 .sidebar{width:220px;background:#003D55;color:#fff;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
-.sb-logo{padding:16px 18px;font-size:20px;font-weight:900;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:8px}
+.sb-logo{padding:16px 18px;font-size:20px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:8px}
 .sb-logo span{font-size:24px}
 .sb-nav{flex:1;padding:8px}
 .sb-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px;font-weight:500;transition:.15s;margin-bottom:2px}
 .sb-item:hover{background:rgba(255,255,255,.1);color:#fff}
-.sb-item.act{background:var(--pr);color:#fff;font-weight:900}
+.sb-item.act{background:var(--pr);color:#fff;font-weight:700}
 .sb-item .sb-icon{font-size:16px;width:22px;text-align:center}
-.sb-item .sb-badge{margin-left:auto;background:var(--rd);color:#fff;font-size:10px;font-weight:900;padding:1px 6px;border-radius:10px}
-.sb-section{padding:6px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.35);margin-top:10px;font-weight:900}
+.sb-item .sb-badge{margin-left:auto;background:var(--rd);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sb-section{padding:6px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.35);margin-top:10px;font-weight:700}
 .sb-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,.1);font-size:11px}
 .sb-footer .sf-name{font-weight:600;color:rgba(255,255,255,.8)}.sb-footer .sf-role{color:rgba(255,255,255,.4);font-size:10px}
 .sb-logout{margin-top:6px;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--ff);width:100%}
@@ -64,7 +64,7 @@ body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;l
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .topbar{background:var(--wh);padding:12px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--b1);flex-shrink:0}
-.topbar-title{font-size:18px;font-weight:900;color:var(--t1)}
+.topbar-title{font-size:18px;font-weight:700;color:var(--t1)}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .content{flex:1;overflow-y:auto;padding:20px 24px}
 /* ═══ COMPONENTS ═══ */
@@ -76,7 +76,7 @@ body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;l
 .btn-sm{padding:5px 10px;font-size:12px}.btn-lg{padding:10px 24px;font-size:15px}
 .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
 .card{background:var(--wh);border-radius:var(--r);box-shadow:var(--sh);padding:18px 20px;margin-bottom:14px}
-.card-title{font-size:15px;font-weight:900;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-title{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
 .bg-pr{background:var(--prl);color:var(--pr)}.bg-gn{background:var(--gnl);color:var(--gnd)}
 .bg-am{background:var(--aml);color:var(--am)}.bg-rd{background:var(--rdl);color:var(--rd)}
@@ -91,14 +91,14 @@ th{background:var(--bg);color:var(--t3);font-weight:600;text-align:left;padding:
 td{padding:8px 10px;border-bottom:1px solid var(--b1);color:var(--t2);vertical-align:top}
 tr:last-child td{border-bottom:none}
 .kpi{background:linear-gradient(135deg,var(--prl),var(--wh));border:1px solid #B8E2F7;border-radius:var(--r);padding:14px;text-align:center}
-.kpi-val{font-size:24px;font-weight:900;color:var(--pr);font-family:var(--fm)}.kpi-lbl{font-size:11px;color:var(--t3);font-weight:600;text-transform:uppercase}
+.kpi-val{font-size:24px;font-weight:700;color:var(--pr);font-family:var(--fm)}.kpi-lbl{font-size:11px;color:var(--t3);font-weight:600;text-transform:uppercase}
 /* ═══ MODAL ═══ */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
 .modal-overlay.show{display:flex}
 .modal{background:var(--wh);border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-lg{max-width:800px}
 .modal-head{padding:16px 20px;border-bottom:1px solid var(--b1);display:flex;align-items:center;position:sticky;top:0;background:var(--wh);z-index:1;border-radius:14px 14px 0 0}
-.modal-head h3{font-size:16px;font-weight:900;flex:1}
+.modal-head h3{font-size:16px;font-weight:700;flex:1}
 .modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--t3);padding:4px 8px;border-radius:6px}
 .modal-close:hover{background:var(--bg)}
 .modal-body{padding:20px}
@@ -112,10 +112,10 @@ tr:last-child td{border-bottom:none}
 .o-card{background:var(--wh);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--pr)}
 .o-card.st-wash{border-left-color:var(--am)}.o-card.st-ready{border-left-color:var(--gn)}.o-card.st-ship{border-left-color:var(--pp)}.o-card.st-done{border-left-color:var(--b2)}.o-card.st-cancel{border-left-color:var(--rd)}
 .o-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.o-id{font-family:var(--fm);font-weight:900;font-size:13px;color:var(--pr)}
+.o-id{font-family:var(--fm);font-weight:700;font-size:13px;color:var(--pr)}
 .o-type{font-size:11px}.o-date{margin-left:auto;font-size:11px;color:var(--t3)}
 .o-cust{font-size:13px;font-weight:600;margin-bottom:4px}.o-info{font-size:12px;color:var(--t3)}
-.o-total{font-family:var(--fm);font-weight:900;font-size:15px;color:var(--t1);margin-top:6px}
+.o-total{font-family:var(--fm);font-weight:700;font-size:15px;color:var(--t1);margin-top:6px}
 .o-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 /* ═══ STATUS FILTER ═══ */
 .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -124,7 +124,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible;-webkit-print-color-adjust:exact;print-color-adjust:exact}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:14px;font-weight:900;color:#000!important;line-height:1.35;font-family:Arial,Helvetica,'IBM Plex Sans Thai',sans-serif}#printArea *{color:#000!important;font-weight:inherit;-webkit-text-stroke:0.3px #000}#printArea.print-a4{width:190mm;font-size:13px;font-weight:900;-webkit-text-stroke:0}#printArea.print-a5{width:138mm;font-size:11px;font-weight:900;-webkit-text-stroke:0}@page{margin:1mm 2mm;size:80mm}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:13px;font-weight:700;color:#000!important;line-height:1.3;font-family:Arial,Helvetica,sans-serif}#printArea *{color:#000!important}#printArea.print-a4{width:190mm;font-size:13px;font-weight:600}#printArea.print-a5{width:138mm;font-size:11px;font-weight:600}@page{margin:1mm 2mm;size:80mm 300mm}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -715,9 +715,9 @@ function renderPublicRegister(){
   window._regLineOA=lineOA;window._regApiUrl=apiUrl;window._regShop=shopName;
   var regDiv=document.createElement('div');regDiv.id='publicRegPage';
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
-    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:900;color:#006F98">'+shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
+    '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:700;color:#006F98">'+shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
     '<div id="regMainArea">'+
-    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine()" style="width:100%;padding:16px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;font-family:var(--ff)">📱 สมัครด้วย LINE</button><div style="margin:14px 0;color:#999;font-size:13px">— หรือกรอกข้อมูลด้านล่าง —</div></div>':'')+
+    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine()" style="width:100%;padding:16px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--ff)">📱 สมัครด้วย LINE</button><div style="margin:14px 0;color:#999;font-size:13px">— หรือกรอกข้อมูลด้านล่าง —</div></div>':'')+
     '<div class="card" id="regFormCard"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone" type="tel" autocomplete="tel"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick" type="text"></div>'+
@@ -726,7 +726,7 @@ function renderPublicRegister(){
     '<div class="grid g2"><div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="pr-proj" type="text"></div>'+
     '<div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="pr-room" type="text" placeholder="A-101/2"></div></div>'+
     '<div class="form-group" style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:flex-start;gap:6px"><input type="checkbox" id="pr-pdpa" style="width:auto;margin-top:3px"><span>ยินยอมให้เก็บข้อมูลส่วนบุคคล (PDPA)</span></label></div>'+
-    '<button id="regSubmitBtn" onclick="savePublicRegister()" style="width:100%;padding:14px;background:#006F98;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:900;cursor:pointer;font-family:var(--ff);margin-top:12px">📝 สมัครสมาชิก</button></div></div></div>';
+    '<button id="regSubmitBtn" onclick="savePublicRegister()" style="width:100%;padding:14px;background:#006F98;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--ff);margin-top:12px">📝 สมัครสมาชิก</button></div></div></div>';
   document.body.appendChild(regDiv);
   // Auto-init LIFF — check if already logged in (after redirect)
   if(liffId&&typeof liff!=='undefined'){
@@ -755,7 +755,7 @@ function fillFromLine(){
     if($('pr-name'))$('pr-name').value=p.displayName||'';
     if($('pr-nick'))$('pr-nick').value=p.displayName||'';
     if($('pr-line-uid'))$('pr-line-uid').value=p.userId||'';
-    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:900;color:#0D8A6A">✅ LINE Login สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม</div></div>';
+    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ LINE Login สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม</div></div>';
   });
 }
 function savePublicRegister(){
@@ -774,7 +774,7 @@ function savePublicRegister(){
     pdpaConsent:'yes'
   };
   // Show loading
-  if($('regMainArea'))$('regMainArea').innerHTML='<div style="text-align:center;padding:40px 0"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:16px;font-weight:900;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
+  if($('regMainArea'))$('regMainArea').innerHTML='<div style="text-align:center;padding:40px 0"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:16px;font-weight:700;color:#006F98">กำลังสมัครสมาชิก...</div></div>';
   if(apiUrl){
     // JSONP — send data via script tag (no CORS)
     var cbName='_regcb_'+Date.now();
@@ -799,10 +799,10 @@ function showRegSuccess(name,phone,memberId){
   var el=$('regMainArea')||$('publicRegPage');
   if(el) el.innerHTML='<div style="text-align:center;padding:20px 0">'+
     '<div style="font-size:56px;margin-bottom:8px">🎉</div>'+
-    '<div style="font-size:22px;font-weight:900;color:#0D8A6A;margin-bottom:8px">สมัครสมาชิกสำเร็จ!</div>'+
+    '<div style="font-size:22px;font-weight:700;color:#0D8A6A;margin-bottom:8px">สมัครสมาชิกสำเร็จ!</div>'+
     (memberId?'<div style="font-size:16px;color:#006F98;margin-bottom:4px">รหัสสมาชิก: <strong>'+memberId+'</strong></div>':'')+
     '<div style="background:#E0F5EF;border-radius:12px;padding:16px;text-align:left;margin:16px 0">'+
-    '<div style="font-weight:900;font-size:16px;color:#0D8A6A">'+name+'</div>'+
+    '<div style="font-weight:700;font-size:16px;color:#0D8A6A">'+name+'</div>'+
     '<div style="font-size:13px;color:#6B7A88;margin-top:4px">📱 '+phone+'</div>'+
     '<div style="font-size:13px;color:#0D8A6A;margin-top:10px">✅ ข้อมูลบันทึกในระบบแล้ว<br>✅ ได้รับแจ้งเตือนทาง LINE<br>✅ เริ่มสะสมแต้มได้ทันที!</div></div>'+
     '<div style="font-size:14px;color:#666">ขอบคุณที่สมัครสมาชิก<br>'+shopName+' 🫧</div></div>';
@@ -1014,7 +1014,7 @@ function openCreateOrderModal(m){
   $('moCreateOrderIn').innerHTML=
     '<div class="modal-head"><h3>👕 สร้างออเดอร์ซักรีด</h3><button class="modal-close" onclick="closeMo(\'moCreateOrder\')">&times;</button></div>'+
     '<div class="modal-body">'+
-    '<div class="card" style="background:var(--prl);box-shadow:none"><div style="font-weight:900">👤 '+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+fmtPhone(m.phone)+' · '+m.id+' · '+m.level+'</div></div>'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><div style="font-weight:700">👤 '+m.name+'</div><div style="font-size:12px;color:var(--t3)">'+fmtPhone(m.phone)+' · '+m.id+' · '+m.level+'</div></div>'+
     '<button class="btn btn-pr" onclick="openAddItemModal()" style="margin-bottom:12px">➕ เพิ่มรายการซัก</button>'+
     '<div id="orderItemsList"></div>'+
     '<div id="orderExtrasArea" style="margin-top:12px"><div class="card-title" style="font-size:13px">💡 บริการเพิ่มเติม</div>'+
@@ -1043,7 +1043,7 @@ function openCreateOrderModal(m){
     '<div class="form-group"><label class="form-label">เวลา</label><input id="co-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="co-payamt" type="number" placeholder="กรอกยอดเงิน"></div>'+
     '</div>'+
-    '<div class="card" style="background:var(--bg);box-shadow:none;text-align:right;font-size:18px;font-weight:900;color:var(--pr)" id="co-total-box">ยอดสุทธิ: ฿0</div>'+
+    '<div class="card" style="background:var(--bg);box-shadow:none;text-align:right;font-size:18px;font-weight:700;color:var(--pr)" id="co-total-box">ยอดสุทธิ: ฿0</div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moCreateOrder\')">ยกเลิก</button><button class="btn btn-gn btn-lg" onclick="saveOrder()">💾 บันทึกออเดอร์</button></div>';
   openMo('moCreateOrder');
@@ -1154,7 +1154,7 @@ function renderOrderItems(){
   if(!orderItems.length){el.innerHTML='<div style="color:var(--t3);font-size:14px;padding:12px;text-align:center">ยังไม่มีรายการ — กดปุ่มเพิ่มรายการซัก</div>';return}
   el.innerHTML='<table style="font-size:14px"><tr><th>รายการ</th><th style="width:60px">จำนวน</th><th style="width:80px">ราคา</th><th style="width:40px"></th></tr>'+
     orderItems.map((it,i)=>
-      '<tr><td style="font-weight:600">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</td><td style="text-align:center;font-weight:900">'+it.qty+'</td><td style="text-align:right;font-weight:900">'+thb(it.p*it.qty)+'</td>'+
+      '<tr><td style="font-weight:600">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td><td style="text-align:right;font-weight:700">'+thb(it.p*it.qty)+'</td>'+
       '<td><button class="btn btn-rd btn-sm" onclick="removeItem('+i+')" style="padding:4px 8px;font-size:14px">✕</button></td></tr>'
     ).join('')+'</table>';
 }
@@ -1268,7 +1268,7 @@ function openPayModal(oid){
   $('moPayIn').innerHTML=
     '<div class="modal-head"><h3>💰 เก็บเงิน — '+oid+'</h3><button class="modal-close" onclick="closeMo(\'moPay\')">&times;</button></div>'+
     '<div class="modal-body">'+
-    '<div class="card" style="background:var(--rdl);box-shadow:none"><div style="font-weight:900;color:var(--rd)">ยอดค้างชำระ: '+thb(rem)+'</div><div style="font-size:12px;color:var(--t3)">ยอดสุทธิ '+thb(o.net)+' — ชำระแล้ว '+thb(paidTotal(o))+'</div></div>'+
+    '<div class="card" style="background:var(--rdl);box-shadow:none"><div style="font-weight:700;color:var(--rd)">ยอดค้างชำระ: '+thb(rem)+'</div><div style="font-size:12px;color:var(--t3)">ยอดสุทธิ '+thb(o.net)+' — ชำระแล้ว '+thb(paidTotal(o))+'</div></div>'+
     '<div class="form-group"><label class="form-label">จำนวนเงินที่รับ (฿)</label><input id="pay-amt" type="number" value="'+rem+'"></div>'+
     '<div class="form-group"><label class="form-label">วิธีชำระ</label><select id="pay-method">'+
     getPayMethods().map(m=>'<option>'+m.name+'</option>').join('')+'</select></div>'+
@@ -1317,7 +1317,7 @@ function showOrderDetail(oid){
     (o.extras||[]).map(e=>'<tr><td>⭐ '+e.name+'</td><td>1</td><td>'+thb(e.price)+'</td></tr>').join('')+
     (o.disc?'<tr><td colspan="2" style="text-align:right">ส่วนลด</td><td style="color:var(--rd)">-'+thb(o.disc)+'</td></tr>':'')+
     (o.delCost?'<tr><td colspan="2" style="text-align:right">ค่าจัดส่ง</td><td>'+thb(o.delCost)+'</td></tr>':'')+
-    '<tr style="font-weight:900;font-size:15px"><td colspan="2" style="text-align:right">ยอดสุทธิ</td><td>'+thb(o.net)+'</td></tr></table>'+
+    '<tr style="font-weight:700;font-size:15px"><td colspan="2" style="text-align:right">ยอดสุทธิ</td><td>'+thb(o.net)+'</td></tr></table>'+
     (o.payHist&&o.payHist.length?'<div class="card-title" style="margin-top:12px;font-size:13px">💳 ประวัติชำระเงิน</div><table><tr><th>รอบ</th><th>วิธี</th><th>จำนวน</th><th>วันที่</th><th>โดย</th></tr>'+
     o.payHist.map(p=>'<tr><td>'+p.round+'</td><td>'+p.method+'</td><td>'+thb(p.amt)+'</td><td>'+p.date+'</td><td>'+p.by+'</td></tr>').join('')+'</table>':'')+
     (o.note?'<div style="margin-top:10px;padding:8px;background:var(--aml);border-radius:6px;font-size:12px">📝 '+o.note+'</div>':'')+
@@ -1406,17 +1406,17 @@ function openDocModal(oid){
     '<div class="form-group"><label class="form-label">ประเภทเอกสาร</label><select id="doc-type" onchange="docTypeChange()"><option value="receipt">🧾 ใบเสร็จรับเงิน (Receipt)</option><option value="taxinv">📋 ใบกำกับภาษี (Tax Invoice)</option><option value="quotation">💰 ใบเสนอราคา (Quotation)</option><option value="invoice">📨 ใบแจ้งหนี้ (Invoice)</option></select></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ขนาดกระดาษ</label><select id="doc-paper"><option value="A4">A4 (210×297mm)</option><option value="A5">A5 (148×210mm)</option></select></div>'+
     '<div class="form-group"><label class="form-label">เลขที่เอกสาร (แก้ไขได้)</label><input id="doc-num" type="text" value="" placeholder="ระบบจะสร้างให้อัตโนมัติ"></div></div>'+
-    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:900;font-size:13px;margin-bottom:8px">👤 ข้อมูลลูกค้า/บริษัท</div>'+
+    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:8px">👤 ข้อมูลลูกค้า/บริษัท</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อ / ชื่อบริษัท</label><input id="doc-cname" type="text" value="'+(m?m.name:'')+'"></div>'+
     '<div class="form-group"><label class="form-label">เลขประจำตัวผู้เสียภาษี</label><input id="doc-taxid" type="text" placeholder="เช่น 1234567890123"></div></div>'+
     '<div class="form-group"><label class="form-label">ที่อยู่</label><input id="doc-addr" type="text" value="'+(m?(m.addrType==='condo'?m.proj+' ห้อง '+m.room:m.village+' '+m.houseNo):'')+'"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">เบอร์โทร</label><input id="doc-phone" type="text" value="'+(m?m.phone:'')+'"></div>'+
     '<div class="form-group"><label class="form-label">สาขา</label><input id="doc-branch" type="text" placeholder="สำนักงานใหญ่"></div></div></div>'+
-    '<div id="doc-vat-section" class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:900;font-size:13px;margin-bottom:8px">💰 ภาษีมูลค่าเพิ่ม</div>'+
+    '<div id="doc-vat-section" class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:8px">💰 ภาษีมูลค่าเพิ่ม</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">คำนวณ VAT</label><select id="doc-vat"><option value="none">ไม่รวม VAT (ราคารวมแล้ว)</option><option value="include">รวม VAT 7% (แยกออก)</option><option value="exclude">บวก VAT 7% เพิ่ม</option></select></div>'+
     '<div id="doc-vat-preview" style="font-size:13px;padding:8px;background:var(--bg);border-radius:6px;text-align:right">ยอด: '+thb(o.net)+'</div></div></div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุเพิ่มเติม</label><input id="doc-remark" type="text"></div>'+
-    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:900;font-size:13px;margin-bottom:8px">🏦 หัก ณ ที่จ่าย</div>'+
+    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🏦 หัก ณ ที่จ่าย</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">อัตราหัก ณ ที่จ่าย</label><select id="doc-wht" onchange="docWhtChange(\''+oid+'\')"><option value="0">ไม่หัก</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="5">5%</option><option value="custom">กำหนดเอง</option></select></div>'+
     '<div class="form-group" id="doc-wht-custom" style="display:none"><label class="form-label">อัตรา (%)</label><input id="doc-wht-rate" type="number" value="0" min="0" max="100" onchange="docWhtChange(\''+oid+'\')"></div></div>'+
     '<div id="doc-wht-preview" style="font-size:13px;padding:8px;background:var(--bg);border-radius:6px;text-align:right;display:none">หัก ณ ที่จ่าย: ฿0</div></div>'+
@@ -1479,17 +1479,17 @@ function generateDocument(oid){
   var h='<div style="width:'+pw+';max-width:100%;font-family:var(--ff);font-size:'+pfs+';padding:'+(paperSize==='A5'?'16px':'24px')+';color:#000;background:#fff;font-weight:'+fw+'">';
   // Header
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">';
-  h+='<div>'+(s.logo?'<img src="'+s.logo+'" style="height:50px;margin-bottom:4px"><br>':'')+'<div style="font-size:18px;font-weight:900">'+s.shopName+'</div>';
+  h+='<div>'+(s.logo?'<img src="'+s.logo+'" style="height:50px;margin-bottom:4px"><br>':'')+'<div style="font-size:18px;font-weight:700">'+s.shopName+'</div>';
   h+='<div style="font-size:11px;color:#666">'+(s.address||'')+'<br>'+(s.phone||'')+' · '+(s.lineOA||'')+'</div>';
   if(bc.taxId) h+='<div style="font-size:11px;color:#666">เลขประจำตัวผู้เสียภาษี: '+bc.taxId+'</div>';
   h+='</div>';
-  h+='<div style="text-align:right"><div style="font-size:18px;font-weight:900;color:'+dt.color+'">'+dt.name+'</div><div style="font-size:12px;color:#666">'+dt.en+'</div>';
+  h+='<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:'+dt.color+'">'+dt.name+'</div><div style="font-size:12px;color:#666">'+dt.en+'</div>';
   h+='<div style="font-size:13px;margin-top:6px"><strong>เลขที่:</strong> '+docNum+'</div>';
   h+='<div style="font-size:12px"><strong>วันที่:</strong> '+formatBillDate(o.createdAt)+'</div>';
   h+='</div></div>';
   // Customer info
   h+='<div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px">';
-  h+='<div style="font-weight:900;margin-bottom:4px">ข้อมูลลูกค้า</div>';
+  h+='<div style="font-weight:700;margin-bottom:4px">ข้อมูลลูกค้า</div>';
   if(cname) h+='<div><strong>ชื่อ:</strong> '+cname+'</div>';
   if(taxid) h+='<div><strong>เลขประจำตัวผู้เสียภาษี:</strong> '+taxid+(branch?' สาขา: '+branch:'')+'</div>';
   if(addr) h+='<div><strong>ที่อยู่:</strong> '+addr+'</div>';
@@ -1517,17 +1517,17 @@ function generateDocument(oid){
     h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>ราคาก่อน VAT</span><span>'+thb(baseAmt)+'</span></div>';
     h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>VAT 7%</span><span>'+thb(vatAmt)+'</span></div>';
   }
-  h+='<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;padding:6px 0;border-top:2px solid #333;margin-top:4px"><span>ยอดรวมทั้งสิ้น</span><span>'+thb(grandTotal)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:6px 0;border-top:2px solid #333;margin-top:4px"><span>ยอดรวมทั้งสิ้น</span><span>'+thb(grandTotal)+'</span></div>';
   if(whtRate>0){
     h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#C92A2A"><span>หัก ณ ที่จ่าย '+whtRate+'%</span><span>-'+thb(whtAmt)+'</span></div>';
-    h+='<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;padding:6px 0;border-top:1px solid #999"><span>ยอดชำระสุทธิ</span><span>'+thb(netPayable)+'</span></div>';
+    h+='<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:6px 0;border-top:1px solid #999"><span>ยอดชำระสุทธิ</span><span>'+thb(netPayable)+'</span></div>';
   }
   h+='</div></div>';
   // Payment status
   if(dtype==='receipt'){
-    h+='<div style="margin-top:12px;padding:8px;background:#E0F5EF;border-radius:6px;text-align:center;font-size:12px;color:#0D8A6A;font-weight:900">✅ ชำระเงินเรียบร้อยแล้ว — '+(o.payHist&&o.payHist.length?(o.payHist.map(function(p){return p.method}).join(', ')):'')+'</div>';
+    h+='<div style="margin-top:12px;padding:8px;background:#E0F5EF;border-radius:6px;text-align:center;font-size:12px;color:#0D8A6A;font-weight:700">✅ ชำระเงินเรียบร้อยแล้ว — '+(o.payHist&&o.payHist.length?(o.payHist.map(function(p){return p.method}).join(', ')):'')+'</div>';
   }else if(dtype==='invoice'||dtype==='quotation'){
-    h+='<div style="margin-top:12px;padding:8px;background:#FEF3C7;border-radius:6px;text-align:center;font-size:12px;color:#92400E;font-weight:900">'+(dtype==='quotation'?'💰 ใบเสนอราคามีอายุ 30 วัน':'📨 กรุณาชำระภายใน 7 วัน')+'</div>';
+    h+='<div style="margin-top:12px;padding:8px;background:#FEF3C7;border-radius:6px;text-align:center;font-size:12px;color:#92400E;font-weight:700">'+(dtype==='quotation'?'💰 ใบเสนอราคามีอายุ 30 วัน':'📨 กรุณาชำระภายใน 7 วัน')+'</div>';
   }
   if(remark) h+='<div style="margin-top:8px;font-size:11px;color:#666"><strong>หมายเหตุ:</strong> '+remark+'</div>';
   // Footer
@@ -1587,7 +1587,7 @@ function openEditOrder(oid){
     '<div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="eo-disc" type="number" value="'+(o.disc||0)+'" onchange="eoRecalc()"></div>'+
     '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy)</label><input id="eo-pickup" type="date" value="'+(o.pickupDate||'')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="eo-note" value="'+(o.note||'')+'"></div>'+
-    '<div id="eo-total-box" class="card" style="background:var(--bg);box-shadow:none;text-align:right;font-size:16px;font-weight:900;color:var(--pr);margin-top:10px">'+calcEditTotalDisplay(o)+'</div>'+
+    '<div id="eo-total-box" class="card" style="background:var(--bg);box-shadow:none;text-align:right;font-size:16px;font-weight:700;color:var(--pr);margin-top:10px">'+calcEditTotalDisplay(o)+'</div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moEditOrder\')">ยกเลิก</button><button class="btn btn-pr" onclick="saveEditOrder()">💾 บันทึก</button></div>';
   openMo('moEditOrder');
@@ -1803,7 +1803,7 @@ function openBuyPkgForm(m){
     '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="bp-paydate" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="bp-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '</div>'+
-    '<div id="bp-total-box" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:900;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: ฿0</div>'+
+    '<div id="bp-total-box" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: ฿0</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBuyPkg\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveBuyPackage()">💾 บันทึก</button></div>';
   openMo('moBuyPkg');bpCalcTotal();
 }
@@ -1848,9 +1848,9 @@ function openBedsetForm(m){
     // Step 1: Select SET package (price comes from here)
     '<div class="form-group"><label class="form-label">เลือก Set Package</label><select id="bs-set" onchange="bsSetChange();bsCalcNet()" style="font-size:14px">'+
     BED_SETS.map(function(b,i){return '<option value="'+i+'">'+b.label+' — '+thb(b.price)+'</option>'}).join('')+'</select></div>'+
-    '<div id="bs-set-price" style="background:var(--gnl);padding:10px;border-radius:8px;text-align:center;font-weight:900;font-size:18px;color:var(--gn);margin-bottom:12px">ราคา Set: '+thb(BED_SETS[0].price)+'</div>'+
+    '<div id="bs-set-price" style="background:var(--gnl);padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin-bottom:12px">ราคา Set: '+thb(BED_SETS[0].price)+'</div>'+
     // Step 2: Specify items (tracking only, no extra charge)
-    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:900;font-size:13px;margin-bottom:4px">📋 ระบุรายการเครื่องนอน <span style="font-size:11px;color:var(--t3);font-weight:400">(ไม่คิดเงินเพิ่ม)</span></div>'+
+    '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ระบุรายการเครื่องนอน <span style="font-size:11px;color:var(--t3);font-weight:400">(ไม่คิดเงินเพิ่ม)</span></div>'+
     '<div style="font-size:11px;color:var(--am);margin-bottom:8px">⚠️ รวมไม่เกิน 5 ชิ้น · หมอน+หมอนข้าง รวม ≤3</div>'+
     bsBuildRow('ผ้าปูที่นอน','Bed Sheet','max 1','bs-q-sheet',1,1)+
     bsBuildRow('ผ้านวม','Comforter','max 1','bs-q-comf',1,1)+
@@ -1870,7 +1870,7 @@ function openBedsetForm(m){
     '<div class="form-group"><label class="form-label">เวลา</label><input id="bs-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="bs-payamt" type="number" placeholder="กรอกยอดเงิน"></div></div>'+
     '</div>'+
-    '<div id="bs-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:900;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(BED_SETS[0].price)+'</div>'+
+    '<div id="bs-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(BED_SETS[0].price)+'</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBedset\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveBedset()">💾 บันทึก</button></div>';
   openMo('moBedset');
 }
@@ -1883,9 +1883,9 @@ function bsBuildRow(name,en,note,id,defVal,max){
   return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bg)">'+
     '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+name+'</div><div style="font-size:10px;color:var(--t3)">'+en+(note?' · '+note:'')+'</div></div>'+
     '<div style="display:flex;align-items:center;gap:8px">'+
-    '<div style="width:44px;height:44px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',-1)">−</div>'+
-    '<div id="'+id+'" style="width:36px;text-align:center;font-size:18px;font-weight:900">'+defVal+'</div>'+
-    '<div style="width:44px;height:44px;border-radius:10px;background:var(--pr);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',1)">+</div>'+
+    '<div style="width:44px;height:44px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',-1)">−</div>'+
+    '<div id="'+id+'" style="width:36px;text-align:center;font-size:18px;font-weight:700">'+defVal+'</div>'+
+    '<div style="width:44px;height:44px;border-radius:10px;background:var(--pr);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent" onclick="bsQty(\''+id+'\',1)">+</div>'+
     '</div></div>';
 }
 function bsQty(id,delta){
@@ -1989,7 +1989,7 @@ function openCleaningForm(m){
     '<div class="form-group"><label class="form-label">เวลา</label><input id="cn-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="cn-payamt" type="number" placeholder="กรอกยอดเงิน"></div></div>'+
     '</div>'+
-    '<div id="cn-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:900;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(CLN_SVCS[0].minPrice)+'</div>'+
+    '<div id="cn-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(CLN_SVCS[0].minPrice)+'</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moCleaning\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveCleaning()">💾 บันทึก</button></div>';
   openMo('moCleaning');
 }
@@ -2068,10 +2068,10 @@ function buildCalendar(year,month){
   const monthNames=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
     '<button class="btn btn-out btn-sm" onclick="calNav(-1)">◀</button>'+
-    '<span style="font-weight:900;font-size:16px">'+monthNames[month]+' '+(year+543)+'</span>'+
+    '<span style="font-weight:700;font-size:16px">'+monthNames[month]+' '+(year+543)+'</span>'+
     '<button class="btn btn-out btn-sm" onclick="calNav(1)">▶</button></div>';
   h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
-  ['อา','จ','อ','พ','พฤ','ศ','ส'].forEach(d=>{h+='<div style="font-weight:900;font-size:11px;color:var(--t3);padding:6px">'+d+'</div>'});
+  ['อา','จ','อ','พ','พฤ','ศ','ส'].forEach(d=>{h+='<div style="font-weight:700;font-size:11px;color:var(--t3);padding:6px">'+d+'</div>'});
   for(let i=0;i<startDay;i++) h+='<div></div>';
   for(let d=1;d<=lastDay;d++){
     const dateStr=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
@@ -2080,7 +2080,7 @@ function buildCalendar(year,month){
     const hasCln=dayClean.length>0;
     h+='<div onclick="showCalDay(\''+dateStr+'\')" style="padding:8px 4px;border-radius:8px;font-size:13px;cursor:pointer;transition:.15s;border:1.5px solid '+(isToday?'var(--pr)':'transparent')+';'+(hasCln?'background:var(--gnl);':'')+'">'+
       '<div style="font-weight:'+(isToday?'800':'400')+'">'+d+'</div>'+
-      (hasCln?'<div style="font-size:9px;color:var(--gn);font-weight:900">'+dayClean.length+' งาน</div>':'')+
+      (hasCln?'<div style="font-size:9px;color:var(--gn);font-weight:700">'+dayClean.length+' งาน</div>':'')+
       '</div>';
   }
   h+='</div>';
@@ -2318,7 +2318,7 @@ function rptOrder(){
         (o.items||[]).map(function(it){return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td>'+thb(it.p)+'</td><td>'+it.qty+'</td><td>'+thb(it.p*it.qty)+'</td></tr>'}).join('')+
         '</table>'+
         (o.extras&&o.extras.length?'<div style="font-size:10px;color:var(--am);margin-top:2px">เสริม: '+(o.extras||[]).map(function(e){return e.name+' '+thb(e.price)}).join(', ')+'</div>':'')+
-        '<div style="text-align:right;font-weight:900;margin-top:4px">ยอดสุทธิ: '+thb(o.net)+(o.disc?' (ลด '+thb(o.disc)+')':'')+'</div></div>';
+        '<div style="text-align:right;font-weight:700;margin-top:4px">ยอดสุทธิ: '+thb(o.net)+(o.disc?' (ลด '+thb(o.disc)+')':'')+'</div></div>';
     }).join('');
 }
 function rptFinancial(){
@@ -2385,7 +2385,7 @@ function renderUnpaidReport(){
   if(!unpaid.length) return '<div class="empty-state"><div class="es-icon">✅</div><div class="es-text">ไม่มียอดค้างชำระ</div></div>';
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="font-size:13px;margin:0">❌ ออเดอร์ค้างชำระ ('+unpaid.length+' รายการ · รวม '+thb(unpaid.reduce((s,o)=>s+remaining(o),0))+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'unpaid\')">📤 Export</button></div>'+
     '<table><tr><th>เลข</th><th>ลูกค้า</th><th>ยอดสุทธิ</th><th>ค้างชำระ</th><th>วันที่</th><th></th></tr>'+
-    unpaid.map(o=>'<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+thb(o.net)+'</td><td style="color:var(--rd);font-weight:900">'+thb(remaining(o))+'</td><td>'+o.createdAt+'</td><td><button class="btn btn-am btn-sm" onclick="openPayModal(\''+o.id+'\')">💰 เก็บเงิน</button> <button class="btn btn-out btn-sm" onclick="showLinePreview(\''+o.id+'\')">📱 เรียกเก็บ</button></td></tr>').join('')+'</table>';
+    unpaid.map(o=>'<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+thb(o.net)+'</td><td style="color:var(--rd);font-weight:700">'+thb(remaining(o))+'</td><td>'+o.createdAt+'</td><td><button class="btn btn-am btn-sm" onclick="openPayModal(\''+o.id+'\')">💰 เก็บเงิน</button> <button class="btn btn-out btn-sm" onclick="showLinePreview(\''+o.id+'\')">📱 เรียกเก็บ</button></td></tr>').join('')+'</table>';
 }
 function renderMemberReport(){
   var levelFilter=window._memberReportLevel||'';
@@ -3247,7 +3247,7 @@ function openPriceEdit(idx){
   const it=CAT[idx];if(!it) return;
   const h='<div class="modal-overlay show" id="moPriceEdit"><div class="modal"><div class="modal-head"><h3>✏️ แก้ไขราคา</h3><button class="modal-close" onclick="document.getElementById(\'moPriceEdit\').remove()">&times;</button></div>'+
     '<div class="modal-body">'+
-    '<div style="font-weight:900;margin-bottom:12px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>'+
+    '<div style="font-weight:700;margin-bottom:12px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">ราคาขาย (฿)</label><input id="pe-price" type="number" value="'+it.p+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="pe-cost" type="number" value="'+it.k+'"></div></div></div>'+
@@ -3460,16 +3460,16 @@ function showMemberCard(mid){
     '<div id="memberCardEl" style="width:340px;height:200px;margin:0 auto;border-radius:16px;padding:20px;color:#fff;position:relative;overflow:hidden;'+bgStyle+';box-shadow:0 8px 30px rgba(0,80,130,.3)">'+
     '<div style="font-size:10px;opacity:.7;letter-spacing:2px;text-transform:uppercase">MEMBER CARD</div>'+
     (cfg.logo?'<img src="'+cfg.logo+'" style="height:'+(cfg.logoSize||30)+'px;margin:4px 0">':'')+ 
-    '<div style="font-size:'+(cfg.shopNameSize||18)+'px;font-weight:900">'+s.shopName+'</div>'+
+    '<div style="font-size:'+(cfg.shopNameSize||18)+'px;font-weight:700">'+s.shopName+'</div>'+
     (cfg.showShopInfo!==false?'<div style="font-size:10px;opacity:.7">'+s.phone+(s.lineOA?' · '+s.lineOA:'')+'</div>':'')+
     '<div style="position:absolute;bottom:20px;left:20px">'+
-    '<div style="font-size:14px;font-weight:900">'+m.name+'</div>'+
+    '<div style="font-size:14px;font-weight:700">'+m.name+'</div>'+
     '<div style="font-size:11px;opacity:.8">'+m.id+' · '+fmtPhone(m.phone)+'</div>'+
-    '<div style="margin-top:4px"><span style="background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:900">'+m.level+'</span>'+(cfg.showPoints!==false?'<span style="margin-left:6px;font-size:11px">'+m.pts+' แต้ม</span>':'')+'</div></div>'+
+    '<div style="margin-top:4px"><span style="background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">'+m.level+'</span>'+(cfg.showPoints!==false?'<span style="margin-left:6px;font-size:11px">'+m.pts+' แต้ม</span>':'')+'</div></div>'+
     '<div id="memberQR" style="position:absolute;bottom:16px;right:16px;background:#fff;padding:4px;border-radius:6px"></div>'+
     '</div>'+
     '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:12px;font-size:12px">'+
-    '<div style="font-weight:900;margin-bottom:8px">⚙️ ตั้งค่า Template บัตร</div>'+
+    '<div style="font-weight:700;margin-bottom:8px">⚙️ ตั้งค่า Template บัตร</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">🖼️ โลโก้ร้าน</label><input type="file" accept="image/*" onchange="mcSetLogo(event)" style="font-size:11px">'+(cfg.logo?'<button class="btn btn-rd btn-sm" onclick="mcDeleteLogo()" style="margin-top:4px">🗑️ ลบโลโก้</button>':'')+'</div>'+
     '<div class="form-group"><label class="form-label">🎨 ภาพพื้นหลัง <span style="color:var(--t3);font-size:10px">(680x360px)</span></label><input type="file" accept="image/*" onchange="mcSetBgImage(event)" style="font-size:11px">'+(cfg.bgImage?'<button class="btn btn-rd btn-sm" onclick="mcDeleteBgImage()" style="margin-top:4px">🗑️ ลบพื้นหลัง</button>':'')+'</div></div>'+
     '<div class="grid g3"><div class="form-group"><label class="form-label">สีพื้นหลัง</label><input type="color" value="'+(cfg.bgColor||'#006F98')+'" onchange="mcUpdateSize(\'bgColor\',this.value);mcRefreshCard()" style="height:36px"></div>'+
@@ -3517,7 +3517,7 @@ function renderExpensePage(c){
     '<button class="btn btn-am" onclick="saveExpense()">💾 บันทึกค่าใช้จ่าย</button></div>'+
     '<div class="card"><div class="card-title">📋 รายการล่าสุด</div>'+
     (expenses.length?'<table><tr><th>วันที่</th><th>หมวด</th><th>รายการ</th><th>จำนวน</th><th>โดย</th>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<th>จัดการ</th>':'')+'</tr>'+
-    expenses.map(function(e,idx){var ri=DB.expenses.length-1-idx;return '<tr><td style="font-size:11px">'+fmtJoinDate(e.date)+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:900">'+thb(e.amount)+'</td><td>'+e.by+'</td>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<td><button class="btn btn-out btn-sm" onclick="editExpense('+ri+')">✏️</button> <button class="btn btn-out btn-sm" onclick="deleteExpense('+ri+')">🗑️</button></td>':'')+'</tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
+    expenses.map(function(e,idx){var ri=DB.expenses.length-1-idx;return '<tr><td style="font-size:11px">'+fmtJoinDate(e.date)+'</td><td><span class="badge bg-am">'+e.category+'</span></td><td>'+e.name+'</td><td style="color:var(--rd);font-weight:700">'+thb(e.amount)+'</td><td>'+e.by+'</td>'+(curUser&&curUser.role==='เจ้าของร้าน'?'<td><button class="btn btn-out btn-sm" onclick="editExpense('+ri+')">✏️</button> <button class="btn btn-out btn-sm" onclick="deleteExpense('+ri+')">🗑️</button></td>':'')+'</tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ยังไม่มีค่าใช้จ่าย</div></div>')+'</div>';
 }
 function saveExpense(){
   var cat=$('exp-cat')?$('exp-cat').value:'';
@@ -3575,37 +3575,37 @@ function deleteExpense(idx){
 function buildBillHTML(o){
   var s=getShopSettings();var bc=s.billConfig||{};var paid=isPaidCheck(o);
   // ═══ Thermal-optimized receipt — ตัวเข้ม อ่านง่าย กระดาษสั้น ═══
-  var h='<div style="width:80mm;font-family:Arial,Helvetica,var(--ff),sans-serif;font-size:14px;padding:4px 6px;color:#000;background:#fff;font-weight:900;margin:0 auto;line-height:1.35">';
+  var h='<div style="width:80mm;font-family:Arial,Helvetica,var(--ff),sans-serif;font-size:14px;padding:4px 6px;color:#000;background:#fff;font-weight:700;margin:0 auto;line-height:1.35">';
   // ── Header ──
   var logoH=(bc.logoSize||50);
   if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:4px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
-  h+='<div style="text-align:center;font-weight:900;font-size:16px">'+(bc.headerText||s.shopName)+'</div>';
+  h+='<div style="text-align:center;font-weight:700;font-size:16px">'+(bc.headerText||s.shopName)+'</div>';
   if(s.address) h+='<div style="text-align:center;font-size:11px">'+s.address+'</div>';
   h+='<div style="text-align:center;font-size:12px">'+fmtPhone(s.phone)+(s.lineOA?' · LINE: '+s.lineOA:'')+'</div>';
   if(bc.taxId) h+='<div style="text-align:center;font-size:11px">TAX ID: '+bc.taxId+'</div>';
   // ── Document type ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
-    '<div style="text-align:center;font-weight:900;font-size:16px">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
-    '<div style="text-align:center;font-size:13px;font-weight:900">เลขที่: '+o.id+'</div>'+
+    '<div style="text-align:center;font-weight:700;font-size:16px">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
+    '<div style="text-align:center;font-size:13px;font-weight:700">เลขที่: '+o.id+'</div>'+
     '<div style="text-align:center;font-size:12px">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
     '<div style="font-size:11px">แคชเชียร์: '+o.by+'</div>';
   // ── Customer ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
-    '<div style="font-size:13px;font-weight:900">'+o.mname+' · '+fmtPhone(o.mphone)+'</div>';
-  if(o.pickupDate) h+='<div style="font-size:12px;font-weight:900">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</div>';
+    '<div style="font-size:13px;font-weight:700">'+o.mname+' · '+fmtPhone(o.mphone)+'</div>';
+  if(o.pickupDate) h+='<div style="font-size:12px;font-weight:700">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</div>';
   h+='<div style="font-size:12px">'+(o.delivery==='delivery'?'🚗 จัดส่ง: '+o.deliveryAddr:o.delivery==='onsite'?'📍 '+o.deliveryAddr:'🏪 รับที่ร้าน')+'</div>';
   // ── Items — grouped by category + compact ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
-  h+='<div style="display:flex;font-size:11px;font-weight:900;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px"><span style="width:55%;overflow:hidden">รายการ</span><span style="width:15%;text-align:center">จำนวน</span><span style="width:30%;text-align:right">ราคา</span></div>';
+  h+='<div style="display:flex;font-size:11px;font-weight:700;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px"><span style="width:55%;overflow:hidden">รายการ</span><span style="width:15%;text-align:center">จำนวน</span><span style="width:30%;text-align:right">ราคา</span></div>';
   var cats={};
   (o.items||[]).forEach(function(it){var cat=it.c||'อื่นๆ';if(!cats[cat]) cats[cat]=[];cats[cat].push(it)});
   Object.keys(cats).forEach(function(cat,ci){
     var catItem=(o.items||[]).find(function(x){return x.c===cat});
     var catEn=catItem&&catItem.ce?catItem.ce:'';
-    h+='<div style="font-weight:900;font-size:12px;margin:'+(ci>0?'4':'1')+'px 0 1px;text-decoration:underline">'+cat+(catEn?' / '+catEn:'')+'</div>';
+    h+='<div style="font-weight:700;font-size:12px;margin:'+(ci>0?'4':'1')+'px 0 1px;text-decoration:underline">'+cat+(catEn?' / '+catEn:'')+'</div>';
     cats[cat].forEach(function(it){
       var name=it.t+(it.o?' · '+it.o:'');
-      h+='<div style="display:flex;font-size:12px;font-weight:900;padding:1px 0"><span style="width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span><span style="width:15%;text-align:center">'+it.qty+'</span><span style="width:30%;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
+      h+='<div style="display:flex;font-size:12px;font-weight:700;padding:1px 0"><span style="width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span><span style="width:15%;text-align:center">'+it.qty+'</span><span style="width:30%;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
       var en=(it.te||'')+(it.oe?' '+it.oe:'');
       if(en) h+='<div style="font-size:9px;color:#555;padding-left:4px">'+en+'</div>';
     });
@@ -3620,35 +3620,35 @@ function buildBillHTML(o){
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
   if(o.disc) h+='<div style="display:flex;justify-content:space-between;font-size:12px"><span>ส่วนลด</span><span>-'+thb(o.disc)+'</span></div>';
   if(o.delCost) h+='<div style="display:flex;justify-content:space-between;font-size:12px"><span>ค่าจัดส่ง</span><span>'+thb(o.delCost)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-weight:900;font-size:18px;margin:2px 0"><span>ยอดสุทธิ</span><span>'+thb(o.net)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin:2px 0"><span>ยอดสุทธิ</span><span>'+thb(o.net)+'</span></div>';
   // ── Payment status ──
   if(paid){
-    h+='<div style="text-align:center;font-weight:900;font-size:13px;padding:4px;border:2px solid #000;margin:4px 0">✅ ชำระเงินครบแล้ว</div>';
+    h+='<div style="text-align:center;font-weight:700;font-size:13px;padding:4px;border:2px solid #000;margin:4px 0">✅ ชำระเงินครบแล้ว</div>';
     if(o.payHist&&o.payHist.length){
-      h+='<div style="font-size:11px;font-weight:900">วิธีชำระ: '+o.payHist[o.payHist.length-1].method+'</div>';
+      h+='<div style="font-size:11px;font-weight:700">วิธีชำระ: '+o.payHist[o.payHist.length-1].method+'</div>';
       if(o.payHist.length>1){
         o.payHist.forEach(function(p){h+='<div style="font-size:10px;padding-left:4px">รอบ'+p.round+': '+p.method+' '+thb(p.amt)+'</div>'});
       }
     }
   }else{
-    h+='<div style="text-align:center;font-weight:900;font-size:14px;padding:4px;border:2px solid #000;margin:4px 0">❌ ค้างชำระ '+thb(remaining(o))+'</div>';
+    h+='<div style="text-align:center;font-weight:700;font-size:14px;padding:4px;border:2px solid #000;margin:4px 0">❌ ค้างชำระ '+thb(remaining(o))+'</div>';
   }
   // ── Points ──
-  if(o.pts&&bc.showPoints!==false) h+='<div style="font-size:11px;font-weight:900">⭐ แต้มที่ได้รับ: +'+o.pts+' แต้ม</div>';
+  if(o.pts&&bc.showPoints!==false) h+='<div style="font-size:11px;font-weight:700">⭐ แต้มที่ได้รับ: +'+o.pts+' แต้ม</div>';
   // ── Quota ──
   if(o.type==='quota'&&o.mid){
     var mQuotas=(DB.quotas||[]).filter(function(q){return q.mid===o.mid&&q.remain>=0});
     if(mQuotas.length){
       h+='<div style="border-top:1px dashed #000;margin:3px 0"></div>';
-      mQuotas.forEach(function(q){h+='<div style="font-size:11px;text-align:center;font-weight:900">📦 '+q.pkgName+' คงเหลือ '+q.remain+'/'+q.total+'</div>'});
+      mQuotas.forEach(function(q){h+='<div style="font-size:11px;text-align:center;font-weight:700">📦 '+q.pkgName+' คงเหลือ '+q.remain+'/'+q.total+'</div>'});
     }
   }
   // ── Promo / Note ──
-  if(o.promo) h+='<div style="font-size:11px;font-weight:900">🎁 โปร: '+o.promo+'</div>';
-  if(o.note) h+='<div style="font-size:11px;font-weight:900;padding:2px 4px;border:1px solid #000;margin:2px 0">📝 '+o.note+'</div>';
+  if(o.promo) h+='<div style="font-size:11px;font-weight:700">🎁 โปร: '+o.promo+'</div>';
+  if(o.note) h+='<div style="font-size:11px;font-weight:700;padding:2px 4px;border:1px solid #000;margin:2px 0">📝 '+o.note+'</div>';
   // ── Footer ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
-  h+='<div style="text-align:center;font-size:12px;font-weight:900">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
+  h+='<div style="text-align:center;font-size:12px;font-weight:700">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
   if(bc.footerImage) h+='<div style="text-align:center;margin-top:2px"><img src="'+bc.footerImage+'" style="max-height:40px;max-width:100%"></div>';
   h+='</div>';return h;
 }
@@ -3965,7 +3965,7 @@ function showRegQR(){
   var s=getShopSettings();var link=getRegLink();
   var h='<div class="modal-overlay show" id="moRegQR"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🔲 QR Code ลิงก์สมัครสมาชิก</h3><button class="modal-close" onclick="document.getElementById(\'moRegQR\').remove()">&times;</button></div>'+
     '<div class="modal-body" style="text-align:center">'+
-    '<div style="font-size:18px;font-weight:900;margin-bottom:4px">'+s.shopName+'</div>'+
+    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">'+s.shopName+'</div>'+
     '<div style="font-size:13px;color:var(--t3);margin-bottom:12px">สแกนเพื่อสมัครสมาชิก</div>'+
     '<div id="regQRBox" style="display:inline-block;padding:16px;background:#fff;border-radius:12px;border:2px solid var(--bd)"></div>'+
     '<div style="margin-top:10px;font-size:11px;color:var(--t3);word-break:break-all">'+link+'</div>'+
@@ -4118,7 +4118,7 @@ function renderExpenseSummary(){
   var cats=Object.entries(catMap).sort(function(a,b){return b[1]-a[1]});
   return '<div class="card-title" style="font-size:13px;margin-top:12px">📊 ค่าใช้จ่ายแยกตามหมวด</div>'+
     (cats.length?'<table><tr><th>หมวด</th><th>ยอดรวม</th><th>สัดส่วน</th></tr>'+
-    cats.map(function(c){var total=expenses.reduce(function(s,e){return s+e.amount},0);return '<tr><td><span class="badge bg-am">'+c[0]+'</span></td><td style="font-weight:900">'+thb(c[1])+'</td><td>'+Math.round(c[1]/(total||1)*100)+'%</td></tr>'}).join('')+'</table>':'<div style="color:var(--t3);font-size:12px">ยังไม่มีข้อมูล</div>');
+    cats.map(function(c){var total=expenses.reduce(function(s,e){return s+e.amount},0);return '<tr><td><span class="badge bg-am">'+c[0]+'</span></td><td style="font-weight:700">'+thb(c[1])+'</td><td>'+Math.round(c[1]/(total||1)*100)+'%</td></tr>'}).join('')+'</table>':'<div style="color:var(--t3);font-size:12px">ยังไม่มีข้อมูล</div>');
 }
 
 // ═══ MISSING — ORDER HELPERS ═══
@@ -5098,7 +5098,7 @@ if(location.search.includes('page=register')||location.search.includes('r=1')){
   var setupApi=new URLSearchParams(location.search).get('setup')||'';
   if(setupApi){
     var s=getShopSettings();s.apiUrl=setupApi;saveDB();
-    document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--ff)"><div style="text-align:center"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:#006F98">กำลังตั้งค่าอุปกรณ์ใหม่...</div><div style="font-size:13px;color:#888;margin-top:8px">Sync ข้อมูลจาก Cloud</div></div></div>';
+    document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--ff)"><div style="text-align:center"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังตั้งค่าอุปกรณ์ใหม่...</div><div style="font-size:13px;color:#888;margin-top:8px">Sync ข้อมูลจาก Cloud</div></div></div>';
     setTimeout(function(){
       syncPullAll().then(function(){
         history.replaceState(null,'',location.pathname);
