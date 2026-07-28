@@ -10,6 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap');
@@ -849,36 +850,76 @@ function renderDashboard(c){
   const today=todayStr();
   const todayOrders=DB.orders.filter(o=>o.createdAt&&o.createdAt.includes(fmtDate()));
   const totalToday=todayOrders.reduce((s,o)=>s+netOf(o),0);
-  const unpaid=DB.orders.filter(o=>!isPaidCheck(o)&&o.status!=='ยกเลิก'&&o.status!=='เสร็จสิ้น'&&o.status!=='ปิดงาน');
+  const costToday=todayOrders.reduce((s,o)=>s+(o.cost||0),0);
+  const unpaid=DB.orders.filter(o=>!isPaidCheck(o)&&!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
   const unpaidAmt=unpaid.reduce((s,o)=>s+remaining(o),0);
   const active=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
+  const monthOrders=DB.orders.filter(o=>{var d=o.createdAt||'';return d.includes('/'+(new Date().getMonth()+1<10?'0':'')+(new Date().getMonth()+1)+'/'+((new Date().getFullYear())+543))});
+  const monthTotal=monthOrders.reduce((s,o)=>s+netOf(o),0);
+  const monthExpense=(DB.expenses||[]).filter(e=>{var d=e.date||'';return d.includes('/'+(new Date().getMonth()+1<10?'0':'')+(new Date().getMonth()+1)+'/')}).reduce((s,e)=>s+(e.amount||0),0);
+  // Shop quota summary
+  var quotas=getShopQuotas();var qRemain=quotas.reduce((s,q)=>s+q.remain,0);var qTotal=quotas.reduce((s,q)=>s+q.total,0);
   c.innerHTML=
-    '<div class="grid g4" style="margin-bottom:20px">'+
-    '<div class="kpi"><div class="kpi-lbl">ยอดขายวันนี้</div><div class="kpi-val">'+thb(totalToday)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-lbl">ออเดอร์วันนี้</div><div class="kpi-val">'+todayOrders.length+'</div></div>'+
-    '<div class="kpi"><div class="kpi-lbl">ค้างชำระ</div><div class="kpi-val" style="color:var(--rd)">'+thb(unpaidAmt)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-lbl">ออเดอร์กำลังดำเนินการ</div><div class="kpi-val">'+active.length+'</div></div>'+
+    '<div class="grid g4" style="margin-bottom:16px">'+
+    '<div class="kpi"><div class="kpi-lbl">💰 ยอดขายวันนี้</div><div class="kpi-val">'+thb(totalToday)+'</div><div style="font-size:11px;color:var(--t3)">'+todayOrders.length+' ออเดอร์</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">📅 ยอดขายเดือนนี้</div><div class="kpi-val">'+thb(monthTotal)+'</div><div style="font-size:11px;color:var(--t3)">'+monthOrders.length+' ออเดอร์</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">❌ ค้างชำระ</div><div class="kpi-val" style="color:var(--rd)">'+thb(unpaidAmt)+'</div><div style="font-size:11px;color:var(--t3)">'+unpaid.length+' รายการ</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">📊 กำไรเดือนนี้</div><div class="kpi-val" style="color:'+(monthTotal-monthExpense>0?'var(--gn)':'var(--rd)')+'">'+thb(monthTotal-monthExpense)+'</div><div style="font-size:11px;color:var(--t3)">รายได้ '+thb(monthTotal)+' - ค่าใช้จ่าย '+thb(monthExpense)+'</div></div>'+
     '</div>'+
+    // Charts row
+    '<div class="grid g2" style="margin-bottom:16px">'+
+    '<div class="card"><div class="card-title">📈 ยอดขาย 7 วัน</div><canvas id="chart7days" height="200"></canvas></div>'+
+    '<div class="card"><div class="card-title">🍩 สัดส่วนบริการ</div><canvas id="chartPie" height="200"></canvas></div>'+
+    '</div>'+
+    // Quota + Quick actions
     '<div class="grid g2">'+
-    '<div class="card"><div class="card-title">📋 ออเดอร์ล่าสุด</div>'+renderRecentOrders()+'</div>'+
+    (quotas.length?'<div class="card"><div class="card-title">🏭 โควต้าส่วนกลาง</div>'+
+    quotas.map(function(q){var pct=q.total>0?Math.round(q.remain/q.total*100):0;var cl=pct>30?'var(--gn)':pct>10?'var(--am)':'var(--rd)';
+      return '<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><strong>'+q.name+'</strong><span>'+q.remain+'/'+q.total+'</span></div>'+
+      '<div style="background:#e5e7eb;border-radius:4px;height:6px;margin:2px 0"><div style="background:'+cl+';height:100%;border-radius:4px;width:'+pct+'%"></div></div></div>'}).join('')+
+    '<button class="btn btn-out btn-sm" onclick="navTo(\'shopquota\')" style="margin-top:8px">จัดการโควต้า →</button></div>':'<div class="card"><div class="card-title">🏭 โควต้าส่วนกลาง</div><div style="color:var(--t3);font-size:13px">ยังไม่มีโควต้า — <a href="#" onclick="navTo(\'shopquota\');return false">เพิ่มโควต้า</a></div></div>')+
     '<div class="card"><div class="card-title">⚡ Quick Actions</div>'+
     '<div class="grid g2" style="gap:8px">'+
     '<button class="btn btn-pr btn-lg" onclick="navTo(\'laundry\')" style="justify-content:center">👕 รับผ้าใหม่</button>'+
     '<button class="btn btn-gn btn-lg" onclick="navTo(\'orders\')" style="justify-content:center">📋 ดูออเดอร์</button>'+
     '<button class="btn btn-out btn-lg" onclick="navTo(\'members\')" style="justify-content:center">👥 สมาชิก</button>'+
     '<button class="btn btn-out btn-lg" onclick="navTo(\'report\')" style="justify-content:center">📈 รายงาน</button>'+
-    '</div></div>'+
-    '<div class="card"><div class="card-title">🕐 กะการทำงาน</div>'+
-    (function(){
-      const shift=getActiveShift();
-      if(shift) return '<div class="paid-box yes">🟢 กะเปิดอยู่ โดย '+shift.openedBy+' ตั้งแต่ '+shift.openedAt+'</div>'+
-        '<button class="btn btn-am" onclick="closeShift()" style="margin-top:8px">🔒 ปิดกะ + นับเงิน</button>';
-      return '<div class="paid-box no">🔴 ยังไม่เปิดกะ</div>'+
-        '<button class="btn btn-gn" onclick="openShift()" style="margin-top:8px">🔓 เปิดกะ</button>';
-    })()+
-    '</div>'+
-    '<div class="card"><div class="card-title">🕐 ประวัติกะล่าสุด</div>'+renderShiftHistory()+'</div>'+
-    '</div>';
+    '</div></div></div>'+
+    // Recent orders + Shift
+    '<div class="grid g2" style="margin-top:16px">'+
+    '<div class="card"><div class="card-title">📋 ออเดอร์ล่าสุด</div>'+renderRecentOrders()+'</div>'+
+    '<div>'+
+    '<div class="card" style="margin-bottom:12px"><div class="card-title">🕐 กะการทำงาน</div>'+
+    (function(){const shift=getActiveShift();if(shift) return '<div class="paid-box yes">🟢 กะเปิดอยู่ โดย '+shift.openedBy+'</div><button class="btn btn-am btn-sm" onclick="closeShift()" style="margin-top:6px">🔒 ปิดกะ</button>';return '<div class="paid-box no">🔴 ยังไม่เปิดกะ</div><button class="btn btn-gn btn-sm" onclick="openShift()" style="margin-top:6px">🔓 เปิดกะ</button>'})()+'</div>'+
+    (unpaid.length?'<div class="card"><div class="card-title" style="color:var(--rd)">⚠️ รายการค้างชำระ ('+unpaid.length+')</div>'+
+    unpaid.slice(0,5).map(o=>'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px"><div>'+o.id+' · '+o.mname+'</div><div style="color:var(--rd);font-weight:700">'+thb(remaining(o))+'</div></div>').join('')+
+    (unpaid.length>5?'<div style="text-align:center;margin-top:6px"><a href="#" onclick="navTo(\'orders\');return false">ดูทั้งหมด →</a></div>':'')+'</div>':'')+
+    '</div></div>';
+  // Render charts
+  setTimeout(function(){renderDashboardCharts()},300);
+}
+function renderDashboardCharts(){
+  if(typeof Chart==='undefined') return;
+  // ═══ 7-day sales chart ═══
+  var labels=[];var salesData=[];var costData=[];
+  for(var i=6;i>=0;i--){
+    var d=new Date();d.setDate(d.getDate()-i);
+    var ds=fmtDate(d);
+    var dayLabel=String(d.getDate())+'/'+String(d.getMonth()+1);
+    labels.push(dayLabel);
+    var dayOrders=DB.orders.filter(function(o){return o.createdAt&&o.createdAt.startsWith(ds.substring(0,5))});
+    salesData.push(dayOrders.reduce(function(s,o){return s+netOf(o)},0));
+    var dayExp=(DB.expenses||[]).filter(function(e){return e.date&&e.date.startsWith(ds.substring(0,5))}).reduce(function(s,e){return s+(e.amount||0)},0);
+    costData.push(dayExp);
+  }
+  var ctx1=document.getElementById('chart7days');
+  if(ctx1){new Chart(ctx1,{type:'bar',data:{labels:labels,datasets:[{label:'รายได้',data:salesData,backgroundColor:'#3B82C4',borderRadius:4},{label:'ค่าใช้จ่าย',data:costData,backgroundColor:'#F87171',borderRadius:4}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return '฿'+v}}}}}})}
+  // ═══ Service type pie chart ═══
+  var typeCount={};
+  DB.orders.forEach(function(o){var t=o.type||'laundry';typeCount[t]=(typeCount[t]||0)+1});
+  var typeLabels={'laundry':'ซักรีด','bedset':'เครื่องนอน','cleaning':'ทำความสะอาด','pkg_buy':'ซื้อ Package','quota':'ใช้โควต้า'};
+  var ctx2=document.getElementById('chartPie');
+  if(ctx2){new Chart(ctx2,{type:'doughnut',data:{labels:Object.keys(typeCount).map(function(k){return typeLabels[k]||k}),datasets:[{data:Object.values(typeCount),backgroundColor:['#3B82C4','#F59E0B','#10B981','#8B5CF6','#EC4899']}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}})}
 }
 function renderRecentOrders(){
   const recent=DB.orders.slice(-5).reverse();
