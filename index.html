@@ -635,10 +635,20 @@ function initApp(){
   $('lockScreen').style.display='none';$('app').style.display='block';
   $('sfName').textContent=curUser.nick;$('sfRole').textContent=curUser.role;
   buildSidebar();navTo('dashboard');startClock();
-  // Initial sync from cloud (only if API URL is configured)
-  setTimeout(function(){if(getApiUrl()){toast('🔄 Sync ข้อมูล...','info');syncPullAll().then(function(){renderPage(curPage);updBadges();toast('✅ Sync สำเร็จ')})}},500);
-  // Start auto-pull every 60 seconds
-  if(getApiUrl()) startAutoPull();
+  // ═══ Auto-setup: เครื่องใหม่เปิด URL ที่มี ?setup=API_URL → เชื่อมต่ออัตโนมัติ ═══
+  var setupUrl=new URLSearchParams(location.search).get('setup');
+  if(setupUrl&&!getApiUrl()){
+    var s=getShopSettings();s.apiUrl=setupUrl;saveDB();
+    toast('🔗 เชื่อมต่อ Cloud อัตโนมัติ...','info');
+    // ลบ ?setup= จาก URL เพื่อความปลอดภัย
+    history.replaceState(null,'',location.pathname);
+  }
+  // Initial sync from cloud
+  if(getApiUrl()){
+    toast('🔄 กำลังดึงข้อมูลจาก Cloud...','info');
+    syncPullAll().then(function(){renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
+    startAutoPull();
+  }
   startDailyReportSchedule();
 }
 function buildSidebar(){
@@ -4961,7 +4971,7 @@ saveDB=function(){
   if(syncTimer) clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     if(getApiUrl()&&curUser) syncPushAll();
-  },5000);
+  },2000);
 };
 
 // ── Auto-pull every 60 seconds ──
