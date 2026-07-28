@@ -2849,7 +2849,7 @@ function savePdfConfig(){
   };
   saveDB();toast('💾 บันทึกตั้งค่า PDF สำเร็จ ✅');logAction('SAVE_PDF_CONFIG','');
   // Trigger sync push ให้ pdfConfig ขึ้น Sheets
-  if(typeof syncPushSilent==='function') setTimeout(syncPushSilent,500);
+  if(typeof syncPushAll==='function') setTimeout(syncPushAll,500);
 }
 function renderSettingsConnect(s){
   var apiOk=!!s.apiUrl;var lineOk=!!s.lineChannelToken;
@@ -4627,7 +4627,8 @@ async function sendBillPdfViaLine(oid){
   // Auto-detect bill type
   var paid=isPaidCheck(o);
   var docType=paid?'receipt':'pickup';
-  if(o.type==='cleaning') docType=paid?'receipt':'pickup';
+  // pkg_buy ชำระทันทีเสมอ
+  if(o.type==='pkg_buy') docType='receipt';
   await sendPdfViaLine(oid,o.id,docType);
 }
 async function sendFlexBill(userId,o,s,docNum){
