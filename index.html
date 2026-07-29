@@ -3015,7 +3015,7 @@ function renderSettingsConnect(s){
     '<table><tr><th>บริการ</th><th>สถานะ</th><th>ใช้สำหรับ</th></tr>'+
     '<tr><td>📊 Google Sheets</td><td><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅':'❌')+'</span></td><td>Sync ข้อมูลทุกอย่าง + หลายอุปกรณ์</td></tr>'+
     '<tr><td>📱 LINE Messaging</td><td><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅':'⏳')+'</span></td><td>แจ้งสถานะลูกค้า + ส่งบิล</td></tr>'+
-    '<tr><td>🗺️ Google Maps</td><td><span class="badge bg-gr">⏳ Phase 3</span></td><td>คำนวณค่าส่งตามระยะทาง</td></tr>'+
+    '<tr><td>🗺️ Google Maps</td><td>'+(s.googleMapsKey?'<span class="badge bg-gn">✅ เชื่อมต่อแล้ว</span>':'<span class="badge bg-am">⚠️ ยังไม่ตั้งค่า</span>')+'</td><td>คำนวณค่าส่งตามระยะทาง — <a href="#" onclick="showSettingsTab(document.querySelector(\'.tab\'),\'delivery\');return false">ตั้งค่าที่ tab ค่าจัดส่ง →</a></td></tr>'+
     '</table></div>'+
     (apiOk?'<div class="card"><div class="card-title">📱 ตั้งค่าอุปกรณ์ใหม่</div>'+
     '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">เปิดลิงก์นี้บนเครื่องใหม่ → ข้อมูลทั้งหมด sync อัตโนมัติ ไม่ต้องตั้งค่าใหม่</div>'+
