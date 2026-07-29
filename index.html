@@ -214,6 +214,8 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
         <div class="topbar-title" id="pageTitle">Dashboard</div>
         <div class="topbar-right">
           <div class="search-box" style="width:200px"><input id="globalSearchInput" placeholder="🔍 ค้นหาออเดอร์/สมาชิก..." onkeydown="if(event.key==='Enter')globalSearch(this.value)" style="font-size:12px;padding:6px 10px 6px 32px"></div>
+          <button onclick="advancedSearch()" title="ค้นหาขั้นสูง" style="background:none;border:none;font-size:18px;cursor:pointer;padding:4px">🔎</button>
+          <button onclick="scanGarmentQR()" title="สแกน QR ป้ายผ้า" style="background:none;border:none;font-size:18px;cursor:pointer;padding:4px">📷</button>
           <span id="clockEl" style="font-family:var(--fm);font-size:12px;color:var(--t3)"></span>
           <span id="btnRefresh" onclick="refreshPage()" style="cursor:pointer;font-size:13px;padding:4px 8px;border-radius:6px;transition:background .2s" onmouseover="this.style.background='var(--b1)'" onmouseout="this.style.background=''" title="รีเฟรชข้อมูล">🔄</span>
           <span id="syncIndicator" style="cursor:pointer" onclick="openSyncPanel()"><span style="font-size:11px">☁️ Cloud</span></span>
@@ -651,6 +653,10 @@ function initApp(){
     startAutoPull();
   }
   startDailyReportSchedule();
+  // Phase 3: PWA + Notifications
+  registerPWA();requestNotifPermission();
+  // Flush offline queue
+  if(offlineQueue.length) setTimeout(flushOfflineQueue,3000);
 }
 function buildSidebar(){
   let h='',lastSec='';
@@ -3186,15 +3192,19 @@ function deleteUser(i){
 }
 function renderSettingsBackup(){
   return '<div class="card"><div class="card-title">💾 สำรอง &amp; กู้คืนข้อมูล</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">Export ข้อมูลทั้งหมดเป็นไฟล์ JSON · Import กู้คืนจากไฟล์ (ทับข้อมูลเดิม)</p>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">Export ข้อมูลทั้งหมดเป็นไฟล์ JSON · Import กู้คืนจากไฟล์</p>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-    '<button class="btn btn-gn btn-lg" onclick="exportBackup()">📤 Export Backup</button>'+
-    '<button class="btn btn-am btn-lg" onclick="importBackupClick()">📥 Import Backup</button>'+
+    '<button class="btn btn-gn btn-lg" onclick="downloadBackup()">📤 Backup (JSON)</button>'+
+    '<button class="btn btn-am btn-lg" onclick="triggerRestore()">📥 Restore (JSON)</button>'+
+    '<button class="btn btn-out btn-lg" onclick="exportBackup()">📤 Export (เดิม)</button>'+
+    '<button class="btn btn-out btn-lg" onclick="importBackupClick()">📥 Import (เดิม)</button>'+
     '<input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)">'+
     '</div>'+
     '<div style="margin-top:14px;font-size:12px;color:var(--t3)">'+
     'ออเดอร์: '+DB.orders.length+' · สมาชิก: '+DB.members.length+' · โควต้า: '+(DB.quotas||[]).length+' · โปรโมชั่น: '+(DB.promos||[]).length+
-    '<br>localStorage: '+Math.round(JSON.stringify(DB).length/1024)+' KB</div>'+
+    ' · โควต้ากลาง: '+(DB.shopQuotas||[]).length+
+    '<br>localStorage: '+Math.round(JSON.stringify(DB).length/1024)+' KB'+
+    '<br>Offline queue: '+offlineQueue.length+' รายการค้าง</div>'+
     '<hr style="margin:14px 0"><div class="card-title" style="font-size:13px;color:var(--rd)">🗑️ ล้างข้อมูลทั้งหมด</div>'+
     '<button class="btn btn-rd btn-sm" onclick="clearAllData()">ล้างข้อมูลทั้งหมด (ไม่สามารถย้อนกลับ)</button></div>';
 }
@@ -5141,6 +5151,257 @@ function printGarmentTags(oid){
   h+='</div>';
   var pa=$('printArea');pa.className='';pa.innerHTML=h;window.print();
   setTimeout(function(){renderPage(curPage)},1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 3 — ADVANCED FEATURES
+// ═══════════════════════════════════════════════════════════
+
+// ═══ #8: OFFLINE MODE + RETRY QUEUE ═══
+var offlineQueue=JSON.parse(localStorage.getItem('skn_offline_queue')||'[]');
+function queueOfflineAction(action,data){offlineQueue.push({action:action,data:data,ts:Date.now()});localStorage.setItem('skn_offline_queue',JSON.stringify(offlineQueue))}
+async function flushOfflineQueue(){
+  if(!offlineQueue.length||!getApiUrl()) return;
+  toast('🔄 กำลังส่งข้อมูลที่ค้าง '+offlineQueue.length+' รายการ...','info');
+  while(offlineQueue.length){
+    var item=offlineQueue[0];
+    try{await syncPushAll();offlineQueue.shift()}catch(e){toast('⚠️ ยังส่งไม่ได้ — จะลองใหม่','warn');break}
+  }
+  localStorage.setItem('skn_offline_queue',JSON.stringify(offlineQueue));
+  if(!offlineQueue.length) toast('✅ ส่งข้อมูลค้างครบแล้ว');
+}
+window.addEventListener('online',function(){toast('🟢 กลับมาออนไลน์แล้ว','info');setTimeout(flushOfflineQueue,2000)});
+window.addEventListener('offline',function(){toast('🔴 ออฟไลน์ — ข้อมูลจะถูกเก็บไว้ส่งทีหลัง','warn')});
+
+// ═══ #9: BACKUP / RESTORE ═══
+function downloadBackup(){
+  var data={version:'4.0',date:fmtDT(),orders:DB.orders,members:DB.members,quotas:DB.quotas,promos:DB.promos,expenses:DB.expenses,shopSettings:DB.shopSettings,shopQuotas:DB.shopQuotas||[],pricelist:{CAT:CAT,BED_SETS:BED_SETS,CLN_SVCS:CLN_SVCS,PKGS:PKGS}};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='SAKKANID_backup_'+todayStr().replace(/-/g,'')+'.json';a.click();
+  toast('💾 ดาวน์โหลด Backup สำเร็จ ✅');logAction('BACKUP','manual');
+}
+function triggerRestore(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(){restoreBackup(inp.files[0])};inp.click()}
+function restoreBackup(file){
+  if(!file) return;
+  if(!confirm('⚠️ การกู้คืนจะแทนที่ข้อมูลทั้งหมด!\n\nข้อมูลปัจจุบันจะหายไป ต้องการดำเนินการ?')) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!data.version){toast('ไฟล์ไม่ถูกต้อง','err');return}
+      DB.orders=data.orders||[];DB.members=data.members||[];DB.quotas=data.quotas||[];
+      DB.promos=data.promos||[];DB.expenses=data.expenses||[];
+      DB.shopSettings=data.shopSettings||{};DB.shopQuotas=data.shopQuotas||[];
+      if(data.pricelist){
+        if(data.pricelist.CAT){CAT.length=0;data.pricelist.CAT.forEach(function(it){CAT.push(it)})}
+        if(data.pricelist.BED_SETS){BED_SETS.length=0;data.pricelist.BED_SETS.forEach(function(it){BED_SETS.push(it)})}
+        if(data.pricelist.CLN_SVCS){CLN_SVCS.length=0;data.pricelist.CLN_SVCS.forEach(function(it){CLN_SVCS.push(it)})}
+        if(data.pricelist.PKGS){PKGS.length=0;data.pricelist.PKGS.forEach(function(it){PKGS.push(it)})}
+      }
+      saveDB();toast('✅ กู้คืนข้อมูลสำเร็จ — '+data.date);logAction('RESTORE',data.date);
+      renderPage(curPage);
+    }catch(err){toast('❌ ไฟล์เสียหาย: '+err.message,'err')}
+  };
+  reader.readAsText(file);
+}
+
+// ═══ #10: สรุปตอนปิดกะ → LINE อัตโนมัติ ═══
+var _origCloseShift=typeof closeShift==='function'?closeShift:null;
+if(_origCloseShift){
+  closeShift=function(){
+    _origCloseShift.apply(this,arguments);
+    // ส่งสรุปรายวันอัตโนมัติ
+    setTimeout(function(){if(getShopSettings().lineChannelToken) sendDailySummaryLine()},2000);
+  };
+}
+
+// ═══ #11: ป้องกัน Double-click ═══
+var _savingOrder=false;
+var _origSaveOrder=typeof saveOrder==='function'?saveOrder:null;
+if(_origSaveOrder){
+  saveOrder=function(){
+    if(_savingOrder){toast('⏳ กำลังบันทึก...กรุณารอ','warn');return}
+    _savingOrder=true;
+    try{_origSaveOrder.apply(this,arguments)}catch(e){throw e}
+    finally{setTimeout(function(){_savingOrder=false},2000)}
+  };
+}
+
+// ═══ #12: Browser Notification ═══
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='default') Notification.requestPermission();
+}
+function showBrowserNotif(title,body){
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  new Notification(title,{body:body,icon:getShopSettings().logo||'',tag:'skn-'+Date.now()});
+}
+// ส่ง notification เมื่อมีออเดอร์ใหม่จาก sync
+var _lastOrderCount=0;
+function checkNewOrderNotif(){
+  if(!DB||!DB.orders) return;
+  if(!_lastOrderCount) _lastOrderCount=DB.orders.length;
+  var newCount=DB.orders.length;
+  if(newCount>_lastOrderCount){
+    var diff=newCount-_lastOrderCount;
+    showBrowserNotif('📦 ออเดอร์ใหม่!','มี '+diff+' ออเดอร์ใหม่เข้ามา');
+    _lastOrderCount=newCount;
+  }
+}
+
+// ═══ #13: PWA — Service Worker + Manifest ═══
+function registerPWA(){
+  if('serviceWorker' in navigator){
+    // สร้าง minimal service worker inline
+    var swCode='self.addEventListener("install",function(e){self.skipWaiting()});self.addEventListener("fetch",function(e){e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request)}))})';
+    var blob=new Blob([swCode],{type:'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(function(){});
+  }
+  // Manifest
+  var manifest={name:'SAKKANID POS',short_name:'SAKKANID',start_url:location.href.split('?')[0],display:'standalone',background_color:'#ffffff',theme_color:'#006F98',icons:[{src:getShopSettings().logo||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">🫧</text></svg>',sizes:'192x192',type:'image/png'}]};
+  var mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+  var link=document.createElement('link');link.rel='manifest';link.href=URL.createObjectURL(mBlob);
+  document.head.appendChild(link);
+}
+
+// ═══ #14: สแกน QR ป้ายผ้า ═══
+function scanGarmentQR(){
+  if(!('BarcodeDetector' in window)){
+    // Fallback: ใช้ camera + prompt
+    var code=prompt('กรอกเลขออเดอร์จากป้ายผ้า:');
+    if(code){var o=gO(code);if(o){showOrderDetail(code)}else{toast('ไม่พบออเดอร์ '+code,'err')}}
+    return;
+  }
+  // ใช้ BarcodeDetector API
+  var video=document.createElement('video');
+  video.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;object-fit:cover';
+  var closeBtn=document.createElement('button');
+  closeBtn.textContent='✕ ปิดกล้อง';closeBtn.className='btn btn-rd';
+  closeBtn.style.cssText='position:fixed;top:20px;right:20px;z-index:10000';
+  closeBtn.onclick=function(){video.srcObject.getTracks().forEach(function(t){t.stop()});video.remove();closeBtn.remove()};
+  document.body.appendChild(video);document.body.appendChild(closeBtn);
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(stream){
+    video.srcObject=stream;video.play();
+    var detector=new BarcodeDetector({formats:['qr_code']});
+    var scanInterval=setInterval(function(){
+      detector.detect(video).then(function(codes){
+        if(codes.length){
+          clearInterval(scanInterval);
+          var code=codes[0].rawValue;
+          video.srcObject.getTracks().forEach(function(t){t.stop()});video.remove();closeBtn.remove();
+          var o=gO(code);if(o){showOrderDetail(code);toast('✅ พบออเดอร์ '+code)}else{toast('ไม่พบ '+code,'err')}
+        }
+      }).catch(function(){});
+    },500);
+  }).catch(function(){toast('ไม่สามารถเปิดกล้องได้','err');video.remove();closeBtn.remove()});
+}
+
+// ═══ #15: ค้นหาขั้นสูง ═══
+function advancedSearch(){
+  var h='<div class="modal-overlay show" id="moSearch"><div class="modal" style="max-width:500px"><div class="modal-head"><h3>🔍 ค้นหาขั้นสูง</h3><button class="modal-close" onclick="document.getElementById(\'moSearch\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">วันที่เริ่ม</label><input type="date" id="as-from"></div>'+
+    '<div class="form-group"><label class="form-label">วันที่สิ้นสุด</label><input type="date" id="as-to"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">สถานะ</label><select id="as-status"><option value="">ทั้งหมด</option><option>รับผ้ารอส่งซัก</option><option>ระหว่างการซัก</option><option>ผ้าพร้อมส่ง</option><option>เสร็จสิ้น</option></select></div>'+
+    '<div class="form-group"><label class="form-label">ประเภท</label><select id="as-type"><option value="">ทั้งหมด</option><option value="laundry">ซักรีด</option><option value="bedset">เครื่องนอน</option><option value="cleaning">ทำความสะอาด</option><option value="pkg_buy">ซื้อ Package</option><option value="quota">ใช้โควต้า</option></select></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ยอดขั้นต่ำ (฿)</label><input type="number" id="as-min" value="0"></div>'+
+    '<div class="form-group"><label class="form-label">ยอดสูงสุด (฿)</label><input type="number" id="as-max" value=""></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อ/เบอร์/ID</label><input id="as-keyword" placeholder="ค้นหา..."></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSearch\').remove()">ปิด</button><button class="btn btn-pr" onclick="doAdvancedSearch()">🔍 ค้นหา</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function doAdvancedSearch(){
+  var from=$('as-from')?$('as-from').value:'';var to=$('as-to')?$('as-to').value:'';
+  var status=$('as-status')?$('as-status').value:'';var type=$('as-type')?$('as-type').value:'';
+  var minAmt=parseFloat($('as-min')?$('as-min').value:0)||0;var maxAmt=parseFloat($('as-max')?$('as-max').value:0)||0;
+  var kw=($('as-keyword')?$('as-keyword').value:'').toLowerCase();
+  var results=DB.orders.filter(function(o){
+    if(status&&o.status!==status) return false;
+    if(type&&o.type!==type) return false;
+    if(minAmt&&netOf(o)<minAmt) return false;
+    if(maxAmt&&netOf(o)>maxAmt) return false;
+    if(kw&&!(o.id+o.mname+o.mphone).toLowerCase().includes(kw)) return false;
+    return true;
+  });
+  document.getElementById('moSearch').remove();
+  toast('🔍 พบ '+results.length+' รายการ');
+  // แสดงผลในหน้า history
+  navTo('history');
+  setTimeout(function(){
+    var c=$('pageContent');if(!c) return;
+    var total=results.reduce(function(s,o){return s+netOf(o)},0);
+    c.innerHTML='<div class="card"><div class="card-title">🔍 ผลการค้นหา ('+results.length+' รายการ · '+thb(total)+')</div>'+
+      '<button class="btn btn-out btn-sm" onclick="renderPage(\'history\')" style="margin-bottom:8px">← กลับ</button>'+
+      '<table><tr><th>ID</th><th>ลูกค้า</th><th>ประเภท</th><th>สถานะ</th><th>ยอด</th><th>วันที่</th></tr>'+
+      results.map(function(o){return '<tr onclick="showOrderDetail(\''+o.id+'\')" style="cursor:pointer"><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+o.type+'</td><td>'+o.status+'</td><td>'+thb(o.net)+'</td><td style="font-size:11px">'+(o.createdAt||'')+'</td></tr>'}).join('')+'</table></div>';
+  },300);
+}
+
+// ═══ #17: สถิติลูกค้าซ้ำ/ใหม่ ═══
+function getCustomerStats(){
+  var byMember={};
+  DB.orders.forEach(function(o){if(!byMember[o.mid]) byMember[o.mid]={count:0,total:0,name:o.mname};byMember[o.mid].count++;byMember[o.mid].total+=netOf(o)});
+  var repeat=0,oneTime=0;
+  Object.keys(byMember).forEach(function(k){if(byMember[k].count>1) repeat++;else oneTime++});
+  return {repeat:repeat,oneTime:oneTime,total:Object.keys(byMember).length,byMember:byMember};
+}
+
+// ═══ #18: แจ้งเตือนโควต้ากลางใกล้หมด LINE ═══
+async function sendQuotaAlertLine(){
+  var s=getShopSettings();if(!s.lineChannelToken) return;
+  var quotas=getShopQuotas();var alerts=quotas.filter(function(q){return q.alertAt&&q.remain<=q.alertAt});
+  if(!alerts.length){toast('โควต้ายังไม่ถึงเกณฑ์แจ้งเตือน');return}
+  var targetUserId=s.ownerLineUserId||'';
+  if(!targetUserId){var om=(DB.members||[]).find(function(m){return m.lineUserId});if(om) targetUserId=om.lineUserId}
+  if(!targetUserId){toast('ไม่พบ LINE User ID เจ้าของ','warn');return}
+  var bodyC=alerts.map(function(q){
+    return {type:'box',layout:'horizontal',margin:'sm',contents:[
+      {type:'text',text:'📦 '+q.name,size:'sm',flex:3},
+      {type:'text',text:'เหลือ '+q.remain+'/'+q.total,size:'sm',weight:'bold',color:'#DC2626',flex:2,align:'end'}
+    ]};
+  });
+  var flex={type:'flex',altText:'⚠️ โควต้าใกล้หมด!',contents:{type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#DC2626',paddingAll:'12px',contents:[{type:'text',text:'⚠️ โควต้าส่วนกลางใกล้หมด!',color:'#ffffff',weight:'bold',size:'md'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC}}};
+  await sendLineMessage(targetUserId,[flex]);
+  toast('⚠️ ส่งแจ้งเตือนโควต้า ✅');
+}
+
+// ═══ #20: Google Maps คำนวณค่าส่ง ═══
+function calcDeliveryByDistance(){
+  var addr=prompt('กรอกที่อยู่ปลายทาง:');if(!addr) return;
+  var s=getShopSettings();var shopAddr=s.address||'กรุงเทพฯ';
+  // ใช้ Google Maps Distance Matrix API (ต้องมี API key)
+  var apiKey=s.googleMapsKey||'';
+  if(!apiKey){
+    // Fallback: คำนวณจากตาราง zone
+    toast('ไม่มี Google Maps API Key — ใช้ตาราง zone แทน','warn');
+    return calcDeliveryByZone(addr);
+  }
+  var url='https://maps.googleapis.com/maps/api/distancematrix/json?origins='+encodeURIComponent(shopAddr)+'&destinations='+encodeURIComponent(addr)+'&key='+apiKey+'&language=th';
+  fetch(url).then(function(r){return r.json()}).then(function(data){
+    if(data.rows&&data.rows[0]&&data.rows[0].elements&&data.rows[0].elements[0].distance){
+      var km=data.rows[0].elements[0].distance.value/1000;
+      var duration=data.rows[0].elements[0].duration.text;
+      var cost=calcDeliveryCostByKm(km);
+      toast('📍 ระยะทาง '+km.toFixed(1)+' km ('+duration+') ค่าส่ง '+thb(cost));
+      return {km:km,duration:duration,cost:cost};
+    }else{toast('ไม่พบเส้นทาง','err')}
+  }).catch(function(e){toast('❌ '+e.message,'err')});
+}
+function calcDeliveryCostByKm(km){
+  var s=getShopSettings();var tiers=s.deliveryTiers||[{maxKm:5,price:30},{maxKm:10,price:50},{maxKm:20,price:80},{maxKm:999,price:120}];
+  for(var i=0;i<tiers.length;i++){if(km<=tiers[i].maxKm) return tiers[i].price}
+  return tiers[tiers.length-1]?tiers[tiers.length-1].price:100;
+}
+function calcDeliveryByZone(addr){
+  var s=getShopSettings();var zones=s.deliveryZones||[];
+  for(var i=0;i<zones.length;i++){if(addr.includes(zones[i].name)) return zones[i].price}
+  toast('ไม่พบ zone — ใช้ค่าเริ่มต้น','warn');
+  return s.defaultDeliveryCost||50;
 }
 
 // ── Auto-pull every 60 seconds ──
