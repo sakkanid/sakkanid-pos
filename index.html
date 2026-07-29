@@ -882,8 +882,8 @@ function renderDashboard(c){
     '<div class="grid g2" style="gap:8px">'+
     '<button class="btn btn-pr btn-lg" onclick="navTo(\'laundry\')" style="justify-content:center">👕 รับผ้าใหม่</button>'+
     '<button class="btn btn-gn btn-lg" onclick="navTo(\'orders\')" style="justify-content:center">📋 ดูออเดอร์</button>'+
-    '<button class="btn btn-out btn-lg" onclick="navTo(\'members\')" style="justify-content:center">👥 สมาชิก</button>'+
-    '<button class="btn btn-out btn-lg" onclick="navTo(\'report\')" style="justify-content:center">📈 รายงาน</button>'+
+    '<button class="btn btn-out btn-lg" onclick="sendDailySummaryLine()" style="justify-content:center">📊 สรุปยอดวันนี้</button>'+
+    '<button class="btn btn-out btn-lg" onclick="sendUnpaidReminders()" style="justify-content:center;color:var(--rd)">⚠️ แจ้งค้างชำระ</button>'+
     '</div></div></div>'+
     // Recent orders + Shift
     '<div class="grid g2" style="margin-top:16px">'+
@@ -956,6 +956,7 @@ function orderCardHTML(o){
   actions+='<button class="btn btn-out btn-sm" onclick="showLinePreview(\''+o.id+'\')">📱 LINE</button>';
   if(!paid) actions+='<button class="btn btn-out btn-sm" onclick="sendBillCollect(\''+o.id+'\')" style="color:var(--am)">📱 เรียกเก็บเงิน</button>';
   actions+='<button class="btn btn-out btn-sm" onclick="showOrderDetail(\''+o.id+'\')">👁️ ดู</button>';
+  if(o.type==='laundry'||o.type==='bedset') actions+='<button class="btn btn-out btn-sm" onclick="printGarmentTags(\''+o.id+'\')">🏷️ ป้าย</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="duplicateOrder(\''+o.id+'\')">📋 ซ้ำ</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="openCancelModal(\''+o.id+'\')" style="color:var(--rd)">❌ ยกเลิก</button>';
   return '<div class="o-card '+getOCardClass(o.status)+'">'+
@@ -2330,11 +2331,13 @@ function renderReportPage(c){
     '<button class="btn btn-sm btn-out" onclick="showRpt(\'delivery\')">🚗 Delivery</button>'+
     '<button class="btn btn-sm btn-out" onclick="showRpt(\'promo\')">🎁 โปรโมชั่น</button>'+
     '<button class="btn btn-sm btn-out" onclick="showRpt(\'top\')">🏆 Top Customer</button>'+
+    '<button class="btn btn-sm btn-gn" onclick="showRpt(\'pl\')">📊 P&L กำไร/ขาดทุน</button>'+
+    '<button class="btn btn-sm btn-am" onclick="exportMonthlyExcel()">📥 Export สรุปเดือน</button>'+
     '</div><div class="card" id="reportContent">'+renderSKUReport()+'</div>';
 }
 function showRpt(tab){
   var rc=$('reportContent');
-  var rpts={sku:renderSKUReport,unpaid:renderUnpaidReport,member:renderMemberReport,staff:renderStaffReport,daily:rptDaily,monthly:rptMonthly,order:rptOrder,financial:rptFinancial,quota:rptQuota,cleaning:rptCleaning,laundry:rptLaundry,bedset:rptBedset,delivery:rptDelivery,promo:rptPromo,top:rptTopCustomer};
+  var rpts={sku:renderSKUReport,unpaid:renderUnpaidReport,member:renderMemberReport,staff:renderStaffReport,daily:rptDaily,monthly:rptMonthly,order:rptOrder,financial:rptFinancial,quota:rptQuota,cleaning:rptCleaning,laundry:rptLaundry,bedset:rptBedset,delivery:rptDelivery,promo:rptPromo,top:rptTopCustomer,pl:rptPL};
   rc.innerHTML=(rpts[tab]||renderSKUReport)();
 }
 function rptDaily(){
@@ -2478,6 +2481,71 @@ function renderSKUReport(){
 }
 
 // ═══ EXPORT REPORT CSV ═══
+
+// ═══ P&L กำไร/ขาดทุน รายเดือน ═══
+function rptPL(){
+  var months={};
+  DB.orders.filter(function(o){return o.status!=='ยกเลิก'}).forEach(function(o){
+    var d=o.createdAt||'';var m=d.substring(3,10)||'unknown';// MM/YYYY
+    if(!months[m]) months[m]={revenue:0,cost:0,orders:0,items:0};
+    months[m].revenue+=netOf(o);months[m].cost+=(o.cost||0);months[m].orders++;
+    months[m].items+=(o.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);
+  });
+  // Add expenses
+  (DB.expenses||[]).forEach(function(e){
+    var d=e.date||'';var m=d.substring(3,10)||'unknown';
+    if(!months[m]) months[m]={revenue:0,cost:0,orders:0,items:0};
+    months[m].cost+=(e.amount||0);
+  });
+  var keys=Object.keys(months).sort().reverse();
+  var totalRev=0,totalCost=0;
+  keys.forEach(function(k){totalRev+=months[k].revenue;totalCost+=months[k].cost});
+  var h='<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title">📊 P&L กำไร/ขาดทุน รายเดือน</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'pl\')">📤 Export</button></div>';
+  h+='<div class="grid g3" style="margin:12px 0">'+
+    '<div class="kpi"><div class="kpi-lbl">รายได้รวม</div><div class="kpi-val">'+thb(totalRev)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">ต้นทุน+ค่าใช้จ่าย</div><div class="kpi-val" style="color:var(--am)">'+thb(totalCost)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-lbl">กำไรสุทธิ</div><div class="kpi-val" style="color:'+(totalRev-totalCost>0?'var(--gn)':'var(--rd)')+'">'+thb(totalRev-totalCost)+'</div></div></div>';
+  h+='<canvas id="chartPL" height="220" style="margin-bottom:12px"></canvas>';
+  h+='<table><tr><th>เดือน</th><th>ออเดอร์</th><th>ชิ้น</th><th>รายได้</th><th>ต้นทุน+ค่าใช้จ่าย</th><th>กำไร</th><th>Margin</th></tr>';
+  keys.forEach(function(k){
+    var d=months[k];var profit=d.revenue-d.cost;var margin=d.revenue>0?Math.round(profit/d.revenue*100):0;
+    h+='<tr><td>'+k+'</td><td>'+d.orders+'</td><td>'+d.items+'</td><td>'+thb(d.revenue)+'</td><td style="color:var(--am)">'+thb(d.cost)+'</td><td style="color:'+(profit>0?'var(--gn)':'var(--rd)')+'">'+thb(profit)+'</td><td>'+margin+'%</td></tr>';
+  });
+  h+='</table>';
+  setTimeout(function(){
+    if(typeof Chart==='undefined') return;
+    var ctx=document.getElementById('chartPL');if(!ctx) return;
+    var labels=keys.reverse();
+    new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[
+      {label:'รายได้',data:labels.map(function(k){return months[k].revenue}),backgroundColor:'#3B82C4',borderRadius:4},
+      {label:'ต้นทุน',data:labels.map(function(k){return months[k].cost}),backgroundColor:'#F87171',borderRadius:4},
+      {label:'กำไร',data:labels.map(function(k){return months[k].revenue-months[k].cost}),backgroundColor:'#10B981',borderRadius:4}
+    ]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return '฿'+v}}}}}});
+  },300);
+  return h;
+}
+
+// ═══ Export สรุปรายเดือน (CSV) ═══
+function exportMonthlyExcel(){
+  var csv='เดือน,ออเดอร์,ชิ้น,รายได้,ต้นทุนสินค้า,ค่าใช้จ่าย,ต้นทุนรวม,กำไร,Margin%\n';
+  var months={};
+  DB.orders.filter(function(o){return o.status!=='ยกเลิก'}).forEach(function(o){
+    var d=o.createdAt||'';var m=d.substring(3,10)||'unknown';
+    if(!months[m]) months[m]={revenue:0,productCost:0,expense:0,orders:0,items:0};
+    months[m].revenue+=netOf(o);months[m].productCost+=(o.cost||0);months[m].orders++;
+    months[m].items+=(o.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);
+  });
+  (DB.expenses||[]).forEach(function(e){
+    var d=e.date||'';var m=d.substring(3,10)||'unknown';
+    if(!months[m]) months[m]={revenue:0,productCost:0,expense:0,orders:0,items:0};
+    months[m].expense+=(e.amount||0);
+  });
+  Object.keys(months).sort().reverse().forEach(function(k){
+    var d=months[k];var totalCost=d.productCost+d.expense;var profit=d.revenue-totalCost;var margin=d.revenue>0?Math.round(profit/d.revenue*100):0;
+    csv+=k+','+d.orders+','+d.items+','+d.revenue+','+d.productCost+','+d.expense+','+totalCost+','+profit+','+margin+'%\n';
+  });
+  downloadCSV(csv,'SAKKANID_monthly_'+todayStr().replace(/-/g,'')+'.csv');
+}
 function exportReportCSV(type){
   var csv='',filename='SAKKANID_report_'+type+'_'+todayStr().replace(/-/g,'')+'.csv';
   var fd=function(dt){return formatBillDate(dt)};
@@ -5014,6 +5082,66 @@ saveDB=function(){
     if(getApiUrl()&&curUser) syncPushAll();
   },2000);
 };
+
+// ═══ LINE แจ้งค้างชำระ + สรุปรายวัน ═══
+async function sendUnpaidReminders(){
+  var s=getShopSettings();if(!s.lineChannelToken){toast('ตั้งค่า LINE Token ก่อน','warn');return}
+  var unpaid=DB.orders.filter(function(o){return !isPaidCheck(o)&&!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)});
+  if(!unpaid.length){toast('ไม่มีรายการค้างชำระ');return}
+  var sent=0;
+  for(var i=0;i<unpaid.length;i++){
+    var o=unpaid[i];var m=gM(o.mid);if(!m||!m.lineUserId) continue;
+    var flex={type:'flex',altText:'แจ้งยอดค้าง '+thb(remaining(o)),contents:{type:'bubble',
+      header:{type:'box',layout:'vertical',backgroundColor:'#DC2626',paddingAll:'12px',contents:[{type:'text',text:'⚠️ แจ้งเตือนยอดค้างชำระ',color:'#ffffff',weight:'bold',size:'md'}]},
+      body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
+        {type:'text',text:o.id+' | '+o.mname,size:'sm'},
+        {type:'text',text:'ยอดค้าง: '+thb(remaining(o)),size:'lg',weight:'bold',color:'#DC2626',margin:'md'},
+        {type:'text',text:'กรุณาชำระเงินด้วยนะคะ 🙏',size:'sm',color:'#666666',margin:'sm'}
+      ]},footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ',size:'xxs',color:'#aaaaaa',align:'center'}]}}};
+    await sendLineMessage(m.lineUserId,[flex]);sent++;
+  }
+  toast('📱 ส่งแจ้งเตือน '+sent+' คน ✅');logAction('REMIND_UNPAID',sent+' msgs');
+}
+async function sendDailySummaryLine(){
+  var s=getShopSettings();if(!s.lineChannelToken){toast('ตั้งค่า LINE Token ก่อน','warn');return}
+  var targetUserId=s.ownerLineUserId||'';
+  if(!targetUserId){var om=(DB.members||[]).find(function(m){return m.lineUserId});if(om) targetUserId=om.lineUserId}
+  if(!targetUserId){toast('ไม่พบ LINE User ID — ตั้งค่าที่ LINE tab','warn');return}
+  var todayO=DB.orders.filter(function(o){return o.createdAt&&o.createdAt.includes(fmtDate())});
+  var rev=todayO.reduce(function(s,o){return s+netOf(o)},0);
+  var cost=todayO.reduce(function(s,o){return s+(o.cost||0)},0);
+  var exp=(DB.expenses||[]).filter(function(e){return e.date&&e.date.includes(fmtDate())}).reduce(function(s,e){return s+(e.amount||0)},0);
+  var unpaid=DB.orders.filter(function(o){return !isPaidCheck(o)&&!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)});
+  var flex={type:'flex',altText:'สรุปวันนี้ '+thb(rev),contents:{type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[{type:'text',text:'📊 สรุปยอดขายประจำวัน',color:'#ffffff',weight:'bold',size:'md'},{type:'text',text:fmtDate(),color:'#ffffffCC',size:'xxs'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',spacing:'sm',contents:[
+      {type:'box',layout:'horizontal',contents:[{type:'text',text:'💰 รายได้',size:'sm',flex:3},{type:'text',text:thb(rev),size:'sm',weight:'bold',align:'end',flex:2}]},
+      {type:'box',layout:'horizontal',contents:[{type:'text',text:'📦 ออเดอร์',size:'sm',flex:3},{type:'text',text:todayO.length+' รายการ',size:'sm',align:'end',flex:2}]},
+      {type:'box',layout:'horizontal',contents:[{type:'text',text:'📈 กำไร',size:'sm',flex:3,weight:'bold'},{type:'text',text:thb(rev-cost-exp),size:'sm',weight:'bold',align:'end',flex:2,color:rev-cost-exp>0?'#10B981':'#DC2626'}]},
+      {type:'separator',margin:'md'},
+      {type:'box',layout:'horizontal',contents:[{type:'text',text:'❌ ค้างชำระ',size:'xs',flex:3,color:'#DC2626'},{type:'text',text:thb(unpaid.reduce(function(s,o){return s+remaining(o)},0))+' ('+unpaid.length+')',size:'xs',align:'end',flex:3,color:'#DC2626'}]}
+    ]}}};
+  await sendLineMessage(targetUserId,[flex]);
+  toast('📊 ส่งสรุปรายวัน ✅');logAction('DAILY_SUMMARY','rev:'+rev);
+}
+
+// ═══ ข้อ 6: พิมพ์ป้ายติดผ้า ═══
+function printGarmentTags(oid){
+  var o=gO(oid);if(!o) return;
+  var h='<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#000">';
+  (o.items||[]).forEach(function(it,idx){
+    for(var q=0;q<(it.qty||1);q++){
+      h+='<div style="border:2px dashed #000;padding:6px 10px;margin:4px 0;page-break-inside:avoid;display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div style="font-size:16px;font-weight:900">'+o.id+'</div>'+
+        '<div style="font-size:12px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>'+
+        '<div style="font-size:11px">'+o.mname+' · '+fmtDate()+'</div></div>'+
+        '<div style="font-size:20px;font-weight:900">'+(idx+1)+'/'+(o.items||[]).reduce(function(s,i){return s+(i.qty||1)},0)+'</div></div>';
+    }
+  });
+  h+='</div>';
+  var pa=$('printArea');pa.className='';pa.innerHTML=h;window.print();
+  setTimeout(function(){renderPage(curPage)},1000);
+}
 
 // ── Auto-pull every 60 seconds ──
 let autoPullInterval=null;
