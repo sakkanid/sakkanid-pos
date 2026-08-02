@@ -5481,7 +5481,11 @@ async function calcOrderDelivery(prefix){
     var selEl=$(prefix+'-del-sel');
     if(selEl){for(var i=0;i<selEl.options.length;i++){if(parseFloat(selEl.options[i].value)===r.cost){selEl.selectedIndex=i;break}}}
     var mapLink='https://www.google.com/maps/search/'+encodeURIComponent(addr);
-    if(resultEl)resultEl.innerHTML='<div style="color:var(--gn);font-weight:600">✅ '+r.km.toFixed(1)+' km'+(r.duration?' ('+r.duration+')':'')+' → ค่าส่ง '+thb(r.cost)+'</div><a href="'+mapLink+'" target="_blank" style="font-size:11px;color:var(--pr)">🗺️ เปิดดูใน Google Maps</a>';
+    // ═══ ฝังแผนที่ Maps Embed (ฟรี) แสดงตำแหน่งที่อยู่ ═══
+    var embedUrl='https://www.google.com/maps/embed/v1/place?key='+encodeURIComponent(s.googleMapsKey)+'&q='+encodeURIComponent(addr)+'&language=th';
+    if(resultEl)resultEl.innerHTML='<div style="color:var(--gn);font-weight:600">✅ '+r.km.toFixed(1)+' km'+(r.duration?' ('+r.duration+')':'')+' → ค่าส่ง '+thb(r.cost)+'</div>'+
+      '<iframe width="100%" height="180" style="border:1px solid var(--bd);border-radius:8px;margin-top:6px" loading="lazy" src="'+embedUrl+'"></iframe>'+
+      '<a href="'+mapLink+'" target="_blank" style="font-size:11px;color:var(--pr)">🗺️ เปิดใน Google Maps (แอปเต็ม)</a>';
     if(typeof calcOrderTotal==='function')calcOrderTotal();
   }
 }
