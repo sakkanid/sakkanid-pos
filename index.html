@@ -3580,7 +3580,7 @@ function viewMemberDetail(mid){
     '<div class="kpi"><div class="kpi-lbl">ระดับ</div><div class="kpi-val" style="font-size:16px">'+m.level+'</div></div></div>'+
     '<div class="card" style="box-shadow:none;background:var(--bg)"><div class="grid g2">'+
     '<div><div class="form-label">เบอร์โทร</div><div>'+fmtPhone(m.phone)+'</div></div>'+
-    '<div><div class="form-label">LINE ID</div><div>'+(m.lineId||'-')+(m.lineUserId?' <span style="font-size:10px;color:var(--gn)">✅ UID</span>':'')+'</div></div>'+
+    '<div><div class="form-label">LINE ID</div><div>'+(m.lineId||'-')+(String(m.lineUserId||'').trim().length>=30&&String(m.lineUserId||'').trim().charAt(0)==='U'?' <span style="font-size:10px;color:var(--gn)">✅ UID พร้อมส่ง</span>':(m.lineUserId?' <span style="font-size:10px;color:var(--am)">⚠️ UID ไม่ถูกต้อง</span>':' <span style="font-size:10px;color:var(--t3)">ยังไม่มี UID</span>'))+'</div></div>'+
     '<div><div class="form-label">ที่อยู่</div><div>'+(function(){var a=(m.proj||m.village||'');var r=(m.room||m.houseNo||'');if(r)a+=(m.addrType==='condo'?' ห้อง ':' ')+r;return a||'-'}())+'</div></div>'+
     '<div><div class="form-label">สมัครเมื่อ</div><div>'+fmtJoinDate(m.joinDate)+'</div></div>'+
     '</div></div>'+
@@ -5265,7 +5265,7 @@ async function sendQuotaInfoLine(mid){
   var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
   var uid=String(m.lineUserId||'').trim();
   if(!uid||uid.length<30||uid.charAt(0)!=='U'){
-    toast('⚠️ ลูกค้ายังไม่มี LINE User ID ที่ถูกต้อง — ต้องให้ลูกค้าทักแชทหา LINE OA ก่อน','warn');return;
+    toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+uid.substring(0,25)+'" (ต้องขึ้นต้น U ยาว 33 ตัว)\nลูกค้าต้องทักแชท LINE OA ก่อน','warn');return;
   }
   var quotas=(DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0});
   if(!quotas.length){toast('ลูกค้าไม่มีโควต้าคงเหลือ','warn');return}
