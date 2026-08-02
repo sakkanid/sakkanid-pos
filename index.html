@@ -250,10 +250,10 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
 
 // ═══ CONSTANTS ═══
 const USERS=[
-  {name:'คุณรพัทสรา อึ้งศิริ',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
-  {name:'คุณสมใจ ดีมาก',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
-  {name:'คุณน้ำฝน รักงาน',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
-  {name:'คุณมินตรา แคชเชียร์',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
+  {name:'เจ้าของร้าน',nick:'เจ้าของ',role:'เจ้าของร้าน',pin:'1234',protected:true},
+  {name:'ผู้จัดการ',nick:'ผู้จัดการ',role:'ผู้จัดการ',pin:'2222',protected:false},
+  {name:'พนักงาน 1',nick:'พนักงาน',role:'พนักงาน',pin:'3333',protected:false},
+  {name:'แคชเชียร์ 1',nick:'แคชเชียร์',role:'แคชเชียร์',pin:'4444',protected:false}
 ];
 
 const STATUSES_LDR=['รับผ้ารอส่งซัก','ระหว่างการซัก','ผ้าพร้อมส่ง (รับที่ร้าน)','ผ้าพร้อมส่ง (Delivery)','จัดส่งแล้ว','เสร็จสิ้น','ยกเลิก'];
@@ -3880,10 +3880,19 @@ function showShortcutsHelp(){
 function initErrorHandler(){
   window.onerror=function(msg,src,line){
     console.error('POS Error:',msg,src,line);
+    // กรอง cross-origin "Script error." จาก JSONP (Apps Script) — ไม่ใช่ error จริงของแอป
+    if(!msg||msg==='Script error.'||msg==='Script error'||(src&&src.indexOf('script.google')>=0)) return true;
+    // กรอง error จาก script tag ที่โหลดจาก external
+    if(src&&src.indexOf(location.origin)<0) return true;
     toast('⚠️ Error: '+(msg||'').substring(0,60),'err');
     logAction('ERROR',(msg||'').substring(0,200));
     return false;
   };
+  // จับ unhandled promise rejection (เช่น JSONP timeout) แบบเงียบ
+  window.addEventListener('unhandledrejection',function(e){
+    console.error('Unhandled:',e.reason);
+    e.preventDefault();
+  });
 }
 
 // ═══ STORAGE CHECK ═══
@@ -5035,18 +5044,22 @@ async function apiCall(action,sheet,body){
 function jsonpCall(action,sheet){
   return new Promise(function(resolve,reject){
     var cbName='_skcb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+    var s=null;
     var timeout=setTimeout(function(){
-      delete window[cbName];if(s.parentNode)s.parentNode.removeChild(s);
+      delete window[cbName];if(s&&s.parentNode)s.parentNode.removeChild(s);
       reject(new Error('Timeout'));
     },30000);
     window[cbName]=function(data){
       clearTimeout(timeout);delete window[cbName];
-      if(s.parentNode)s.parentNode.removeChild(s);
+      if(s&&s.parentNode)s.parentNode.removeChild(s);
       resolve(data);
     };
     var url=getApiUrl()+'?action='+action+(sheet?'&sheet='+sheet:'')+'&callback='+cbName;
-    var s=document.createElement('script');
-    s.src=url;s.onerror=function(){clearTimeout(timeout);delete window[cbName];s.parentNode.removeChild(s);reject(new Error('Script load failed'))};
+    // ป้องกัน URL ยาวเกิน (JSONP cap ~8KB)
+    if(url.length>8000){clearTimeout(timeout);delete window[cbName];reject(new Error('URL too long'));return}
+    s=document.createElement('script');
+    s.src=url;
+    s.onerror=function(){clearTimeout(timeout);delete window[cbName];if(s&&s.parentNode)s.parentNode.removeChild(s);reject(new Error('เชื่อมต่อไม่ได้'))};
     document.head.appendChild(s);
   });
 }
