@@ -1087,7 +1087,7 @@ function openCreateOrderModal(m){
     '<div class="form-group" id="co-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="co-del-sel">'+
     tiers.map((t,i)=>'<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>').join('')+
     '</select></div></div>'+
-    '<div class="form-group" id="co-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><input id="co-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'"></div>'+
+    '<div class="form-group" id="co-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="co-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'co\')" style="white-space:nowrap">📍 คำนวณระยะทาง</button></div><div id="co-map-result" style="font-size:12px;margin-top:4px"></div></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy +3วัน)</label><input id="co-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
     '<div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="co-disc" type="number" value="0" oninput="calcOrderTotal()"></div>'+
@@ -5467,6 +5467,25 @@ async function sendQuotaAlertLine(){
 }
 
 // ═══ #20: Google Maps คำนวณค่าส่ง ═══
+// ═══ คำนวณค่าจัดส่งจากที่อยู่ (ในหน้าสร้างออเดอร์) + ปักหมุด Maps ═══
+async function calcOrderDelivery(prefix){
+  var addrEl=$(prefix+'-addr');if(!addrEl)return;
+  var addr=addrEl.value.trim();
+  if(!addr){toast('กรุณากรอกที่อยู่ก่อน','warn');return}
+  var s=getShopSettings();var resultEl=$(prefix+'-map-result');
+  if(!s.googleMapsKey){if(resultEl)resultEl.innerHTML='<span style="color:var(--am)">⚠️ ยังไม่ตั้งค่า Google Maps — ใช้ค่าจัดส่งจาก dropdown</span>';return}
+  if(resultEl)resultEl.innerHTML='<span style="color:var(--t3)">📍 กำลังคำนวณ...</span>';
+  var r=await calcDeliveryByDistance(addr);
+  if(r&&r.km!=null){
+    // อัปเดต dropdown ค่าจัดส่งให้ตรง tier
+    var selEl=$(prefix+'-del-sel');
+    if(selEl){for(var i=0;i<selEl.options.length;i++){if(parseFloat(selEl.options[i].value)===r.cost){selEl.selectedIndex=i;break}}}
+    var mapLink='https://www.google.com/maps/search/'+encodeURIComponent(addr);
+    if(resultEl)resultEl.innerHTML='<div style="color:var(--gn);font-weight:600">✅ '+r.km.toFixed(1)+' km'+(r.duration?' ('+r.duration+')':'')+' → ค่าส่ง '+thb(r.cost)+'</div><a href="'+mapLink+'" target="_blank" style="font-size:11px;color:var(--pr)">🗺️ เปิดดูใน Google Maps</a>';
+    if(typeof calcOrderTotal==='function')calcOrderTotal();
+  }
+}
+
 async function calcDeliveryByDistance(destAddr){
   var addr=destAddr||prompt('กรอกที่อยู่ปลายทาง:');if(!addr) return;
   var s=getShopSettings();var shopAddr=s.address||'กรุงเทพฯ';
