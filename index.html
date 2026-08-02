@@ -1084,10 +1084,12 @@ function openCreateOrderModal(m){
     '<hr style="margin:14px 0">'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">วิธีรับผ้า</label><select id="co-delivery" onchange="onDeliveryChange()"><option value="pickup">🏪 รับที่ร้าน</option><option value="delivery">🚗 Delivery</option></select></div>'+
-    '<div class="form-group" id="co-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="co-del-sel">'+
+    '<div class="form-group" id="co-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="co-del-sel" onchange="onDelCostChange()">'+
     tiers.map((t,i)=>'<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>').join('')+
-    '</select></div></div>'+
-    '<div class="form-group" id="co-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="co-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'co\')" style="white-space:nowrap">📍 คำนวณระยะทาง</button></div><div id="co-map-result" style="font-size:12px;margin-top:4px"></div></div>'+
+    '<option value="custom">✏️ กำหนดเอง (ระยะไกลพิเศษ)</option>'+
+    '</select><input id="co-del-custom" type="number" placeholder="ระบุค่าจัดส่ง ฿" style="display:none;margin-top:6px" oninput="calcOrderTotal()"></div></div>'+
+    '<div class="form-group" id="co-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="co-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'co\')" style="white-space:nowrap">📍 คำนวณระยะทาง</button></div><div id="co-map-result" style="font-size:12px;margin-top:4px"></div>'+
+    '<label class="form-label" style="margin-top:8px">🗺️ ลิงก์ Google Maps (สำหรับคนขนส่ง)</label><input id="co-maplink" placeholder="วางลิงก์ Google Maps ที่นี่ (คัดลอกจากแอป Maps)"></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy +3วัน)</label><input id="co-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
     '<div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="co-disc" type="number" value="0" oninput="calcOrderTotal()"></div>'+
@@ -1250,7 +1252,8 @@ function saveOrder(){
   if(!orderItems.length){toast('กรุณาเพิ่มรายการซักอย่างน้อย 1 รายการ','err');return}
   const m=gM(orderMemberId);if(!m){toast('ไม่พบข้อมูลลูกค้า','err');return}
   const isDel=$('co-delivery').value==='delivery';
-  const delCost=isDel?parseFloat($('co-del-sel').value)||0:0;
+  var delSel=$('co-del-sel')?$('co-del-sel').value:'0';
+  const delCost=isDel?(delSel==='custom'?(parseFloat($('co-del-custom')?$('co-del-custom').value:0)||0):parseFloat(delSel)||0):0;
   var disc=parseFloat($('co-disc').value)||0;
   // Apply promo
   var promoName='';
@@ -1278,7 +1281,7 @@ function saveOrder(){
   const order={
     id:genId('LDR'),type:'laundry',mid:m.id,mname:m.name,mphone:m.phone,
     status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',
-    delCost:delCost,deliveryAddr:isDel?($('co-addr')?$('co-addr').value.trim():''):'',
+    delCost:delCost,deliveryAddr:isDel?($('co-addr')?$('co-addr').value.trim():''):'',mapLink:isDel?($('co-maplink')?$('co-maplink').value.trim():''):'',
     items:[...orderItems],extras:[...orderExtras],disc:disc,net:net,cost:cost,
     payHist:payHist,isPaid:paidNow&&payAmt>=net,pts:pts4(net),
     promo:promoName,note:$('co-note')?$('co-note').value.trim():'',
@@ -1371,7 +1374,12 @@ function showOrderDetail(oid){
     '<div class="grid g2">'+
     '<div><div class="form-label">ลูกค้า</div><div style="font-weight:600">'+o.mname+'</div><div style="font-size:12px;color:var(--t3)">'+o.mphone+'</div></div>'+
     '<div><div class="form-label">รายละเอียด</div><div style="font-size:12px">สร้าง: '+o.createdAt+'<br>โดย: '+o.by+'<br>รับผ้า: '+(o.delivery==='delivery'?'🚗 Delivery':'🏪 รับที่ร้าน')+'</div></div>'+
-    '</div></div>'+
+    '</div>'+
+    (o.delivery==='delivery'?'<div style="margin-top:8px;padding:8px;background:var(--prl);border-radius:6px"><div class="form-label" style="color:var(--pr)">🚚 รายละเอียดจัดส่ง</div>'+
+      '<div style="font-size:13px;font-weight:600">📍 '+(o.deliveryAddr||'-')+'</div>'+
+      '<div style="font-size:12px;color:var(--t3);margin-top:2px">💰 ค่าจัดส่ง: '+thb(o.delCost||0)+'</div>'+
+      (o.mapLink?'<a href="'+o.mapLink+'" target="_blank" style="font-size:12px;color:var(--pr);display:inline-block;margin-top:4px">🗺️ เปิดแผนที่นำทาง (Google Maps)</a>':(o.deliveryAddr?'<a href="https://www.google.com/maps/search/'+encodeURIComponent(o.deliveryAddr)+'" target="_blank" style="font-size:12px;color:var(--pr);display:inline-block;margin-top:4px">🗺️ ค้นหาที่อยู่ใน Google Maps</a>':''))+
+      '</div>':'')+'</div>'+
     '<table><tr><th>รายการ</th><th>จำนวน</th><th>ราคา</th></tr>'+
     (o.items||[]).map(it=>'<tr><td>'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</td><td>'+it.qty+'</td><td>'+thb(it.p*it.qty)+'</td></tr>').join('')+
     (o.extras||[]).map(e=>'<tr><td>⭐ '+e.name+'</td><td>1</td><td>'+thb(e.price)+'</td></tr>').join('')+
@@ -2649,7 +2657,7 @@ function openSvcPriceEdit(type,i){
   if(type==='bed'){label=BED_SETS[i].label;price=BED_SETS[i].price;cost=BED_SETS[i].cost}
   else if(type==='cln'){label=CLN_SVCS[i].label;price=CLN_SVCS[i].minPrice;cost=CLN_SVCS[i].cost}
   else if(type==='pkg'){label=PKGS[i].type+' '+PKGS[i].qty;price=PKGS[i].price;cost=PKGS[i].cost;expDays=PKGS[i].expDays}
-  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="sp-d" type="number" value="'+expDays+'"></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
+  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="sp-d" type="number" value="'+expDays+'" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="sp-noexp" '+(expDays==0?'checked':'')+' onchange="if(this.checked){document.getElementById(\'sp-d\').value=0}else{document.getElementById(\'sp-d\').value=90}"> ♾️ ไม่มีวันหมดอายุ</label></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function saveSvcPrice(type,i){
@@ -3560,7 +3568,7 @@ function viewMemberDetail(mid){
     (orders.length?'<table><tr><th>เลข</th><th>ประเภท</th><th>ยอด</th><th>สถานะ</th><th>วันที่</th></tr>'+
     orders.slice(0,20).map(o=>'<tr><td>'+o.id+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
     '</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button><button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
   openMo('moDetail');
 }
 
@@ -3701,8 +3709,15 @@ function showMemberCard(mid){
 }
 function printMemberCard(){
   var el=$('memberCardEl');if(!el) return;
-  $('printArea').innerHTML=el.outerHTML;$('printArea').style.display='block';
-  window.print();setTimeout(function(){$('printArea').style.display='none'},500);
+  var pa=$('printArea');
+  // เพิ่ม style บังคับพิมพ์สี
+  var oldStyle=document.getElementById('mcPrintStyle');if(oldStyle) oldStyle.remove();
+  var st=document.createElement('style');st.id='mcPrintStyle';
+  st.innerHTML='@media print{#printArea,#printArea *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}#printArea{width:auto!important;font-weight:normal!important}@page{size:auto;margin:10mm}}';
+  document.head.appendChild(st);
+  pa.className='';pa.innerHTML=el.outerHTML;pa.style.display='block';
+  window.print();
+  setTimeout(function(){pa.style.display='none';if(st)st.remove()},500);
 }
 
 // ═══ EXPENSE TRACKING ═══
@@ -4066,7 +4081,7 @@ function openAddPkg(){
     '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="as-qty" type="number"></div></div>'+
     '<div class="grid g3"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="as-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="as-cost" type="number" value="0"></div>'+
-    '<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="as-exp" type="number" value="90"></div></div>'+
+    '<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="as-exp" type="number" value="90" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="as-noexp" onchange="if(this.checked){document.getElementById(\'as-exp\').value=0}else{document.getElementById(\'as-exp\').value=90}"> ♾️ ไม่มีวันหมดอายุ</label></div></div>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moAddSvc\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveAddPkg()">💾 เพิ่ม</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
@@ -5231,6 +5246,34 @@ async function sendDailySummaryLine(){
   toast('📊 ส่งสรุปรายวัน ✅');logAction('DAILY_SUMMARY','rev:'+rev);
 }
 
+// ═══ ส่งข้อมูล Package โควต้าคงเหลือให้ลูกค้าทาง LINE ═══
+async function sendQuotaInfoLine(mid){
+  var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
+  if(!m.lineUserId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
+  var quotas=(DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0});
+  if(!quotas.length){toast('ลูกค้าไม่มีโควต้าคงเหลือ','warn');return}
+  var bodyC=[{type:'text',text:'สวัสดีค่ะ '+m.name,size:'sm',weight:'bold'},{type:'separator',margin:'md'}];
+  quotas.forEach(function(q){
+    var pct=q.total>0?Math.round(q.remain/q.total*100):0;
+    bodyC.push({type:'box',layout:'vertical',margin:'md',contents:[
+      {type:'text',text:'📦 '+q.pkgName,size:'sm',weight:'bold',color:'#7C3AED'},
+      {type:'box',layout:'horizontal',margin:'xs',contents:[
+        {type:'text',text:'คงเหลือ '+q.remain+'/'+q.total+' ชิ้น',size:'xs',color:'#333333',flex:3},
+        {type:'text',text:pct+'%',size:'xs',align:'end',flex:1,color:pct>30?'#10B981':'#DC2626'}
+      ]},
+      {type:'text',text:q.exp&&q.exp!=='ไม่มีวันหมดอายุ'?'📅 หมดอายุ '+q.exp:'♾️ ไม่มีวันหมดอายุ',size:'xxs',color:'#888888',margin:'xs'}
+    ]});
+  });
+  var s=getShopSettings();
+  var flex={type:'flex',altText:'ข้อมูลแพ็คเกจคงเหลือ',contents:{type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#7C3AED',paddingAll:'12px',contents:[{type:'text',text:'📦 แพ็คเกจคงเหลือ',color:'#ffffff',weight:'bold',size:'md'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
+    footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ',size:'xxs',color:'#aaaaaa',align:'center'}]}
+  }};
+  await sendLineMessage(m.lineUserId,[flex]);
+  toast('📦 ส่งข้อมูลแพ็คเกจให้ '+m.name+' ✅');
+}
+
 // ═══ ข้อ 6: พิมพ์ป้ายติดผ้า ═══
 function printGarmentTags(oid){
   var o=gO(oid);if(!o) return;
@@ -5468,6 +5511,11 @@ async function sendQuotaAlertLine(){
 
 // ═══ #20: Google Maps คำนวณค่าส่ง ═══
 // ═══ คำนวณค่าจัดส่งจากที่อยู่ (ในหน้าสร้างออเดอร์) + ปักหมุด Maps ═══
+function onDelCostChange(){
+  var sel=$('co-del-sel');var custom=$('co-del-custom');
+  if(sel&&custom){custom.style.display=sel.value==='custom'?'block':'none'}
+  if(typeof calcOrderTotal==='function') calcOrderTotal();
+}
 async function calcOrderDelivery(prefix){
   var addrEl=$(prefix+'-addr');if(!addrEl)return;
   var addr=addrEl.value.trim();
