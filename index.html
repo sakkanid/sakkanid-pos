@@ -5467,26 +5467,41 @@ async function sendQuotaAlertLine(){
 }
 
 // ═══ #20: Google Maps คำนวณค่าส่ง ═══
-function calcDeliveryByDistance(){
-  var addr=prompt('กรอกที่อยู่ปลายทาง:');if(!addr) return;
+async function calcDeliveryByDistance(destAddr){
+  var addr=destAddr||prompt('กรอกที่อยู่ปลายทาง:');if(!addr) return;
   var s=getShopSettings();var shopAddr=s.address||'กรุงเทพฯ';
-  // ใช้ Google Maps Distance Matrix API (ต้องมี API key)
   var apiKey=s.googleMapsKey||'';
-  if(!apiKey){
-    // Fallback: คำนวณจากตาราง zone
-    toast('ไม่มี Google Maps API Key — ใช้ตาราง zone แทน','warn');
-    return calcDeliveryByZone(addr);
+  if(!apiKey){toast('ไม่มี Google Maps API Key','warn');return calcDeliveryByZone(addr)}
+  var apiUrl=getApiUrl();
+  if(!apiUrl){toast('⚠️ ต้องตั้งค่า API URL (Apps Script) ก่อน','err');return}
+  toast('📍 กำลังคำนวณระยะทาง...','info');
+  try{
+    // เรียกผ่าน Apps Script (server-side) เพื่อเลี่ยง CORS
+    var payload=encodeURIComponent(JSON.stringify({origin:shopAddr,dest:addr,key:apiKey}));
+    var result=await new Promise(function(resolve,reject){
+      var cbName='_mapcb_'+Date.now();
+      window[cbName]=function(r){delete window[cbName];resolve(r)};
+      var sc=document.createElement('script');
+      sc.src=apiUrl+'?action=calcDistance&callback='+cbName+'&data='+payload;
+      sc.onerror=function(){delete window[cbName];reject(new Error('เชื่อมต่อไม่ได้'))};
+      document.head.appendChild(sc);
+      setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},15000);
+    });
+    if(result&&result.ok&&result.km!=null){
+      var cost=calcDeliveryCostByKm(result.km);
+      var el=$('mapsTestResult');
+      if(el) el.innerHTML='<div style="color:var(--gn);font-weight:600">✅ ระยะทาง '+result.km.toFixed(1)+' km'+(result.duration?' ('+result.duration+')':'')+'<br>💰 ค่าส่ง '+thb(cost)+'</div>';
+      toast('📍 '+result.km.toFixed(1)+' km · ค่าส่ง '+thb(cost));
+      return {km:result.km,duration:result.duration,cost:cost};
+    }else{
+      var msg=result&&result.error?result.error:'ไม่พบเส้นทาง';
+      var el2=$('mapsTestResult');if(el2) el2.innerHTML='<span style="color:var(--rd)">❌ '+msg+'</span>';
+      toast('❌ '+msg,'err');
+    }
+  }catch(e){
+    var el3=$('mapsTestResult');if(el3) el3.innerHTML='<span style="color:var(--rd)">❌ '+e.message+'</span>';
+    toast('❌ '+e.message,'err');
   }
-  var url='https://maps.googleapis.com/maps/api/distancematrix/json?origins='+encodeURIComponent(shopAddr)+'&destinations='+encodeURIComponent(addr)+'&key='+apiKey+'&language=th';
-  fetch(url).then(function(r){return r.json()}).then(function(data){
-    if(data.rows&&data.rows[0]&&data.rows[0].elements&&data.rows[0].elements[0].distance){
-      var km=data.rows[0].elements[0].distance.value/1000;
-      var duration=data.rows[0].elements[0].duration.text;
-      var cost=calcDeliveryCostByKm(km);
-      toast('📍 ระยะทาง '+km.toFixed(1)+' km ('+duration+') ค่าส่ง '+thb(cost));
-      return {km:km,duration:duration,cost:cost};
-    }else{toast('ไม่พบเส้นทาง','err')}
-  }).catch(function(e){toast('❌ '+e.message,'err')});
 }
 function calcDeliveryCostByKm(km){
   var s=getShopSettings();var tiers=s.deliveryKmTiers||[{maxKm:3,price:30},{maxKm:5,price:50},{maxKm:10,price:80},{maxKm:20,price:120}];
