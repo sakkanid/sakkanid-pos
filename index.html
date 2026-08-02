@@ -4358,14 +4358,15 @@ function renderShopQuotaPage(c){
 }
 
 function openAddShopQuota(){
+  // ดึงหมวดบริการจริง (กรอง empty/Package/ใช้โควต้า ออก)
+  var validCats=CATS_UNIQUE.filter(function(c){return c&&c!==''&&c!=='Package'&&c!=='ใช้โควต้า'&&c!=='เครื่องนอน Set'});
   var h='<div class="modal-overlay show" id="moSQ"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>➕ เพิ่มโควต้าส่วนกลาง</h3><button class="modal-close" onclick="document.getElementById(\'moSQ\').remove()">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="form-group"><label class="form-label">ชื่อโควต้า</label><input id="sq-name" placeholder="เช่น โควต้าซักทั่วไป"></div>'+
-    '<div class="form-group"><label class="form-label">ประเภทบริการ</label><select id="sq-type"><option value="ซักทั่วไป">ซักทั่วไป (ตัดจากทุกบริการ)</option>'+
-    CATS_UNIQUE.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('')+
-    '<option value="เครื่องนอน">🛏️ เครื่องนอน</option>'+
-    '<option value="ทำความสะอาด">🧹 ทำความสะอาด</option>'+
-    '</select></div>'+
+    '<div class="form-group"><label class="form-label">ประเภทบริการ <span style="color:var(--t3);font-weight:normal">(ตามหมวดในตารางราคา)</span></label><select id="sq-type"><option value="ซักทั่วไป">⭐ ซักทั่วไป (ตัดจากทุกบริการ)</option>'+
+    '<optgroup label="── หมวดบริการเฉพาะ ──">'+
+    validCats.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('')+
+    '</optgroup></select></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="sq-qty" type="number" min="1" value="100"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุนรวม (฿)</label><input id="sq-cost" type="number" min="0" value="0"></div></div>'+
