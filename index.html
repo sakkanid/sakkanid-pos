@@ -413,24 +413,38 @@ const PAY_METHODS_DEFAULT=[
 ];
 
 const PAGES=[
-  {id:'dashboard',icon:'📊',label:'Dashboard',section:'จัดการ'},
-  {id:'laundry',icon:'👕',label:'รับผ้ารายชิ้น',section:'สร้างออเดอร์'},
-  {id:'package',icon:'📦',label:'บริการ Package',section:'สร้างออเดอร์'},
-  {id:'bedset',icon:'🛏️',label:'Set เครื่องนอน',section:'สร้างออเดอร์'},
-  {id:'cleaning',icon:'🧹',label:'ทำความสะอาด',section:'สร้างออเดอร์'},
-  {id:'orders',icon:'📋',label:'สถานะออเดอร์',section:'จัดการ'},
-  {id:'history',icon:'🕐',label:'ประวัติการขาย',section:'จัดการ'},
-  {id:'docs',icon:'📄',label:'ประวัติเอกสาร',section:'จัดการ'},
-  {id:'calendar',icon:'📅',label:'ปฏิทิน',section:'จัดการ'},
-  {id:'members',icon:'👥',label:'สมาชิก',section:'ลูกค้า'},
-  {id:'crm',icon:'⭐',label:'CRM',section:'ลูกค้า'},
-  {id:'promo',icon:'🎁',label:'โปรโมชั่น',section:'ลูกค้า'},
-  {id:'report',icon:'📈',label:'รายงาน',section:'วิเคราะห์'},
-  {id:'pricelist',icon:'💰',label:'ตารางราคา',section:'ตั้งค่า'},
-  {id:'expense',icon:'💵',label:'ค่าใช้จ่าย',section:'ตั้งค่า'},
-  {id:'shopquota',icon:'🏭',label:'โควต้าส่วนกลาง',section:'ตั้งค่า'},
-  {id:'settings',icon:'⚙️',label:'ตั้งค่า',section:'ตั้งค่า'}
+  {id:'dashboard',icon:'📊',label:'Dashboard',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'laundry',icon:'👕',label:'รับผ้ารายชิ้น',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'package',icon:'📦',label:'บริการ Package',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'bedset',icon:'🛏️',label:'Set เครื่องนอน',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'cleaning',icon:'🧹',label:'ทำความสะอาด',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'orders',icon:'📋',label:'สถานะออเดอร์',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'history',icon:'🕐',label:'ประวัติการขาย',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','แคชเชียร์']},
+  {id:'docs',icon:'📄',label:'ประวัติเอกสาร',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','แคชเชียร์']},
+  {id:'calendar',icon:'📅',label:'ปฏิทิน',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'members',icon:'👥',label:'สมาชิก',section:'ลูกค้า',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'crm',icon:'⭐',label:'CRM',section:'ลูกค้า',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'promo',icon:'🎁',label:'โปรโมชั่น',section:'ลูกค้า',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'report',icon:'📈',label:'รายงาน',section:'วิเคราะห์',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'pricelist',icon:'💰',label:'ตารางราคา',section:'ตั้งค่า',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'expense',icon:'💵',label:'ค่าใช้จ่าย',section:'ตั้งค่า',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'shopquota',icon:'🏭',label:'โควต้าส่วนกลาง',section:'ตั้งค่า',roles:['เจ้าของร้าน','ผู้จัดการ']},
+  {id:'settings',icon:'⚙️',label:'ตั้งค่า',section:'ตั้งค่า',roles:['เจ้าของร้าน']}
 ];
+// ═══ ระบบสิทธิ์การเข้าถึง (Role Permissions) ═══
+function canAccess(pageId){
+  var pg=PAGES.find(function(p){return p.id===pageId});
+  if(!pg||!pg.roles) return true;
+  return curUser&&pg.roles.indexOf(curUser.role)>=0;
+}
+function canSeeCost(){
+  // เห็นต้นทุน/กำไร: เฉพาะเจ้าของร้าน + ผู้จัดการ
+  return curUser&&(curUser.role==='เจ้าของร้าน'||curUser.role==='ผู้จัดการ');
+}
+function canEditPrice(){
+  // แก้ไขตารางราคา: เฉพาะเจ้าของร้าน + ผู้จัดการ
+  return curUser&&(curUser.role==='เจ้าของร้าน'||curUser.role==='ผู้จัดการ');
+}
 
 // ═══ STATE ═══
 let curUser=null,curPage='dashboard',pinStr='',selUserIdx=null;
@@ -662,13 +676,14 @@ function initApp(){
 }
 function buildSidebar(){
   let h='',lastSec='';
-  PAGES.forEach(p=>{
+  PAGES.filter(function(p){return canAccess(p.id)}).forEach(p=>{
     if(p.section!==lastSec){h+='<div class="sb-section">'+p.section+'</div>';lastSec=p.section}
     h+='<div class="sb-item" data-page="'+p.id+'" onclick="navTo(\''+p.id+'\')"><span class="sb-icon">'+p.icon+'</span>'+p.label+'</div>';
   });
   $('sbNav').innerHTML=h;
 }
 function navTo(page){
+  if(!canAccess(page)){toast('⛔ คุณไม่มีสิทธิ์เข้าถึงหน้านี้','err');return}
   curPage=page;
   document.querySelectorAll('.sb-item').forEach(el=>el.classList.toggle('act',el.dataset.page===page));
   const pg=PAGES.find(p=>p.id===page);
@@ -2648,13 +2663,14 @@ function showPriceTab(el,tab){
   else if(tab==='pkg') rc.innerHTML=eiBar+renderPkgPriceTable();
 }
 function renderPriceTable(list){
-  return '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+
-    list.map(function(it){var idx=CAT.indexOf(it);return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td><strong>'+thb(it.p)+'</strong></td><td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(it.p-it.k)+'</td><td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td></tr>'}).join('')+'</table>';
+  return '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+
+    list.map(function(it){var idx=CAT.indexOf(it);return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td><strong>'+thb(it.p)+'</strong></td>'+(canSeeCost()?'<td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(it.p-it.k)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>';
 }
-function renderBedPriceTable(){return '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div><table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong></td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td><td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
-function renderClnPriceTable(){return '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div><table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th><th>ต้นทุน</th><th>กำไร</th><th></th></tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong></td><td><strong>'+thb(s.minPrice)+'</strong></td><td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
-function renderPkgPriceTable(){return '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div><table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th><th>ต้นทุน</th><th>กำไร</th><th>อายุ</th><th></th></tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong></td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td><td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td><td>'+p.expDays+' วัน</td><td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td></tr>'}).join('')+'</table>'}
+function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong></td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong></td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong></td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function openSvcPriceEdit(type,i){
+  if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
   var label='',price=0,cost=0,expDays=0;
   if(type==='bed'){label=BED_SETS[i].label;price=BED_SETS[i].price;cost=BED_SETS[i].cost}
   else if(type==='cln'){label=CLN_SVCS[i].label;price=CLN_SVCS[i].minPrice;cost=CLN_SVCS[i].cost}
@@ -2663,6 +2679,7 @@ function openSvcPriceEdit(type,i){
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function saveSvcPrice(type,i){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
   var p=parseFloat($('sp-p').value)||0,k=parseFloat($('sp-k').value)||0;
   if(type==='bed'){BED_SETS[i].price=p;BED_SETS[i].cost=k}
   else if(type==='cln'){CLN_SVCS[i].minPrice=p;CLN_SVCS[i].cost=k}
@@ -3479,6 +3496,7 @@ function globalSearch(q){
 
 // ═══ PRICE EDITING ═══
 function openPriceEdit(idx){
+  if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
   const it=CAT[idx];if(!it) return;
   const h='<div class="modal-overlay show" id="moPriceEdit"><div class="modal"><div class="modal-head"><h3>✏️ แก้ไขราคา</h3><button class="modal-close" onclick="document.getElementById(\'moPriceEdit\').remove()">&times;</button></div>'+
     '<div class="modal-body">'+
@@ -3490,6 +3508,7 @@ function openPriceEdit(idx){
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function savePriceEdit(idx){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
   CAT[idx].p=parseFloat($('pe-price').value)||0;
   CAT[idx].k=parseFloat($('pe-cost').value)||0;
   logAction('EDIT_PRICE',CAT[idx].c+' '+CAT[idx].t+' → '+thb(CAT[idx].p));
