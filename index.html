@@ -2602,6 +2602,17 @@ function exportReportCSV(type){
   }else if(type==='promo'){
     csv='วันที่สร้าง,เลขออเดอร์,ลูกค้า,โปรโมชั่น,ส่วนลด,ยอดสุทธิ,สถานะ\n';
     DB.orders.filter(o=>o.promo&&o.status!=='ยกเลิก').forEach(o=>{csv+=fd(o.createdAt)+','+o.id+','+o.mname+','+o.promo+','+(o.disc||0)+','+o.net+','+o.status+'\n'});
+  }else if(type==='pl'){
+    csv='เดือน,ออเดอร์,ชิ้น,รายได้,ต้นทุน+ค่าใช้จ่าย,กำไร,Margin%\n';
+    var months={};
+    DB.orders.filter(function(o){return o.status!=='ยกเลิก'}).forEach(function(o){
+      var d=o.createdAt||'';var m=d.substring(3,10)||'unknown';
+      if(!months[m]) months[m]={revenue:0,cost:0,orders:0,items:0};
+      months[m].revenue+=netOf(o);months[m].cost+=(o.cost||0);months[m].orders++;
+      months[m].items+=(o.items||[]).reduce(function(s,it){return s+(it.qty||1)},0);
+    });
+    (DB.expenses||[]).forEach(function(e){var d=e.date||'';var m=d.substring(3,10)||'unknown';if(!months[m]) months[m]={revenue:0,cost:0,orders:0,items:0};months[m].cost+=(e.amount||0)});
+    Object.keys(months).sort().reverse().forEach(function(k){var d=months[k];var profit=d.revenue-d.cost;var margin=d.revenue>0?Math.round(profit/d.revenue*100):0;csv+=k+','+d.orders+','+d.items+','+d.revenue+','+d.cost+','+profit+','+margin+'%\n'});
   }else if(type==='top'||type==='monthly'){
     csv='วันที่สร้าง,ลูกค้า,ระดับ,เลขออเดอร์,ประเภท,ยอด\n';
     DB.members.sort((a,b)=>b.spend-a.spend).forEach(m=>{var ords=DB.orders.filter(o=>o.mid===m.id&&o.status!=='ยกเลิก');if(ords.length){ords.forEach(o=>{csv+=fd(o.createdAt)+','+m.name+','+m.level+','+o.id+','+o.type+','+o.net+'\n'})}else{csv+='-,'+m.name+','+m.level+',ไม่มีออเดอร์,-,-\n'}});
