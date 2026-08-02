@@ -125,7 +125,7 @@ tr:last-child td{border-bottom:none}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:13px;font-weight:700;color:#000!important;line-height:1.3;font-family:Arial,Helvetica,sans-serif}#printArea *{color:#000!important}#printArea.print-a4{width:190mm;font-size:13px;font-weight:600}#printArea.print-a5{width:138mm;font-size:11px;font-weight:600}@page{margin:1mm 2mm;size:80mm 300mm}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:13px;font-weight:700;color:#000!important;line-height:1.3;font-family:Tahoma,Arial,sans-serif}#printArea *{color:#000!important}#printArea.print-a4{width:190mm;font-size:13px;font-weight:600}#printArea.print-a5{width:138mm;font-size:11px;font-weight:600}@page{margin:1mm 2mm;size:80mm 300mm}}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -3758,7 +3758,7 @@ function deleteExpense(idx){
 function buildBillHTML(o){
   var s=getShopSettings();var bc=s.billConfig||{};var paid=isPaidCheck(o);
   // ═══ Thermal-optimized receipt — ตัวเข้ม อ่านง่าย กระดาษสั้น ═══
-  var h='<div style="width:80mm;font-family:Arial,Helvetica,var(--ff),sans-serif;font-size:14px;padding:4px 6px;color:#000;background:#fff;font-weight:700;margin:0 auto;line-height:1.35">';
+  var h='<div style="width:80mm;font-family:Tahoma,Arial,sans-serif;font-size:14px;padding:4px 6px;color:#000;background:#fff;font-weight:700;margin:0 auto;line-height:1.35">';
   // ── Header ──
   var logoH=(bc.logoSize||50);
   if(s.logo&&bc.showLogo!==false) h+='<div style="text-align:center;margin-bottom:4px"><img src="'+s.logo+'" style="height:'+logoH+'px"></div>';
