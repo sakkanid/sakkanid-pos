@@ -3588,7 +3588,7 @@ function viewMemberDetail(mid){
     (orders.length?'<table><tr><th>เลข</th><th>ประเภท</th><th>ยอด</th><th>สถานะ</th><th>วันที่</th></tr>'+
     orders.slice(0,20).map(o=>'<tr><td>'+o.id+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
     '</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length&&String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
   openMo('moDetail');
 }
 
@@ -4127,24 +4127,18 @@ function mcDeletePreset(i){
   s.cardPresets.splice(i,1);saveDB();toast('ลบ Preset สำเร็จ');
 }
 function mcExportPNG(){
-  var el=$('memberCardEl');if(!el) return;
-  toast('กำลัง Export PNG...','info');
-  var qrCanvas=$('memberQR')?$('memberQR').querySelector('canvas'):null;
-  if(typeof html2canvas!=='undefined'){
-    html2canvas(el,{scale:2,backgroundColor:null,useCORS:true}).then(function(canvas){
-      // If QR was missed by html2canvas, draw it manually
-      if(qrCanvas){
-        var ctx=canvas.getContext('2d');
-        var qrEl=$('memberQR');
-        var rect=qrEl.getBoundingClientRect();var elRect=el.getBoundingClientRect();
-        var x=(rect.left-elRect.left)*2,y=(rect.top-elRect.top)*2;
-        ctx.fillStyle='#fff';ctx.fillRect(x,y,qrCanvas.width*2+16,qrCanvas.height*2+16);
-        ctx.drawImage(qrCanvas,x+8,y+8,qrCanvas.width*2,qrCanvas.height*2);
-      }
-      var a=document.createElement('a');a.href=canvas.toDataURL('image/png');
-      a.download='member_card_'+window._mcMid+'.png';a.click();toast('Export PNG สำเร็จ ✅');
-    });
-  }else{toast('ไม่พบ html2canvas','err')}
+  var el=$('memberCardEl');if(!el){toast('ไม่พบบัตร','err');return}
+  if(typeof html2canvas==='undefined'){toast('กำลังโหลด... ลองอีกครั้ง','warn');return}
+  toast('📸 กำลัง Export PNG...','info');
+  html2canvas(el,{scale:3,backgroundColor:null,useCORS:true,logging:false,width:el.offsetWidth,height:el.offsetHeight,onclone:function(doc){
+    // บังคับให้ gradient + สีแสดงใน clone
+    var cloned=doc.getElementById('memberCardEl');
+    if(cloned){cloned.style.transform='none';cloned.style.margin='0'}
+  }}).then(function(canvas){
+    var a=document.createElement('a');a.href=canvas.toDataURL('image/png');
+    a.download='member_card_'+(window._mcMid||'card')+'.png';a.click();
+    toast('✅ Export PNG สำเร็จ');
+  }).catch(function(e){toast('❌ '+e.message,'err')});
 }
 
 // ═══ MISSING — CRM/MEMBER ═══
@@ -5269,7 +5263,10 @@ async function sendDailySummaryLine(){
 // ═══ ส่งข้อมูล Package โควต้าคงเหลือให้ลูกค้าทาง LINE ═══
 async function sendQuotaInfoLine(mid){
   var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
-  if(!m.lineUserId){toast('⚠️ ลูกค้ายังไม่มี LINE User ID','warn');return}
+  var uid=String(m.lineUserId||'').trim();
+  if(!uid||uid.length<30||uid.charAt(0)!=='U'){
+    toast('⚠️ ลูกค้ายังไม่มี LINE User ID ที่ถูกต้อง — ต้องให้ลูกค้าทักแชทหา LINE OA ก่อน','warn');return;
+  }
   var quotas=(DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0});
   if(!quotas.length){toast('ลูกค้าไม่มีโควต้าคงเหลือ','warn');return}
   var bodyC=[{type:'text',text:'สวัสดีค่ะ '+m.name,size:'sm',weight:'bold'},{type:'separator',margin:'md'}];
@@ -5338,12 +5335,12 @@ function openTagConfig(){
   var h='<div class="modal-overlay show" id="moTagCfg"><div class="modal" style="max-width:400px"><div class="modal-head"><h3>⚙️ ตั้งค่าป้ายติดผ้า</h3><button class="modal-close" onclick="document.getElementById(\'moTagCfg\').remove()">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="form-group"><label class="form-label">ความกว้างป้าย (mm)</label><input id="tc-width" type="number" value="'+(tc.width||70)+'"></div>'+
-    '<div class="card-title" style="font-size:13px">แสดงข้อมูลในป้าย:</div>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-item" '+(tc.showItem!==false?'checked':'')+'> รายการซัก (หมวด·ประเภท)</label>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-cust" '+(tc.showCust!==false?'checked':'')+'> ชื่อลูกค้า</label>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-phone" '+(tc.showPhone?'checked':'')+'> เบอร์โทร</label>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-date" '+(tc.showDate!==false?'checked':'')+'> วันที่รับ</label>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-pickup" '+(tc.showPickup?'checked':'')+'> วันนัดรับ</label>'+
+    '<div class="card-title" style="font-size:13px;margin-bottom:6px">แสดงข้อมูลในป้าย:</div>'+
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer;border-bottom:1px solid var(--bd)"><input type="checkbox" id="tc-item" '+(tc.showItem!==false?'checked':'')+' style="flex:none;width:18px;height:18px"> <span style="flex:1">รายการซัก (หมวด·ประเภท)</span></label>'+
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer;border-bottom:1px solid var(--bd)"><input type="checkbox" id="tc-cust" '+(tc.showCust!==false?'checked':'')+' style="flex:none;width:18px;height:18px"> <span style="flex:1">ชื่อลูกค้า</span></label>'+
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer;border-bottom:1px solid var(--bd)"><input type="checkbox" id="tc-phone" '+(tc.showPhone?'checked':'')+' style="flex:none;width:18px;height:18px"> <span style="flex:1">เบอร์โทร</span></label>'+
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer;border-bottom:1px solid var(--bd)"><input type="checkbox" id="tc-date" '+(tc.showDate!==false?'checked':'')+' style="flex:none;width:18px;height:18px"> <span style="flex:1">วันที่รับ</span></label>'+
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer"><input type="checkbox" id="tc-pickup" '+(tc.showPickup?'checked':'')+' style="flex:none;width:18px;height:18px"> <span style="flex:1">วันนัดรับ</span></label>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moTagCfg\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveTagConfig()">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
