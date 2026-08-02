@@ -125,7 +125,9 @@ tr:last-child td{border-bottom:none}
 .filter-chip.act{background:var(--pr);color:#fff;border-color:var(--pr)}
 /* ═══ PRINT ═══ */
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:13px;font-weight:700;color:#000!important;line-height:1.3;font-family:Tahoma,Arial,sans-serif}#printArea *{color:#000!important}#printArea.print-a4{width:190mm;font-size:13px;font-weight:600}#printArea.print-a5{width:138mm;font-size:11px;font-weight:600}@page{margin:1mm 2mm;size:80mm 300mm}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:72mm;font-size:13px;font-weight:700;color:#000!important;line-height:1.3;font-family:Tahoma,Arial,sans-serif}#printArea *{color:#000!important}#printArea.print-a4{width:190mm;font-size:13px;font-weight:600}#printArea.print-a5{width:138mm;font-size:11px;font-weight:600}@page{margin:2mm}}
+@media print{#printArea:not(.print-a4):not(.print-a5){width:72mm}}
+.print-a4-page{}
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;z-index:999;transition:.3s;width:260px;height:100vh}
@@ -1419,18 +1421,29 @@ function showBill(oid){
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="openDocModal(\''+oid+'\')">📄 ออกเอกสาร</button><button class="btn btn-out" onclick="saveBillImage(\''+oid+'\')">📸 บันทึกรูป</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button>'+(isPaidCheck(gO(oid))?'':'<button class="btn btn-am" onclick="sendQrPayment(\''+oid+'\')">📲 ส่ง QR ชำระ</button>')+'<button class="btn btn-gn" onclick="sendBillPdfViaLine(\''+oid+'\')" id="btnSendPdf'+oid+'">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
   openMo('moBill');
 }
-function doPrint(oid){
+function doPrint(oid,paperSize){
   const billEl=$('moBillIn').querySelector('.modal-body');
   if(!billEl) return;
   var pa=$('printArea');pa.innerHTML=billEl.innerHTML;
-  // Detect paper size from content
   var content=billEl.innerHTML;
-  if(content.includes('width:210mm')) pa.className='print-a4';
-  else if(content.includes('width:148mm')) pa.className='print-a5';
-  else pa.className='';
+  // ═══ ตรวจประเภทกระดาษ ═══
+  // paperSize อาจถูกส่งมาจากปุ่ม (a4/a5/thermal) หรือ auto-detect
+  var size=paperSize||'';
+  if(!size){
+    if(content.includes('width:210mm')||content.includes('width:190mm')) size='a4';
+    else if(content.includes('width:148mm')||content.includes('width:138mm')) size='a5';
+    else size='thermal';
+  }
+  // Inject dynamic @page style
+  var oldStyle=document.getElementById('dynPageStyle');if(oldStyle) oldStyle.remove();
+  var styleEl=document.createElement('style');styleEl.id='dynPageStyle';
+  if(size==='a4'){pa.className='print-a4';styleEl.innerHTML='@media print{@page{size:A4 portrait;margin:12mm}}'}
+  else if(size==='a5'){pa.className='print-a5';styleEl.innerHTML='@media print{@page{size:A5 portrait;margin:8mm}}'}
+  else{pa.className='';styleEl.innerHTML='@media print{@page{size:80mm 300mm;margin:1mm 2mm}}'}
+  document.head.appendChild(styleEl);
   pa.style.display='block';
   window.print();
-  setTimeout(()=>{pa.style.display='none';pa.className=''},500);
+  setTimeout(function(){pa.style.display='none';pa.className='';if(styleEl)styleEl.remove()},500);
 }
 function saveBillImage(oid){
   // จับภาพเฉพาะบิล ไม่รวม padding ของ modal
@@ -1601,7 +1614,7 @@ function generateDocument(oid){
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="saveDocDataThenSendPdf(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\')">🖨️ พิมพ์</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+docNum+'\')">📸 บันทึกรูป</button><button class="btn btn-gn" onclick="saveDocDataThenSendPdf(\''+oid+'\',\''+docNum+'\',\''+dtype+'\')">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+docNum+'\',\'a4\')">🖨️ พิมพ์ A4</button><button class="btn btn-out" onclick="doPrint(\''+docNum+'\',\'a5\')">🖨️ A5</button></div>';
   // Remove doc modal
   var docMo=$('moDoc');if(docMo) docMo.remove();
   // Save to document history
