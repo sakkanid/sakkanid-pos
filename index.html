@@ -1939,7 +1939,8 @@ function openBedsetForm(m){
     '</div>'+
     // Delivery + other fields
     '<div class="grid g2"><div class="form-group"><label class="form-label">วิธีรับผ้า</label><select id="bs-delivery" onchange="bsDeliveryChange();bsCalcNet()"><option value="pickup">🏪 รับที่ร้าน</option><option value="delivery">🚗 Delivery</option></select></div>'+
-    '<div class="form-group" id="bs-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="bs-del-sel">'+tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+'</select></div></div>'+
+    '<div class="form-group" id="bs-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="bs-del-sel" onchange="bsDelCostChange();bsCalcNet()">'+tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+'<option value="custom">✏️ กำหนดเอง</option></select><input id="bs-del-custom" type="number" placeholder="฿" style="display:none;margin-top:6px" oninput="bsCalcNet()"></div></div>'+
+    '<div class="form-group" id="bs-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="bs-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'bs\')" style="white-space:nowrap">📍 คำนวณ</button></div><div id="bs-map-result" style="font-size:12px;margin-top:4px"></div><label class="form-label" style="margin-top:8px">🗺️ ลิงก์ Google Maps</label><input id="bs-maplink" placeholder="วางลิงก์ Google Maps"></div>'+
     '<div class="form-group"><label class="form-label">วันนัดรับ</label><input id="bs-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="bs-note" type="text"></div>'+
     '<div class="form-group"><label class="form-label">🎁 โปรโมชั่น</label><select id="bs-promo" onchange="bsCalcNet()"><option value="">— ไม่ใช้โปร —</option>'+getActivePromos().map(function(p,i){return '<option value="'+i+'">'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
@@ -1997,7 +1998,8 @@ function bsItemCheck(){
 }
 function bsSizeChange(){bsSetChange()}
 function bsCalcTotal(){bsSetChange()}
-function bsDeliveryChange(){var isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';if($('bs-del-tier'))$('bs-del-tier').style.display=isDel?'block':'none'}
+function bsDeliveryChange(){var isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';if($('bs-del-tier'))$('bs-del-tier').style.display=isDel?'block':'none';if($('bs-del-addr'))$('bs-del-addr').style.display=isDel?'block':'none'}
+function bsDelCostChange(){var sel=$('bs-del-sel');var c=$('bs-del-custom');if(sel&&c)c.style.display=sel.value==='custom'?'block':'none'}
 function bsPaidChange(){if($('bs-pay-detail'))$('bs-pay-detail').style.display=$('bs-paid').value==='1'?'block':'none'}
 function saveBedset(){
   const m=gM(bedMemberId);if(!m) return;
@@ -2021,7 +2023,7 @@ function saveBedset(){
   items.unshift({c:'เครื่องนอน Set',ce:'Bedding Set',t:bs.label,te:bs.label,o:total+' ชิ้น',oe:total+' pcs',qty:1,p:bs.price,k:bs.cost});
   // Delivery
   const isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';
-  const delCost=isDel?parseFloat($('bs-del-sel')?$('bs-del-sel').value:0)||0:0;
+  var bsDelSel=$('bs-del-sel')?$('bs-del-sel').value:'0';const delCost=isDel?(bsDelSel==='custom'?(parseFloat($('bs-del-custom')?$('bs-del-custom').value:0)||0):parseFloat(bsDelSel)||0):0;
   // Promo
   var disc=0;var promoName='';
   var pi=$('bs-promo')?$('bs-promo').value:'';
@@ -2033,7 +2035,7 @@ function saveBedset(){
   var payDt=paidNow?fmtDate(new Date($('bs-paydate')?$('bs-paydate').value:new Date())):'';
   var payTm=paidNow?($('bs-paytime')?$('bs-paytime').value:''):'';
   const method=paidNow&&$('bs-method')?$('bs-method').value:'เงินสด';
-  const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo):'',items:items,extras:[],disc:disc,net:net,cost:bs.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
+  const order={id:genId('BED'),type:'bedset',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?($('bs-addr')?$('bs-addr').value.trim():(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo)):'',mapLink:isDel?($('bs-maplink')?$('bs-maplink').value.trim():''):'',items:items,extras:[],disc:disc,net:net,cost:bs.cost,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('bs-note')?$('bs-note').value:'',pickupDate:$('bs-pickup')?$('bs-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
   DB.orders.push(order);deductShopQuota((order.items||[]).reduce(function(s,it){return s+(it.qty||1)},0),'bedset',order.items);if(order.isPaid){m.spend+=net;m.pts+=order.pts}saveDB();
   logAction('CREATE_ORDER',order.id+' Bedset '+bs.label+' '+total+'ชิ้น');toast('สร้างออเดอร์เครื่องนอนสำเร็จ ✅ '+bs.label);
   closeMo('moBedset');navTo('orders');
@@ -2657,7 +2659,7 @@ function openSvcPriceEdit(type,i){
   if(type==='bed'){label=BED_SETS[i].label;price=BED_SETS[i].price;cost=BED_SETS[i].cost}
   else if(type==='cln'){label=CLN_SVCS[i].label;price=CLN_SVCS[i].minPrice;cost=CLN_SVCS[i].cost}
   else if(type==='pkg'){label=PKGS[i].type+' '+PKGS[i].qty;price=PKGS[i].price;cost=PKGS[i].cost;expDays=PKGS[i].expDays}
-  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="sp-d" type="number" value="'+expDays+'" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="sp-noexp" '+(expDays==0?'checked':'')+' onchange="if(this.checked){document.getElementById(\'sp-d\').value=0}else{document.getElementById(\'sp-d\').value=90}"> ♾️ ไม่มีวันหมดอายุ</label></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
+  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ Package</label><input id="sp-d" type="number" value="'+expDays+'" placeholder="จำนวนวัน"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer;padding:8px;background:var(--bg);border-radius:6px"><input type="checkbox" id="sp-noexp" '+(expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"> <span>♾️ ไม่มีวันหมดอายุ</span></label></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function saveSvcPrice(type,i){
@@ -3412,6 +3414,7 @@ function importBackup(e){
 function openUseQuotaForm(m){
   const quotas=(DB.quotas||[]).filter(q=>q.mid===m.id&&q.remain>0);
   if(!quotas.length){toast('ลูกค้ายังไม่มีโควต้า — ต้องซื้อ Package ก่อน','warn');return}
+  var s=getShopSettings();var tiers=s.deliveryTiers||DEL_TIERS_DEFAULT;
   $('moUseQuotaIn').innerHTML=
     '<div class="modal-head"><h3>🎫 ใช้โควต้า</h3><button class="modal-close" onclick="closeMo(\'moUseQuota\')">&times;</button></div>'+
     '<div class="modal-body">'+
@@ -3419,21 +3422,38 @@ function openUseQuotaForm(m){
     '<div class="form-group"><label class="form-label">เลือก Package</label><select id="uq-pkg">'+
     quotas.map((q,i)=>'<option value="'+i+'">'+q.pkgName+' — เหลือ '+q.remain+'/'+q.total+' ชิ้น</option>').join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">จำนวนที่ใช้</label><input id="uq-qty" type="number" value="1" min="1"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วิธีรับผ้า</label><select id="uq-delivery" onchange="uqDeliveryChange()"><option value="pickup">🏪 รับที่ร้าน</option><option value="delivery">🚗 Delivery</option></select></div>'+
+    '<div class="form-group" id="uq-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="uq-del-sel" onchange="uqDelCostChange()">'+
+    tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+
+    '<option value="custom">✏️ กำหนดเอง</option></select><input id="uq-del-custom" type="number" placeholder="฿" style="display:none;margin-top:6px"></div></div>'+
+    '<div class="form-group" id="uq-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="uq-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'uq\')" style="white-space:nowrap">📍 คำนวณ</button></div><div id="uq-map-result" style="font-size:12px;margin-top:4px"></div>'+
+    '<label class="form-label" style="margin-top:8px">🗺️ ลิงก์ Google Maps</label><input id="uq-maplink" placeholder="วางลิงก์ Google Maps"></div>'+
+    '<div class="form-group"><label class="form-label">วันนัดรับ</label><input id="uq-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moUseQuota\')">ยกเลิก</button><button class="btn btn-gn" onclick="uqSave()">✅ ใช้โควต้า</button></div>';
   openMo('moUseQuota');
 }
+function uqDeliveryChange(){var isDel=$('uq-delivery')&&$('uq-delivery').value==='delivery';if($('uq-del-tier'))$('uq-del-tier').style.display=isDel?'block':'none';if($('uq-del-addr'))$('uq-del-addr').style.display=isDel?'block':'none'}
+function uqDelCostChange(){var sel=$('uq-del-sel');var c=$('uq-del-custom');if(sel&&c)c.style.display=sel.value==='custom'?'block':'none'}
 function uqSave(){
   const m=gM(uqMemberId);if(!m) return;
   const quotas=(DB.quotas||[]).filter(q=>q.mid===m.id&&q.remain>0);
   const idx=parseInt($('uq-pkg').value);const q=quotas[idx];if(!q) return;
   const qty=parseInt($('uq-qty').value)||1;
   if(qty>q.remain){toast('โควต้าไม่พอ! เหลือ '+q.remain+' ชิ้น','err');return}
+  // ═══ วิธีจัดส่ง ═══
+  var isDel=$('uq-delivery')&&$('uq-delivery').value==='delivery';
+  var delSel=$('uq-del-sel')?$('uq-del-sel').value:'0';
+  var delCost=isDel?(delSel==='custom'?(parseFloat($('uq-del-custom')?$('uq-del-custom').value:0)||0):parseFloat(delSel)||0):0;
+  var delAddr=isDel?($('uq-addr')?$('uq-addr').value.trim():''):'';
+  var mapLink=isDel?($('uq-maplink')?$('uq-maplink').value.trim():''):'';
+  var pickupD=$('uq-pickup')?$('uq-pickup').value:defaultPickupDate();
   q.used+=qty;q.remain-=qty;
-  const order={id:genId('LDR'),type:'quota',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'ใช้โควต้า',t:q.pkgType,o:q.pkgName,qty,p:0,k:0}],extras:[],disc:0,net:0,cost:0,payHist:[],isPaid:true,pts:0,note:'ใช้โควต้า '+q.pkgName,pickupDate:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick,quotaId:q.id,quotaUsed:qty};
+  var net=delCost;// ค่าจัดส่งต้องจ่าย (โควต้าตัดค่าซัก แต่ค่าส่งจ่ายเพิ่ม)
+  const order={id:genId('LDR'),type:'quota',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:delAddr,mapLink:mapLink,items:[{c:'ใช้โควต้า',t:q.pkgType,o:q.pkgName,qty,p:0,k:0}],extras:[],disc:0,net:net,cost:0,payHist:[],isPaid:net<=0,pts:0,note:'ใช้โควต้า '+q.pkgName+(delCost?' + ค่าส่ง '+thb(delCost):''),pickupDate:pickupD,createdAt:fmtDT(),by:curUser.nick,quotaId:q.id,quotaUsed:qty};
   DB.orders.push(order);deductShopQuota(qty,'laundry',order.items);saveDB();
   logAction('CREATE_ORDER',order.id+' ใช้โควต้า '+qty);
-  toast('ใช้โควต้าสำเร็จ ✅ เหลือ '+q.remain+' ชิ้น');
+  toast('ใช้โควต้าสำเร็จ ✅ เหลือ '+q.remain+' ชิ้น'+(delCost?' (ค่าส่ง '+thb(delCost)+' รอชำระ)':''));
   closeMo('moUseQuota');navTo('orders');
 }
 
@@ -4548,7 +4568,7 @@ function bsCalcNet(){
   var idx=parseInt($('bs-set')?$('bs-set').value:0);var b=BED_SETS[idx];if(!b)return;
   var price=b.price;var disc=0;
   var isDel=$('bs-delivery')&&$('bs-delivery').value==='delivery';
-  var delCost=isDel?parseFloat($('bs-del-sel')?$('bs-del-sel').value:0)||0:0;
+  var bsDelSel2=$('bs-del-sel')?$('bs-del-sel').value:'0';var delCost=isDel?(bsDelSel2==='custom'?(parseFloat($('bs-del-custom')?$('bs-del-custom').value:0)||0):parseFloat(bsDelSel2)||0):0;
   var pi=$('bs-promo')?$('bs-promo').value:'';
   if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){if(pr.type==='percent')disc=Math.round(price*pr.value/100);else if(pr.type!=='buyXfreeY')disc=pr.value||0}}
   var net=Math.max(0,price+delCost-disc);
@@ -5277,19 +5297,62 @@ async function sendQuotaInfoLine(mid){
 // ═══ ข้อ 6: พิมพ์ป้ายติดผ้า ═══
 function printGarmentTags(oid){
   var o=gO(oid);if(!o) return;
-  var h='<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#000">';
-  (o.items||[]).forEach(function(it,idx){
+  var s=getShopSettings();var tc=s.tagConfig||{};
+  var totalQty=(o.items||[]).reduce(function(s,i){return s+(i.qty||1)},0);
+  var tagNum=0;
+  var h='';
+  (o.items||[]).forEach(function(it){
     for(var q=0;q<(it.qty||1);q++){
-      h+='<div style="border:2px dashed #000;padding:6px 10px;margin:4px 0;page-break-inside:avoid;display:flex;justify-content:space-between;align-items:center">'+
-        '<div><div style="font-size:16px;font-weight:900">'+o.id+'</div>'+
-        '<div style="font-size:12px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>'+
-        '<div style="font-size:11px">'+o.mname+' · '+fmtDate()+'</div></div>'+
-        '<div style="font-size:20px;font-weight:900">'+(idx+1)+'/'+(o.items||[]).reduce(function(s,i){return s+(i.qty||1)},0)+'</div></div>';
+      tagNum++;
+      h+='<div style="border:2px dashed #000;padding:8px 12px;margin:6px 0;page-break-inside:avoid;width:'+(tc.width||70)+'mm;font-family:Tahoma,Arial,sans-serif">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div style="font-size:'+(tc.idSize||18)+'px;font-weight:900;color:#000">'+o.id+'</div>'+
+        '<div style="font-size:'+(tc.numSize||16)+'px;font-weight:900;color:#000">'+tagNum+'/'+totalQty+'</div></div>'+
+        (tc.showItem!==false?'<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>':'')+
+        (tc.showCust!==false?'<div style="font-size:12px;font-weight:600;color:#000">'+o.mname+'</div>':'')+
+        (tc.showPhone?'<div style="font-size:11px;color:#000">📱 '+fmtPhone(o.mphone)+'</div>':'')+
+        (tc.showDate!==false?'<div style="font-size:11px;color:#000">'+fmtDate()+'</div>':'')+
+        (tc.showPickup&&o.pickupDate?'<div style="font-size:11px;color:#000">📅 นัดรับ '+fmtISO(o.pickupDate)+'</div>':'')+
+        '</div>';
     }
   });
-  h+='</div>';
-  var pa=$('printArea');pa.className='';pa.innerHTML=h;window.print();
-  setTimeout(function(){renderPage(curPage)},1000);
+  // แสดง preview modal ก่อนพิมพ์
+  var modal='<div class="modal-overlay show" id="moTag"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🏷️ ป้ายติดผ้า ('+totalQty+' ป้าย)</h3><button class="modal-close" onclick="document.getElementById(\'moTag\').remove()">&times;</button></div>'+
+    '<div class="modal-body"><div style="max-height:400px;overflow-y:auto;background:#fff;padding:10px">'+h+'</div></div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moTag\').remove()">ปิด</button><button class="btn btn-out" onclick="openTagConfig()">⚙️ ตั้งค่าป้าย</button><button class="btn btn-pr" onclick="doPrintTags()">🖨️ พิมพ์</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',modal);
+  window._tagHTML=h;
+}
+function doPrintTags(){
+  var pa=$('printArea');
+  var oldStyle=document.getElementById('tagPrintStyle');if(oldStyle)oldStyle.remove();
+  var st=document.createElement('style');st.id='tagPrintStyle';
+  st.innerHTML='@media print{#printArea,#printArea *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#printArea{width:auto!important;font-weight:normal!important;transform:none!important}@page{size:auto;margin:5mm}}';
+  document.head.appendChild(st);
+  pa.className='';pa.innerHTML=window._tagHTML||'';pa.style.display='block';
+  window.print();
+  setTimeout(function(){pa.style.display='none';if(st)st.remove();var m=document.getElementById('moTag');if(m)m.remove()},500);
+}
+function openTagConfig(){
+  var s=getShopSettings();var tc=s.tagConfig||{};
+  var h='<div class="modal-overlay show" id="moTagCfg"><div class="modal" style="max-width:400px"><div class="modal-head"><h3>⚙️ ตั้งค่าป้ายติดผ้า</h3><button class="modal-close" onclick="document.getElementById(\'moTagCfg\').remove()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="form-group"><label class="form-label">ความกว้างป้าย (mm)</label><input id="tc-width" type="number" value="'+(tc.width||70)+'"></div>'+
+    '<div class="card-title" style="font-size:13px">แสดงข้อมูลในป้าย:</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-item" '+(tc.showItem!==false?'checked':'')+'> รายการซัก (หมวด·ประเภท)</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-cust" '+(tc.showCust!==false?'checked':'')+'> ชื่อลูกค้า</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-phone" '+(tc.showPhone?'checked':'')+'> เบอร์โทร</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-date" '+(tc.showDate!==false?'checked':'')+'> วันที่รับ</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer"><input type="checkbox" id="tc-pickup" '+(tc.showPickup?'checked':'')+'> วันนัดรับ</label>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moTagCfg\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveTagConfig()">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveTagConfig(){
+  var s=getShopSettings();
+  s.tagConfig={width:parseInt($('tc-width').value)||70,showItem:$('tc-item').checked,showCust:$('tc-cust').checked,showPhone:$('tc-phone').checked,showDate:$('tc-date').checked,showPickup:$('tc-pickup').checked};
+  saveDB();toast('💾 บันทึกตั้งค่าป้าย ✅');
+  document.getElementById('moTagCfg').remove();
+  var m=document.getElementById('moTag');if(m)m.remove();
 }
 
 // ═══════════════════════════════════════════════════════════
