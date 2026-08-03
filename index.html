@@ -28,14 +28,14 @@
 body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;overflow:hidden;height:100vh}
 /* ═══ LOGIN ═══ */
 #lockScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#004E6B,#006F98 35%,#1ABBEF 70%,#7FD2FD 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:20px}
-.login-card{display:flex;background:rgba(255,255,255,.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.2);border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.3);max-width:840px;width:100%;min-height:480px}
+.login-card{display:flex;background:rgba(255,255,255,.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.2);border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.3);max-width:800px;width:100%;max-height:92vh}
 .login-left{flex:1;background:linear-gradient(160deg,#F4F9FB,#E3F2FA);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;position:relative}
 .login-mascot{width:100%;max-width:300px;height:auto}
 .login-tagline{color:#006F98;font-weight:700;font-size:17px;margin-top:12px;letter-spacing:.5px}
-.login-right{flex:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center}
+.login-right{flex:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 32px;text-align:center;overflow-y:auto}
 @media(max-width:720px){.login-card{flex-direction:column;min-height:auto;max-width:420px}.login-left{padding:28px 20px}.login-mascot{max-width:180px}.login-right{padding:28px 20px}}
-.lock-logo{font-size:44px;font-weight:800;margin-bottom:6px;text-shadow:0 4px 30px rgba(0,0,0,.25);letter-spacing:-.5px}
-.lock-sub{opacity:.85;font-size:14px;margin-bottom:40px;font-weight:500;letter-spacing:2px}
+.lock-logo{font-size:32px;font-weight:800;margin-bottom:4px;text-shadow:0 4px 30px rgba(0,0,0,.25);letter-spacing:-.5px}
+.lock-sub{opacity:.85;font-size:13px;margin-bottom:16px;font-weight:500;letter-spacing:2px}
 .user-grid{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:24px}
 .user-btn{background:rgba(255,255,255,.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;padding:18px 24px;color:#fff;cursor:pointer;text-align:center;min-width:130px;transition:.25s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 24px rgba(0,0,0,.12)}
 .user-btn:hover,.user-btn.sel{background:rgba(255,255,255,.28);border-color:#fff;transform:translateY(-4px) scale(1.03);box-shadow:0 12px 32px rgba(0,0,0,.2)}
@@ -3230,6 +3230,7 @@ function renderSettingsConnect(s){
     '<div class="form-group"><label class="form-label">Channel Access Token</label><input id="cn-line-token" type="password" value="'+(s.lineChannelToken||'')+'" placeholder="ใส่ Channel Access Token จาก LINE Developers"></div>'+
     '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
     '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
+    '<div class="form-group"><label class="form-label">LINE OA Numeric ID <span style="font-size:10px;color:var(--t3)">(สำหรับปุ่มแชทตรง — ดูจาก URL ตอนเปิด chat.line.biz)</span></label><input id="cn-line-oanum" type="text" value="'+(s.lineOaNumId||'')+'" placeholder="เช่น 123456789"></div>'+
     '<div class="form-group"><label class="form-label">LIFF ID <span style="font-size:10px;color:var(--t3)">(สำหรับ LINE Login สมัครสมาชิก)</span></label><input id="cn-liff-id" type="text" value="'+(s.liffId||'')+'" placeholder="1234567890-abcdefgh"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
@@ -3278,6 +3279,8 @@ function saveConnectionSettings(){
   if(token) s.lineChannelToken=token; else delete s.lineChannelToken;
   if(secret) s.lineChannelSecret=secret; else delete s.lineChannelSecret;
   if(oa) s.lineOA=oa;
+  var oaNum=$('cn-line-oanum')?$('cn-line-oanum').value.trim():'';
+  if(oaNum) s.lineOaNumId=oaNum; else delete s.lineOaNumId;
   var liffId=$('cn-liff-id')?$('cn-liff-id').value.trim():'';
   if(liffId) s.liffId=liffId; else delete s.liffId;
   s.dailyReportTo=$('cn-report-to')?$('cn-report-to').value.trim():'';
@@ -3829,8 +3832,9 @@ function openEditMember(mid){
     '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input id="em-name" value="'+m.name+'"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="em-nick" value="'+(m.nick||'')+'"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">เบอร์โทร</label><input id="em-phone" value="'+ph+'"></div>'+
-    '<div class="form-group"><label class="form-label">LINE ID</label><input id="em-line" value="'+(m.lineId||'')+'"></div></div>'+
-    '<div class="form-group"><label class="form-label">LINE User ID</label><input id="em-line-uid" value="'+(m.lineUserId||'')+'" placeholder="Uxxxxxxxx (ได้จาก webhook/LIFF)"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อ LINE <span style="font-size:10px;color:var(--t3)">(ดึงจาก LINE)</span></label><input id="em-linename" value="'+(m.lineName||'')+'" placeholder="อัปเดตเองเมื่อลูกค้าทักแชท"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">LINE ID</label><input id="em-line" value="'+(m.lineId||'')+'"></div>'+
+    '<div class="form-group"><label class="form-label">LINE User ID</label><input id="em-line-uid" value="'+(m.lineUserId||'')+'" placeholder="Uxxxxxxxx (ได้จาก webhook/LIFF)"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="em-addr"><option value="condo"'+(m.addrType==='condo'?' selected':'')+'>คอนโด</option><option value="house"'+(m.addrType==='house'?' selected':'')+'>บ้าน/หมู่บ้าน</option></select></div>'+
     '<div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="em-proj" value="'+(m.proj||'')+'"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="em-room" value="'+(m.room||m.houseNo||'')+'"></div>'+
@@ -3846,6 +3850,7 @@ function saveEditMember(mid){
   if(rawPhone&&rawPhone.charAt(0)!=='0') rawPhone='0'+rawPhone;
   m.phone=rawPhone||m.phone;
   m.lineId=$('em-line').value.trim();
+  m.lineName=$('em-linename')?$('em-linename').value.trim():'';
   m.lineUserId=$('em-line-uid')?$('em-line-uid').value.trim():'';
   m.addrType=$('em-addr')?$('em-addr').value:'condo';
   m.proj=$('em-proj')?$('em-proj').value.trim():'';
@@ -5492,11 +5497,20 @@ async function sendDailySummaryLine(){
 // ═══ แชทกับลูกค้า — เปิด LINE OA Chat ═══
 function chatWithCustomer(mid){
   var m=gM(mid);if(!m) return;
+  var s=getShopSettings();
+  var uid=String(m.lineUserId||'').trim();
+  var oaNumId=(s.lineOaNumId||'').replace(/[^0-9]/g,'');
+  // ถ้ามี OA numeric ID + userId → เปิดแชทลูกค้าตรงเลย
+  if(oaNumId&&uid.length>=30){
+    window.open('https://chat.line.biz/'+oaNumId+'/chat/'+uid,'_blank');
+    toast('💬 เปิดแชท '+(m.lineName||m.name),'info');
+    return;
+  }
+  // ไม่มี OA numeric ID → copy ชื่อ + เปิดหน้าแชทรวม
   var searchName=m.lineName||m.name||'';
-  // LINE ไม่มี URL เปิดแชทรายคนได้ — เปิดหน้าแชท OA + copy ชื่อให้ค้นหา
   if(navigator.clipboard&&searchName){
     navigator.clipboard.writeText(searchName).then(function(){
-      toast('📋 คัดลอกชื่อ "'+searchName+'" แล้ว — วางในช่องค้นหาแชท LINE','info');
+      toast('📋 คัดลอก "'+searchName+'" — วางค้นหาในแชท (ตั้งค่า OA ID ในตั้งค่าเพื่อเปิดแชทตรง)','info');
     }).catch(function(){});
   }
   window.open('https://chat.line.biz/','_blank');
@@ -5505,30 +5519,23 @@ async function sendQuotaInfoLine(mid){
   var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
   var uid=String(m.lineUserId||'').trim();
   if(!uid||uid.length<30||uid.charAt(0)!=='U'){
-    toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+uid.substring(0,25)+'" (ต้องขึ้นต้น U ยาว 33 ตัว)\nลูกค้าต้องทักแชท LINE OA ก่อน','warn');return;
+    toast('⚠️ LINE User ID ไม่ถูกต้อง — ลูกค้าต้องทักแชท LINE OA ก่อน','warn');return;
   }
   var quotas=(DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0});
   if(!quotas.length){toast('ลูกค้าไม่มีโควต้าคงเหลือ','warn');return}
-  var bodyC=[{type:'text',text:'สวัสดีค่ะ '+m.name,size:'sm',weight:'bold'},{type:'separator',margin:'md'}];
-  quotas.forEach(function(q){
-    var pct=q.total>0?Math.round(q.remain/q.total*100):0;
-    bodyC.push({type:'box',layout:'vertical',margin:'md',contents:[
-      {type:'text',text:'📦 '+q.pkgName,size:'sm',weight:'bold',color:'#7C3AED'},
-      {type:'box',layout:'horizontal',margin:'xs',contents:[
-        {type:'text',text:'คงเหลือ '+q.remain+'/'+q.total+' ชิ้น',size:'xs',color:'#333333',flex:3},
-        {type:'text',text:pct+'%',size:'xs',align:'end',flex:1,color:pct>30?'#10B981':'#DC2626'}
-      ]},
-      {type:'text',text:q.exp&&q.exp!=='ไม่มีวันหมดอายุ'?'📅 หมดอายุ '+q.exp:'♾️ ไม่มีวันหมดอายุ',size:'xxs',color:'#888888',margin:'xs'}
-    ]});
-  });
   var s=getShopSettings();
-  var flex={type:'flex',altText:'ข้อมูลแพ็คเกจคงเหลือ',contents:{type:'bubble',
-    header:{type:'box',layout:'vertical',backgroundColor:'#7C3AED',paddingAll:'12px',contents:[{type:'text',text:'📦 แพ็คเกจคงเหลือ',color:'#ffffff',weight:'bold',size:'md'}]},
-    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
-    footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ',size:'xxs',color:'#aaaaaa',align:'center'}]}
-  }};
-  await sendLineMessage(m.lineUserId,[flex]);
-  toast('📦 ส่งข้อมูลแพ็คเกจให้ '+m.name+' ✅');
+  // ใช้ข้อความธรรมดา — สั้น ส่งได้ชัวร์ (Flex ยาวเกิน URL limit)
+  var txt='📦 แพ็คเกจคงเหลือของคุณ\n'+m.name+'\n';
+  txt+='━━━━━━━━━━━━━\n';
+  quotas.forEach(function(q){
+    txt+='\n• '+q.pkgName+'\n';
+    txt+='  คงเหลือ '+q.remain+'/'+q.total+' ชิ้น\n';
+    txt+='  '+(q.exp&&q.exp!=='ไม่มีวันหมดอายุ'?'📅 หมดอายุ '+q.exp:'♾️ ไม่มีวันหมดอายุ')+'\n';
+  });
+  txt+='\n━━━━━━━━━━━━━\nขอบคุณที่ใช้บริการค่ะ';
+  if(s.shopName) txt+='\n'+s.shopName;
+  var r=await sendLineMessage(m.lineUserId,[{type:'text',text:txt}]);
+  if(r&&r.ok) toast('📦 ส่งข้อมูลแพ็คเกจให้ '+m.name+' ✅');
 }
 
 // ═══ ข้อ 6: พิมพ์ป้ายติดผ้า ═══
