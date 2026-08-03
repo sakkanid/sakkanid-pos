@@ -3177,7 +3177,38 @@ function renderSettingsShop(s){
     '<div class="form-group"><label class="form-label">ขนาดโลโก้ในบิล: <span id="bc-logo-val">'+((s.billConfig||{}).logoSize||50)+'</span>px</label><input type="range" id="bc-logosize" min="20" max="120" value="'+((s.billConfig||{}).logoSize||50)+'" oninput="$(\'bc-logo-val\').textContent=this.value" style="width:100%"></div></div>'+
     ((s.billConfig||{}).footerImage?'<div style="margin:4px 0"><img src="'+s.billConfig.footerImage+'" style="height:40px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">รูปท้ายบิล</span></div>':'')+
     (s.payQR?'<div style="margin:4px 0"><img src="'+s.payQR+'" style="height:50px;border-radius:4px"> <span style="font-size:11px;color:var(--t3)">QR PromptPay</span></div>':'')+
-    '<button class="btn btn-pr btn-sm" onclick="saveBillConfig()">💾 บันทึกตั้งค่าบิล</button></div>';
+    '<button class="btn btn-pr btn-sm" onclick="saveBillConfig()">💾 บันทึกตั้งค่าบิล</button></div>'+
+    // ── บริการเพิ่มเติม (Presets) ──
+    '<div class="card"><div class="card-title">💡 บริการเพิ่มเติม (ปุ่มลัดในหน้าสร้างออเดอร์)</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:8px">แก้ชื่อ/ราคา หรือเพิ่ม-ลบได้เลย แล้วกดบันทึก — ปุ่มพวกนี้จะไปโผล่ตอนสร้างออเดอร์</div>'+
+    '<div id="extraPresetRows">'+getExtraPresets().map(function(p){return extraPresetRowHTML(p.name,p.price)}).join('')+'</div>'+
+    '<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-out btn-sm" onclick="addExtraPresetRow()">➕ เพิ่มบริการ</button><button class="btn btn-pr btn-sm" onclick="saveExtraPresets()">💾 บันทึกบริการเพิ่มเติม</button></div></div>';
+}
+// ── บริการเพิ่มเติม: แถวแก้ไข + บันทึก ──
+function extraPresetRowHTML(name,price){
+  var n=String(name||'').replace(/"/g,'&quot;');
+  return '<div class="ep-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'+
+    '<input class="ep-name" value="'+n+'" placeholder="ชื่อบริการ" style="flex:2;margin:0">'+
+    '<input class="ep-price" type="number" value="'+(parseFloat(price)||0)+'" placeholder="฿" style="flex:1;max-width:90px;margin:0">'+
+    '<button class="btn btn-rd btn-sm" onclick="this.parentNode.remove()" style="padding:4px 10px">✕</button></div>';
+}
+function addExtraPresetRow(){
+  var c=$('extraPresetRows');if(!c) return;
+  c.insertAdjacentHTML('beforeend',extraPresetRowHTML('',0));
+}
+function saveExtraPresets(){
+  var rows=document.querySelectorAll('#extraPresetRows .ep-row');
+  var arr=[];
+  rows.forEach(function(r){
+    var ni=r.querySelector('.ep-name');var pi=r.querySelector('.ep-price');
+    var name=ni?ni.value.trim():'';var price=pi?(parseFloat(pi.value)||0):0;
+    if(name) arr.push({name:name,price:price});
+  });
+  var s=getShopSettings();
+  s.extraPresets=arr;
+  saveDB();
+  logAction('CHANGE_SETTINGS','แก้บริการเพิ่มเติม '+arr.length+' รายการ');
+  toast('💾 บันทึกบริการเพิ่มเติม '+arr.length+' รายการ ✅');
 }
 // ═══ PDF SETTINGS — ตั้งค่า PDF พร้อม Preview ═══
 function renderSettingsPdf(s){
