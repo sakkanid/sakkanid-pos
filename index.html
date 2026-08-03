@@ -697,14 +697,23 @@ function toggleSidebar(force){
   const open=force!==undefined?force:!sb.classList.contains('open');
   sb.classList.toggle('open',open);ov.classList.toggle('show',open);
 }
-function refreshPage(){
+async function refreshPage(){
   var btn=$('btnRefresh');
   if(btn){btn.style.animation='spin .6s';setTimeout(function(){btn.style.animation=''},700)}
-  // Pull from cloud if connected
-  if(getApiUrl()){syncPullSilent()}
-  // Re-render current page
-  renderPage(curPage);updBadges();
-  toast('🔄 รีเฟรชข้อมูลแล้ว');
+  if(getApiUrl()){
+    toast('🔄 กำลังดึงข้อมูลล่าสุด...','info');
+    try{
+      await syncPullAll();
+      renderPage(curPage);updBadges();
+      toast('✅ ข้อมูลอัปเดตล่าสุดแล้ว');
+    }catch(e){
+      renderPage(curPage);updBadges();
+      toast('⚠️ ดึงข้อมูลไม่ได้ — ใช้ข้อมูลในเครื่อง','warn');
+    }
+  }else{
+    renderPage(curPage);updBadges();
+    toast('🔄 รีเฟรชแล้ว (ยังไม่ได้เชื่อม Cloud)');
+  }
 }
 function startClock(){setInterval(()=>{const d=new Date();$('clockEl').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')},1000)}
 
@@ -3043,9 +3052,42 @@ function savePdfConfig(){
   // Trigger sync push ให้ pdfConfig ขึ้น Sheets
   if(typeof syncPushAll==='function') setTimeout(syncPushAll,500);
 }
+// ═══ ปุ่ม Sync ที่มี feedback ชัดเจน ═══
+async function syncPullNow(){
+  var box=$('syncStatusBox');
+  if(!getApiUrl()){toast('⚠️ ยังไม่ได้ตั้งค่า API URL','warn');return}
+  if(box) box.innerHTML='<span style="color:var(--pr)">🔄 กำลังดึงข้อมูล...</span>';
+  try{
+    await syncPullAll();
+    if(box) box.innerHTML='<span style="color:var(--gn)">✅ ดึงข้อมูลสำเร็จ! '+new Date().toLocaleString('th-TH')+'</span>';
+    renderPage(curPage);
+  }catch(e){
+    if(box) box.innerHTML='<span style="color:var(--rd)">❌ ดึงไม่ได้ — ตรวจสอบ URL + เน็ต</span>';
+  }
+}
+async function syncPushNow(){
+  var box=$('syncStatusBox');
+  if(!getApiUrl()){toast('⚠️ ยังไม่ได้ตั้งค่า API URL','warn');return}
+  if(!confirm('⚠️ ส่งข้อมูลเครื่องนี้ขึ้น Cloud?\n\nข้อมูลบน Cloud จะถูกแทนที่ด้วยข้อมูลในเครื่องนี้\n(ใช้เมื่อเครื่องนี้เป็นเครื่องหลักที่ข้อมูลถูกต้อง)')) return;
+  if(box) box.innerHTML='<span style="color:var(--pr)">🔄 กำลังส่งข้อมูล...</span>';
+  try{
+    await syncPushAll();
+    if(box) box.innerHTML='<span style="color:var(--gn)">✅ ส่งข้อมูลสำเร็จ! '+new Date().toLocaleString('th-TH')+'</span>';
+  }catch(e){
+    if(box) box.innerHTML='<span style="color:var(--rd)">❌ ส่งไม่ได้ — ตรวจสอบ URL + เน็ต</span>';
+  }
+}
 function renderSettingsConnect(s){
   var apiOk=!!s.apiUrl;var lineOk=!!s.lineChannelToken;
-  return '<div class="grid g2">'+
+  return '<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,var(--prl),#fff)"><div class="card-title">🔄 ดึง/ส่งข้อมูล (ทำเมื่ออัปเดตหรือเปลี่ยนเครื่อง)</div>'+
+    '<p style="font-size:13px;color:var(--t3);margin-bottom:12px">กดปุ่มนี้เมื่อ: เปิดเครื่องใหม่ · ข้อมูลไม่ตรงกัน · หลังอัปเดตโปรแกรม</p>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+    '<button class="btn btn-gn btn-lg" onclick="syncPullNow()" style="flex:1;min-width:200px;justify-content:center">📥 ดึงข้อมูลล่าสุดจาก Cloud</button>'+
+    '<button class="btn btn-pr btn-lg" onclick="syncPushNow()" style="flex:1;min-width:200px;justify-content:center">📤 ส่งข้อมูลเครื่องนี้ขึ้น Cloud</button>'+
+    '</div>'+
+    '<div id="syncStatusBox" style="margin-top:10px;font-size:13px">'+(lastSyncTime?'<span style="color:var(--gn)">✅ Sync ล่าสุด: '+lastSyncTime.toLocaleString('th-TH')+'</span>':'<span style="color:var(--t3)">ยังไม่เคย sync</span>')+'</div>'+
+    '</div>'+
+    '<div class="grid g2">'+
     '<div class="card"><div class="card-title">📊 Google Sheets API</div>'+
     '<div style="margin-bottom:10px"><span class="badge '+(apiOk?'bg-gn':'bg-rd')+'">'+(apiOk?'✅ เชื่อมต่อแล้ว':'❌ ยังไม่ได้ตั้งค่า')+'</span></div>'+
     '<div class="form-group"><label class="form-label">Apps Script URL</label><input id="cn-api-url" type="text" value="'+(s.apiUrl||'')+'" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:12px"></div>'+
@@ -3053,10 +3095,7 @@ function renderSettingsConnect(s){
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
     '<button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
     '<button class="btn btn-out btn-sm" onclick="testApiConnection()">🔌 ทดสอบ</button>'+
-    '<button class="btn btn-gn btn-sm" onclick="syncPushAll()">📤 Push ข้อมูลขึ้น Cloud</button>'+
-    '<button class="btn btn-am btn-sm" onclick="syncPullAll()">📥 Pull ข้อมูลจาก Cloud</button>'+
     '</div>'+
-    (apiOk?'<div style="margin-top:8px;padding:8px;background:var(--gnl);border-radius:6px;font-size:11px"><strong>Sync ล่าสุด:</strong> '+(lastSyncTime?lastSyncTime.toLocaleString('th-TH'):'ยังไม่เคย sync')+'</div>':'')+
     '</div>'+
     '<div class="card"><div class="card-title">📱 LINE Messaging API</div>'+
     '<div style="margin-bottom:10px"><span class="badge '+(lineOk?'bg-gn':'bg-gr')+'">'+(lineOk?'✅ เชื่อมต่อแล้ว':'⏳ Phase 2 — ยังไม่เปิดใช้')+'</span></div>'+
@@ -5840,13 +5879,23 @@ if(location.search.includes('page=register')||location.search.includes('r=1')){
   var setupApi=new URLSearchParams(location.search).get('setup')||'';
   if(setupApi){
     var s=getShopSettings();s.apiUrl=setupApi;saveDB();
-    document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--ff)"><div style="text-align:center"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:700;color:#006F98">กำลังตั้งค่าอุปกรณ์ใหม่...</div><div style="font-size:13px;color:#888;margin-top:8px">Sync ข้อมูลจาก Cloud</div></div></div>';
+    document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:linear-gradient(135deg,#004E6B,#1ABBEF)"><div style="text-align:center;color:#fff"><div style="font-size:48px;margin-bottom:12px">🔄</div><div style="font-size:20px;font-weight:700">กำลังเชื่อมต่อ Cloud...</div><div style="font-size:13px;opacity:.8;margin-top:8px" id="setupMsg">ดึงข้อมูลจากเครื่องหลัก</div><div id="setupBtns" style="margin-top:20px;display:none"><button onclick="history.replaceState(null,\'\',location.pathname);location.reload()" style="background:#fff;color:#006F98;border:none;padding:12px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:15px">✅ เข้าใช้งานเลย</button></div></div></div>';
+    var setupDone=false;
+    var finishSetup=function(msg){
+      if(setupDone) return;setupDone=true;
+      var mEl=document.getElementById('setupMsg');if(mEl) mEl.textContent=msg||'เชื่อมต่อสำเร็จ!';
+      var bEl=document.getElementById('setupBtns');if(bEl) bEl.style.display='block';
+      setTimeout(function(){history.replaceState(null,'',location.pathname);location.reload()},1500);
+    };
+    // Timeout 10 วินาที — ถ้า sync ไม่เสร็จก็เข้าใช้งานได้
+    var setupTimeout=setTimeout(function(){finishSetup('⚠️ ใช้เวลานาน — เข้าใช้งานได้เลย')},10000);
     setTimeout(function(){
       syncPullAll().then(function(){
-        history.replaceState(null,'',location.pathname);
-        location.reload();
+        clearTimeout(setupTimeout);finishSetup('✅ ดึงข้อมูลสำเร็จ!');
+      }).catch(function(){
+        clearTimeout(setupTimeout);finishSetup('⚠️ ยังเชื่อมต่อไม่ได้ — ลองใหม่ในแอป');
       });
-    },1500);
+    },1000);
   }
 }else{
   initLockScreen();
