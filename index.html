@@ -3376,19 +3376,18 @@ async function clearOrdersOnly(){
   if(!confirm('⚠️ ล้างประวัติออเดอร์ทั้งหมด?\n\nออเดอร์ '+(DB.orders||[]).length+' รายการจะถูกลบ (ทั้งในเครื่องและ Cloud)\n(สมาชิก ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
   if(!confirm('❗ ยืนยันอีกครั้ง — ลบออเดอร์ทั้งหมดจริงหรือ? ไม่สามารถย้อนกลับได้')) return;
   DB.orders=[];DB.docs=[];DB.orderSeq=0;saveDB();
-  // ล้างใน Google Sheets ด้วย (ไม่งั้น sync pull กลับมา)
+  // ล้างใน Google Sheets ด้วย (ทุก sheet ที่เก็บออเดอร์)
   if(getApiUrl()){
     toast('🔄 กำลังล้างข้อมูลใน Cloud...','info');
-    try{
-      var r=await jsonpCall('clearSheet','orders');
-      if(r&&r.ok){
-        toast('🗑️ ล้างประวัติออเดอร์ทั้งในเครื่องและ Cloud แล้ว ✅');
-      }else{
-        toast('⚠️ ล้างในเครื่องแล้ว แต่ Cloud อาจยังไม่ล้าง','warn');
-      }
-    }catch(e){
-      toast('⚠️ ล้างในเครื่องแล้ว — Cloud ล้างไม่ได้: '+e.message,'warn');
+    var orderSheets=['orders','orders_laundry','orders_package','orders_bedset','orders_cleaning','docs'];
+    var cleared=0;
+    for(var i=0;i<orderSheets.length;i++){
+      try{
+        var r=await jsonpCall('clearSheet',orderSheets[i]);
+        if(r&&r.ok) cleared++;
+      }catch(e){}
     }
+    toast('🗑️ ล้างประวัติออเดอร์แล้ว ('+cleared+' sheets) ✅');
   }else{
     toast('🗑️ ล้างประวัติออเดอร์แล้ว ✅');
   }
