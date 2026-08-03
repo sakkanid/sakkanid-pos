@@ -842,8 +842,8 @@ function renderPublicRegister(){
   regDiv.innerHTML='<div style="max-width:480px;margin:20px auto;padding:20px;font-family:var(--ff)">'+
     '<div style="text-align:center;margin-bottom:20px"><div style="font-size:36px">🫧</div><div style="font-size:22px;font-weight:700;color:#006F98">'+shopName+'</div><div style="color:#6B7A88;font-size:14px">สมัครสมาชิก</div></div>'+
     '<div id="regMainArea">'+
-    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine()" style="width:100%;padding:16px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--ff)">📱 สมัครด้วย LINE</button><div style="margin:14px 0;color:#999;font-size:13px">— หรือกรอกข้อมูลด้านล่าง —</div></div>':'')+
-    '<div class="card" id="regFormCard"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
+    (liffId?'<div id="lineLoginArea" style="margin-bottom:16px;text-align:center"><button onclick="loginWithLine()" style="width:100%;padding:16px;background:#06C755;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--ff)">📱 เข้าสู่ระบบด้วย LINE เพื่อสมัคร</button><div style="margin:12px 0;color:#888;font-size:12px">🔒 ร้านนี้รับสมัครสมาชิกผ่าน LINE เท่านั้น<br>กดปุ่มด้านบนเพื่อเริ่มสมัคร</div></div>':'<div style="padding:16px;background:#FFF4E0;border:1px solid #F0C36D;border-radius:10px;text-align:center;margin-bottom:16px;color:#8A6D0A;font-size:13px;line-height:1.5">🔒 ร้านนี้รับสมัครสมาชิกผ่าน <b>LINE</b> เท่านั้น<br>กรุณาเปิดลิงก์นี้ผ่านแอป LINE หรือติดต่อร้านเพื่อสมัคร</div>')+
+    '<div class="card" id="regFormCard" style="display:none"><div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input id="pr-name" type="text" autocomplete="name"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร *</label><input id="pr-phone" type="tel" autocomplete="tel"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อเล่น</label><input id="pr-nick" type="text"></div>'+
     '<input id="pr-line-uid" type="hidden" value="">'+
@@ -880,10 +880,14 @@ function fillFromLine(){
     if($('pr-name'))$('pr-name').value=p.displayName||'';
     if($('pr-nick'))$('pr-nick').value=p.displayName||'';
     if($('pr-line-uid'))$('pr-line-uid').value=p.userId||'';
-    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ LINE Login สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม</div></div>';
+    if($('regFormCard'))$('regFormCard').style.display='block'; // เปิดฟอร์มหลัง login LINE สำเร็จเท่านั้น
+    if($('lineLoginArea'))$('lineLoginArea').innerHTML='<div style="padding:12px;background:#E0F5EF;border-radius:10px;text-align:center;margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0D8A6A">✅ เชื่อม LINE สำเร็จ — '+p.displayName+'</div><div style="font-size:12px;color:#888;margin-top:4px">กรุณากรอกเบอร์โทรและที่อยู่เพิ่มเติม แล้วกดสมัคร</div></div>';
   });
 }
 function savePublicRegister(){
+  // บังคับสมัครผ่าน LINE เท่านั้น — ต้องมี LINE user id
+  var lineUid=($('pr-line-uid')?$('pr-line-uid').value:'')||sessionStorage.getItem('reg_lineUserId')||'';
+  if(!lineUid){toast('⚠️ กรุณาเข้าสู่ระบบด้วย LINE ก่อนสมัคร','err');return}
   var name=$('pr-name')?$('pr-name').value.trim():'';
   var phone=$('pr-phone')?$('pr-phone').value.trim():'';
   if(!name||!phone){toast('กรุณากรอกชื่อและเบอร์โทร','err');return}
