@@ -10,6 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
@@ -1588,6 +1589,24 @@ function showBill(oid){
     '<div class="modal-body" style="display:flex;justify-content:center">'+buildBillHTML(o)+'</div>'+
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="openDocModal(\''+oid+'\')">📄 ออกเอกสาร</button><button class="btn btn-out" onclick="saveBillImage(\''+oid+'\')">📸 บันทึกรูป</button><button class="btn btn-out" onclick="showLinePreview(\''+oid+'\')">📱 LINE</button>'+(isPaidCheck(gO(oid))?'':'<button class="btn btn-am" onclick="sendQrPayment(\''+oid+'\')">📲 ส่ง QR ชำระ</button>')+'<button class="btn btn-gn" onclick="sendBillPdfViaLine(\''+oid+'\')" id="btnSendPdf'+oid+'">📄 ส่ง PDF LINE</button><button class="btn btn-pr" onclick="doPrint(\''+oid+'\')">🖨️ พิมพ์</button></div>';
   openMo('moBill');
+  renderBillBarcodes($('moBillIn'));
+}
+// เรนเดอร์บาร์โค้ด Code128 ของเลขออเดอร์บนบิล (รอ JsBarcode โหลดถ้ายังไม่มา)
+function renderBillBarcodes(root,tries){
+  root=root||document;tries=tries||0;
+  var els=root.querySelectorAll?root.querySelectorAll('svg.billBarcode'):[];
+  if(!els.length) return;
+  if(typeof JsBarcode==='undefined'){
+    if(tries<20) setTimeout(function(){renderBillBarcodes(root,tries+1)},150);
+    return;
+  }
+  els.forEach(function(svg){
+    var val=svg.getAttribute('data-val');if(!val||svg.getAttribute('data-done')==='1') return;
+    try{
+      JsBarcode(svg,val,{format:'CODE128',width:1.5,height:38,displayValue:false,margin:0,background:'#ffffff',lineColor:'#000000'});
+      svg.setAttribute('data-done','1');
+    }catch(e){console.error('barcode',e)}
+  });
 }
 function doPrint(oid,paperSize){
   const billEl=$('moBillIn').querySelector('.modal-body');
@@ -1950,15 +1969,36 @@ function cancelOrder(oid){
 function renderOrdersPage(c){
   const all=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
   const allStatuses=[...new Set(all.map(o=>o.status))];
-  c.innerHTML='<div class="filter-bar">'+
+  c.innerHTML='<div class="card" style="padding:10px;margin-bottom:12px">'+
+    '<div class="search-box" style="width:100%"><input id="orderTagSearch" placeholder="🔍 ค้นหา / สแกนเลขจากป้ายผ้า (กรอกบางส่วนได้)" oninput="searchOrdersByTag(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();searchOrdersByTag(this.value)}" style="font-size:14px;padding:8px 12px 8px 34px" autocomplete="off"></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-top:4px">พิมพ์เลขออเดอร์บางส่วน / ชื่อ / เบอร์โทร หรือสแกนบาร์โค้ดบนบิล — ค้นทุกสถานะ แล้วเลือกออเดอร์ที่ต้องการ</div></div>'+
+    '<div id="ordersSearchResult"></div>'+
+    '<div id="ordersDefaultView"><div class="filter-bar">'+
     '<div class="filter-chip act" onclick="filterOrders(this,\'all\')">ทั้งหมด ('+all.length+')</div>'+
     allStatuses.map(st=>{
       const cnt=all.filter(o=>o.status===st).length;
       return '<div class="filter-chip" onclick="filterOrders(this,\''+st+'\')">'+st+' ('+cnt+')</div>';
     }).join('')+'</div>'+
-    '<div id="ordersContainer">'+all.reverse().map(o=>orderCardHTML(o)).join('')+'</div>';
+    '<div id="ordersContainer">'+all.reverse().map(o=>orderCardHTML(o)).join('')+'</div></div>';
   if(!all.length) $('ordersContainer').innerHTML='<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
 }
+// ค้นหา/สแกนเลขออเดอร์จากป้ายผ้า — บางส่วนก็เจอ, ทุกสถานะ
+function searchOrdersByTag(q){
+  q=(q||'').trim().toLowerCase();
+  var resEl=$('ordersSearchResult');var defEl=$('ordersDefaultView');
+  if(!resEl) return;
+  if(q.length<1){ // ว่าง → กลับไปมุมมองปกติ
+    resEl.innerHTML='';if(defEl) defEl.style.display='';return;
+  }
+  if(defEl) defEl.style.display='none';
+  var list=DB.orders.filter(function(o){
+    return o.id.toLowerCase().includes(q)||(o.mname||'').toLowerCase().includes(q)||String(o.mphone||'').includes(q);
+  }).slice().reverse().slice(0,30);
+  var head='<div class="card" style="padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0;font-size:13px">🔍 ผลการค้นหา "'+q+'" ('+list.length+')</div><button class="btn btn-out btn-sm" onclick="clearOrderTagSearch()">✕ ล้าง</button></div>';
+  if(!list.length){resEl.innerHTML=head+'<div class="empty-state"><div class="es-icon">🔍</div><div class="es-text">ไม่พบออเดอร์ที่ตรงกับ "'+q+'"</div></div>';return}
+  resEl.innerHTML=head+list.map(function(o){return orderCardHTML(o)}).join('');
+}
+function clearOrderTagSearch(){var i=$('orderTagSearch');if(i)i.value='';searchOrdersByTag('')}
 function filterOrders(el,st){
   document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('act'));el.classList.add('act');
   const all=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
@@ -2869,6 +2909,7 @@ function saveSvcPrice(type,i){
   if(type==='bed'){BED_SETS[i].price=p;BED_SETS[i].cost=k}
   else if(type==='cln'){CLN_SVCS[i].minPrice=p;CLN_SVCS[i].cost=k}
   else if(type==='pkg'){PKGS[i].price=p;PKGS[i].cost=k;PKGS[i].expDays=parseInt($('sp-d').value)||90}
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('บันทึกสำเร็จ ✅');logAction('EDIT_PRICE',type+' idx:'+i);
   var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
 }
@@ -2900,6 +2941,7 @@ function saveAddPriceItem(){
   CAT.push({c:cat,t:type,o:opt,p:price,k:cost,pt:'fixed',sku:$('ap-sku')?$('ap-sku').value.trim():'',ce:'',te:'',oe:''});
   // Update CATS_UNIQUE
   if(!CATS_UNIQUE.includes(cat)) CATS_UNIQUE.push(cat);
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   logAction('ADD_PRICE',cat+' '+type+' '+thb(price));
   toast('เพิ่มรายการสำเร็จ ✅ '+type+' '+thb(price));
   var mo=$('moAddPrice');if(mo)mo.remove();renderPage('pricelist');
@@ -2976,49 +3018,65 @@ function parseCSV(text){
   return rows;
 }
 
+// ── บันทึกตารางราคาขึ้น Cloud ทันที (กัน auto-pull ทับข้อมูลที่เพิ่ง import) ──
+function pushPriceToCloud(){
+  try{
+    if(typeof getApiUrl==='function'&&getApiUrl()&&typeof syncPushAll==='function'&&curUser){
+      syncPushAll(true); // fire-and-forget เงียบ — ดันทั้งชุดขึ้น Sheets ทันที
+    }
+  }catch(e){console.error('pushPriceToCloud',e)}
+}
 function importPriceCSV(tab,fileInput){
   if(!fileInput.files||!fileInput.files[0]) return;
   var reader=new FileReader();
   reader.onload=function(e){
     var rows=parseCSV(e.target.result);
-    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');return}
+    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');fileInput.value='';return}
     rows.shift(); // skip header
     var count=0;
     if(tab==='cat'){
-      // เพิ่มหรือแทนที่ — ถามก่อน
-      var mode=confirm('กด OK = แทนที่ทั้งหมด (ลบรายการเดิม)\nกด Cancel = เพิ่มต่อท้าย (เก็บรายการเดิม)');
-      if(mode) CAT.length=0;
+      // parse เข้า temp ก่อน — ถ้าไม่มีแถวที่ถูกต้อง จะไม่ลบของเดิม
+      var tmp=[];
       rows.forEach(function(r){
         if(r.length<7||!r[0]||!r[2]) return;
-        CAT.push({c:r[0],ce:r[1]||'',t:r[2],te:r[3]||'',o:r[4]||'',oe:r[5]||'',p:parseFloat(r[6])||0,k:parseFloat(r[7])||0,pt:r[8]||'fixed',sku:r[9]||''});
-        count++;
+        tmp.push({c:r[0],ce:r[1]||'',t:r[2],te:r[3]||'',o:r[4]||'',oe:r[5]||'',p:parseFloat(r[6])||0,k:parseFloat(r[7])||0,pt:r[8]||'fixed',sku:r[9]||''});
       });
+      if(!tmp.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง — ตรวจว่าไฟล์มีครบ 10 คอลัมน์ (โหลด Template ไปแก้)','err');fileInput.value='';return}
+      var mode=confirm('พบ '+tmp.length+' รายการ\n\nกด OK = แทนที่ทั้งหมด (ลบรายการเดิม)\nกด Cancel = เพิ่มต่อท้าย (เก็บรายการเดิม)');
+      if(mode) CAT.length=0;
+      tmp.forEach(function(it){CAT.push(it);count++});
       CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
     }else if(tab==='bed'){
-      BED_SETS.length=0;
-      rows.forEach(function(r){
-        if(r.length<3||!r[0]) return;
-        BED_SETS.push({size:r[0],label:r[1]||r[0],price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,items:[]});count++;
-      });
+      var tmpB=[];
+      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpB.push({size:r[0],label:r[1]||r[0],price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,items:[]})});
+      if(!tmpB.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี รหัสขนาด,ชื่อแสดง,ราคา)','err');fileInput.value='';return}
+      BED_SETS.length=0;tmpB.forEach(function(b){BED_SETS.push(b);count++});
     }else if(tab==='cln'){
-      CLN_SVCS.length=0;
-      rows.forEach(function(r){
-        if(r.length<3||!r[0]) return;
-        CLN_SVCS.push({type:r[0],label:r[1]||r[0],minPrice:parseFloat(r[2])||0,cost:parseFloat(r[3])||0});count++;
-      });
+      var tmpC=[];
+      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpC.push({type:r[0],label:r[1]||r[0],minPrice:parseFloat(r[2])||0,cost:parseFloat(r[3])||0})});
+      if(!tmpC.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ)','err');fileInput.value='';return}
+      CLN_SVCS.length=0;tmpC.forEach(function(s){CLN_SVCS.push(s);count++});
     }else if(tab==='pkg'){
-      PKGS.length=0;
-      rows.forEach(function(r){
-        if(r.length<3||!r[0]) return;
-        PKGS.push({type:r[0],qty:parseInt(r[1])||0,price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,expDays:parseInt(r[4])||90});count++;
-      });
+      var tmpP=[];
+      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpP.push({type:r[0],qty:parseInt(r[1])||0,price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,expDays:parseInt(r[4])||90})});
+      if(!tmpP.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี ประเภท,จำนวนชิ้น,ราคา)','err');fileInput.value='';return}
+      PKGS.length=0;tmpP.forEach(function(p){PKGS.push(p);count++});
     }
     saveDB();logAction('IMPORT_PRICE',tab+' '+count+' rows');
-    toast('📥 Import สำเร็จ — '+count+' รายการ ✅');
+    fileInput.value=''; // reset
+    // re-render แล้วเปิด tab ที่เพิ่ง import (renderPage จะ default เป็น cat)
     renderPage('pricelist');
+    if(tab!=='cat'){
+      setTimeout(function(){
+        var tabs=document.querySelectorAll('.tabs .tab');var map={bed:1,cln:2,pkg:3};
+        var el=tabs[map[tab]];if(el)showPriceTab(el,tab);
+      },60);
+    }
+    pushPriceToCloud(); // ดันขึ้น Cloud ทันที กัน auto-pull ทับ
+    var hasApi=(typeof getApiUrl==='function'&&getApiUrl());
+    toast('📥 Import สำเร็จ — '+count+' รายการ '+(hasApi?'✅ (กำลัง sync ขึ้น Cloud)':'✅'));
   };
   reader.readAsText(fileInput.files[0]);
-  fileInput.value=''; // reset
 }
 
 function importMembersCSV(fileInput){
@@ -3756,6 +3814,7 @@ function savePriceEdit(idx){
   CAT[idx].p=parseFloat($('pe-price').value)||0;
   CAT[idx].k=parseFloat($('pe-cost').value)||0;
   logAction('EDIT_PRICE',CAT[idx].c+' '+CAT[idx].t+' → '+thb(CAT[idx].p));
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('แก้ไขราคาสำเร็จ ✅');
   const mo=$('moPriceEdit');if(mo) mo.remove();
   renderPage('pricelist');
@@ -4094,6 +4153,7 @@ function buildBillHTML(o){
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
     '<div style="text-align:center;font-weight:700;font-size:16px">'+(o.type==='cleaning'?(paid?'ใบเสร็จรับเงิน':'ใบรับจองทำความสะอาด'):(paid?'ใบเสร็จรับเงิน':'ใบรับผ้า'))+'</div>'+
     '<div style="text-align:center;font-size:13px;font-weight:700">เลขที่: '+o.id+'</div>'+
+    '<div style="text-align:center;margin:1px 0 2px"><svg class="billBarcode" data-val="'+o.id+'" style="max-width:100%;height:auto"></svg></div>'+
     '<div style="text-align:center;font-size:12px">วันที่: '+formatBillDate(o.createdAt)+'</div>'+
     '<div style="font-size:11px">แคชเชียร์: '+o.by+'</div>';
   // ── Customer ──
@@ -5370,10 +5430,11 @@ function jsonpCall(action,sheet){
 }
 
 // ── Push all data to Sheets (per-sheet) ──
-async function syncPushAll(){
+async function syncPushAll(silent){
   var apiUrl=getApiUrl();
-  if(!apiUrl){toast('⚠️ ยังไม่ได้ตั้งค่า API URL — ไปที่ ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return}
-  toast('📤 กำลัง sync ขึ้น Cloud (15 sheets)...','info');
+  if(!apiUrl){if(!silent)toast('⚠️ ยังไม่ได้ตั้งค่า API URL — ไปที่ ⚙️ ตั้งค่า → 🔗 การเชื่อมต่อ','err');return}
+  syncStatus='syncing';updSyncUI();
+  if(!silent)toast('📤 กำลัง sync ขึ้น Cloud (15 sheets)...','info');
   var allOrders=DB.orders||[];
   var sheets={
     orders:allOrders,
@@ -5403,7 +5464,7 @@ async function syncPushAll(){
     }
   }
   syncStatus='success';lastSyncTime=new Date();updSyncUI();
-  toast('✅ Sync สำเร็จ! ('+success+'/15 sheets)');
+  if(!silent)toast('✅ Sync สำเร็จ! ('+success+'/15 sheets)');
   logAction('SYNC_PUSH','Push to Google Sheets (15 sheets)');
 }
 
@@ -5479,7 +5540,7 @@ saveDB=function(){
   originalSaveDB();
   if(syncTimer) clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
-    if(getApiUrl()&&curUser) syncPushAll();
+    if(getApiUrl()&&curUser) syncPushAll(true); // เงียบ — ไม่เด้ง toast ทุกครั้งที่บันทึก
   },2000);
 };
 
@@ -5643,7 +5704,7 @@ async function flushOfflineQueue(){
   toast('🔄 กำลังส่งข้อมูลที่ค้าง '+offlineQueue.length+' รายการ...','info');
   while(offlineQueue.length){
     var item=offlineQueue[0];
-    try{await syncPushAll();offlineQueue.shift()}catch(e){toast('⚠️ ยังส่งไม่ได้ — จะลองใหม่','warn');break}
+    try{await syncPushAll(true);offlineQueue.shift()}catch(e){toast('⚠️ ยังส่งไม่ได้ — จะลองใหม่','warn');break}
   }
   localStorage.setItem('skn_offline_queue',JSON.stringify(offlineQueue));
   if(!offlineQueue.length) toast('✅ ส่งข้อมูลค้างครบแล้ว');
@@ -5926,7 +5987,7 @@ function calcDeliveryByZone(addr){
   return s.defaultDeliveryCost||50;
 }
 
-// ── Auto-pull every 60 seconds ──
+// ── Auto-pull every 30 seconds ──
 let autoPullInterval=null;
 function startAutoPull(){
   if(autoPullInterval) clearInterval(autoPullInterval);
@@ -5935,6 +5996,17 @@ function startAutoPull(){
     syncPullSilent();
   },30000);
 }
+// ── ดึงข้อมูลสดทันทีเมื่อกลับมาที่หน้าจอ (สลับแอป/แท็บ/ปลุกเครื่อง) — ให้รู้สึกเหมือน login แล้วสดเสมอ ──
+var _lastFocusPull=0;
+function pullOnFocus(){
+  if(!getApiUrl()||!curUser||syncStatus==='syncing') return;
+  var now=Date.now();
+  if(now-_lastFocusPull<8000) return; // กันยิงถี่เกิน
+  _lastFocusPull=now;
+  syncPullSilent();
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden) pullOnFocus()});
+window.addEventListener('focus',pullOnFocus);
 async function syncPullSilent(){
   try{
     var data=await jsonpCall('getFullDB','');
@@ -6015,8 +6087,8 @@ async function syncPullSilent(){
 function updSyncUI(){
   var el=$('syncIndicator');
   if(!el) return;
-  var icons={idle:'☁️',syncing:'🔄',success:'✅',error:'❌'};
-  var labels={idle:'Cloud',syncing:'Syncing...',success:'Synced',error:'Error'};
+  var icons={idle:'☁️',syncing:'🔄',success:'✅',error:'⚠️'};
+  var labels={idle:'ซิงค์อัตโนมัติ',syncing:'กำลังซิงค์...',success:'ข้อมูลล่าสุด',error:'ซิงค์มีปัญหา'};
   el.innerHTML='<span style="font-size:11px;cursor:pointer" onclick="openSyncPanel()" title="Last sync: '+(lastSyncTime?lastSyncTime.toLocaleTimeString():'never')+'">'+icons[syncStatus]+' '+labels[syncStatus]+'</span>';
 }
 
@@ -6027,15 +6099,19 @@ function openSyncPanel(){
     '<div class="grid g2" style="margin-bottom:12px">'+
     '<div class="kpi"><div class="kpi-lbl">สถานะ</div><div class="kpi-val" style="font-size:16px">'+(syncStatus==='success'?'✅ เชื่อมต่อแล้ว':syncStatus==='syncing'?'🔄 กำลัง sync...':syncStatus==='error'?'❌ ผิดพลาด':'☁️ รอ sync')+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">Sync ล่าสุด</div><div class="kpi-val" style="font-size:14px">'+(lastSyncTime?lastSyncTime.toLocaleString('th-TH'):'ยังไม่เคย sync')+'</div></div></div>'+
-    '<div style="display:flex;flex-direction:column;gap:8px">'+
-    '<button class="btn btn-pr" onclick="syncPushAll().then(function(){document.getElementById(\'moSync\').remove()})"><span style="font-size:18px">📤</span> Push ขึ้น Cloud (POS → Sheets)</button>'+
-    '<button class="btn btn-gn" onclick="syncPullAll().then(function(){document.getElementById(\'moSync\').remove()})"><span style="font-size:18px">📥</span> Pull จาก Cloud (Sheets → POS)</button>'+
-    '<button class="btn btn-am" onclick="syncTestConnection()">🔌 ทดสอบการเชื่อมต่อ</button>'+
-    '</div>'+
-    '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--t3)">'+
-    '<strong>Auto-sync:</strong> ระบบ sync อัตโนมัติ 10 วินาทีหลังบันทึกข้อมูล<br>'+
+    '<div style="padding:14px;background:var(--gnl);border-radius:10px;text-align:center;margin-bottom:10px">'+
+    '<div style="font-size:15px;font-weight:700;color:var(--gn)">✅ ซิงค์อัตโนมัติทำงานอยู่</div>'+
+    '<div style="font-size:12px;color:var(--t2);margin-top:4px">ไม่ต้องกดปุ่มเอง — login เครื่องไหนก็เห็นข้อมูลล่าสุด บันทึกปุ๊บขึ้น Cloud เอง และดึงสดทุกครั้งที่กลับเข้าหน้าจอ</div></div>'+
+    '<button class="btn btn-gn" style="width:100%" onclick="syncPullAll().then(function(){document.getElementById(\'moSync\').remove()})">🔄 ดึงข้อมูลล่าสุดตอนนี้</button>'+
+    '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--t3);padding:4px 0">⚙️ ขั้นสูง (ปกติไม่ต้องใช้)</summary>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'+
+    '<button class="btn btn-out btn-sm" onclick="if(confirm(\'⚠️ เขียนทับข้อมูลบน Cloud ด้วยข้อมูลเครื่องนี้?\')){syncPushAll().then(function(){document.getElementById(\'moSync\').remove()})}"><span style="font-size:16px">📤</span> Push ขึ้น Cloud (เขียนทับ Sheets)</button>'+
+    '<button class="btn btn-am btn-sm" onclick="syncTestConnection()">🔌 ทดสอบการเชื่อมต่อ</button>'+
+    '<div style="padding:10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--t3)">'+
+    '<strong>Auto-sync:</strong> บันทึกแล้วดันขึ้น Cloud ใน ~2 วินาที · ดึงสดทุก 30 วินาที + ตอน login + ตอนกลับเข้าหน้าจอ<br>'+
     '<strong>URL:</strong> <code style="font-size:10px;word-break:break-all">'+(getApiUrl()||'ยังไม่ได้ตั้งค่า').substring(0,60)+'...</code>'+
-    '</div></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSync\').remove()">ปิด</button></div></div></div>';
+    '</div></div></details>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moSync\').remove()">ปิด</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 
