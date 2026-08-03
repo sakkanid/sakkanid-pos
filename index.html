@@ -2464,7 +2464,7 @@ async function sendQrPayment(oid){
     ]}
   }};
   var msgs=[flex,{type:'image',originalContentUrl:s.payQrUrl,previewImageUrl:s.payQrUrl}];
-  await sendLineMessage(userId,msgs);
+  await sendLineMessage(userId,msgs,'ส่ง QR ชำระเงิน');
   toast('📲 ส่ง QR ชำระเงินแล้ว ✅');logAction('SEND_QR_PAY',oid+' → '+o.mname);
 }
 // (exportMembers moved to Import/Export section above)
@@ -3913,9 +3913,45 @@ function viewMemberDetail(mid){
     '<div class="card-title" style="margin-top:16px;font-size:13px">📋 ประวัติออเดอร์ ('+orders.length+')</div>'+
     (orders.length?'<table><tr><th>เลข</th><th>ประเภท</th><th>ยอด</th><th>สถานะ</th><th>วันที่</th></tr>'+
     orders.slice(0,20).map(o=>'<tr><td>'+o.id+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
+    (String(m.lineUserId||'').trim().length>=30&&String(m.lineUserId||'').trim().charAt(0)==='U'?'<div class="card-title" style="margin-top:16px;font-size:13px;display:flex;justify-content:space-between;align-items:center"><span>📤 ประวัติส่ง LINE</span><button class="btn btn-out btn-sm" onclick="loadMemberLineLog(\''+String(m.lineUserId).trim()+'\')">🔄 โหลด</button></div><div id="memLineLog" style="font-size:12px;color:var(--t3)">กด "โหลด" เพื่อดูว่าส่งอะไรหาลูกค้าไปบ้าง</div>':'')+
     '</div>'+
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length&&String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+(String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-out" onclick="chatWithCustomer(\''+mid+'\')">💬 แชท LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
   openMo('moDetail');
+}
+
+// ═══ โหลดประวัติการส่ง LINE ของสมาชิก (จาก line_log ใน Cloud) ═══
+async function loadMemberLineLog(uid){
+  var box=$('memLineLog');if(!box) return;
+  var apiUrl=getApiUrl();
+  if(!apiUrl){box.innerHTML='<span style="color:var(--rd)">⚠️ ยังไม่ได้เชื่อม Cloud</span>';return}
+  box.innerHTML='⏳ กำลังโหลด...';
+  try{
+    var result=await new Promise(function(resolve,reject){
+      var cbName='_lgcb_'+Date.now();
+      window[cbName]=function(r){delete window[cbName];resolve(r)};
+      var sc=document.createElement('script');
+      sc.src=apiUrl+'?action=getLineLog&uid='+encodeURIComponent(uid)+'&callback='+cbName;
+      sc.onerror=function(){delete window[cbName];reject(new Error('เชื่อมต่อไม่ได้'))};
+      document.head.appendChild(sc);
+      setTimeout(function(){if(window[cbName]){delete window[cbName];reject(new Error('Timeout'))}},20000);
+    });
+    var rows=(result&&result.ok&&result.data)?result.data:[];
+    if(!rows.length){box.innerHTML='<span style="color:var(--t3)">ยังไม่มีประวัติการส่ง LINE ให้ลูกค้ารายนี้</span>';return}
+    box.innerHTML='<table style="font-size:12px"><tr><th>เมื่อไหร่</th><th>ส่งอะไร</th><th>สถานะ</th></tr>'+
+      rows.map(function(r){
+        var ok=(r.status==='ส่งสำเร็จ');
+        var dt=fmtLineLogTime(r.timestamp);
+        return '<tr><td style="white-space:nowrap">'+dt+'</td><td>'+(r.type||'-')+'</td><td>'+(ok?'<span class="badge bg-gn">✅ ส่งสำเร็จ</span>':'<span class="badge bg-rd">❌ '+(r.status||'ล้มเหลว')+'</span>')+(r.detail?'<div style="font-size:10px;color:var(--t3)">'+r.detail+'</div>':'')+'</td></tr>';
+      }).join('')+'</table>'+
+      '<div style="font-size:10px;color:var(--t3);margin-top:6px">* "ส่งสำเร็จ" = LINE รับข้อความไปส่งต่อแล้ว (LINE ไม่เปิดให้เช็คว่าลูกค้าอ่านหรือยัง)</div>';
+  }catch(e){box.innerHTML='<span style="color:var(--rd)">❌ โหลดไม่ได้: '+e.message+'</span>'}
+}
+function fmtLineLogTime(iso){
+  try{
+    var d=new Date(iso);if(isNaN(d.getTime()))return iso;
+    var p=function(n){return String(n).padStart(2,'0')};
+    return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+  }catch(e){return iso}
 }
 
 // ═══ EDIT MEMBER ═══
@@ -4647,7 +4683,7 @@ async function sendDailyReport(){
   msg+=s.shopName+' · POS Report';
 
   toast('📊 กำลังส่งรายงานประจำวัน...','info');
-  await sendLineMessage(to,[{type:'text',text:msg}]);
+  await sendLineMessage(to,[{type:'text',text:msg}],'รายงานรายวัน');
   logAction('DAILY_REPORT','ส่งรายงานประจำวัน');
 }
 function importRegMember(){
@@ -4950,7 +4986,7 @@ function exportDocsCSV(){
 }
 
 // ═══ LINE MESSAGING ═══
-async function sendLineMessage(userId,messages){
+async function sendLineMessage(userId,messages,logType){
   var apiUrl=getApiUrl();
   if(!apiUrl){toast('⚠️ ตั้งค่า API URL ก่อน','err');return{ok:false}}
   userId=String(userId||'').trim();
@@ -4958,8 +4994,9 @@ async function sendLineMessage(userId,messages){
     toast('⚠️ LINE User ID ไม่ถูกต้อง: "'+userId.substring(0,20)+'"','err');
     return{ok:false};
   }
+  logType=logType||'ข้อความ';
   try{
-    var payload=JSON.stringify({to:userId,messages:messages});
+    var payload=JSON.stringify({to:userId,messages:messages,logType:logType});
     var data=encodeURIComponent(payload);
     // If too large for JSONP, fallback to text
     if(data.length>7000){
@@ -4967,7 +5004,7 @@ async function sendLineMessage(userId,messages){
       var textMsgs=messages.filter(function(m){return m.type!=='flex'}).concat([{type:'text',text:altText}]);
       // Keep non-flex messages (like QR image) + use altText
       if(messages[0]&&messages[0]._textFallback) textMsgs=[{type:'text',text:messages[0]._textFallback}].concat(messages.filter(function(m){return m.type==='image'}));
-      payload=JSON.stringify({to:userId,messages:textMsgs});
+      payload=JSON.stringify({to:userId,messages:textMsgs,logType:logType});
       data=encodeURIComponent(payload);
     }
     var result=await new Promise(function(resolve,reject){
@@ -5107,7 +5144,7 @@ async function sendPdfViaLine(oid,docNum,docType){
       ]}
     }};
     var msgs=[flex];
-    await sendLineMessage(userId,msgs);
+    await sendLineMessage(userId,msgs,'ส่งบิล PDF');
     toast('📱 ส่ง '+dtInfo.name+' ทาง LINE สำเร็จ ✅');
     logAction('SEND_PDF_LINE',(docNum||o.id)+' → '+o.mname);
   }catch(e){toast('❌ '+e.message,'err')}
@@ -5185,7 +5222,7 @@ async function uploadBillToLine(billEl,oid,docNum,docType){
         ]}
       }};
       var msgs=[flex];
-      await sendLineMessage(userId,msgs);
+      await sendLineMessage(userId,msgs,'ส่งรูปบิล');
       logAction('SEND_IMG_LINE',(docNum||o.id));
     }else{toast('❌ ไม่ได้ URL','err')}
   }catch(e){toast('❌ '+e.message,'err')}
@@ -5293,7 +5330,7 @@ async function sendFlexBill(userId,o,s,docNum){
   txt+='\nขอบคุณที่ใช้บริการค่ะ Thank you.\n'+s.shopName+' · '+fmtPhone(s.phone);
   flex._textFallback=txt;
   var msgs=[flex];
-  await sendLineMessage(userId,msgs);
+  await sendLineMessage(userId,msgs,'ส่งบิล');
 }
 async function sendFlexStatus(userId,o,s){
   var paid=isPaidCheck(o);
@@ -5334,7 +5371,7 @@ async function sendFlexStatus(userId,o,s){
     ]}
   }};
   var msgs=[flex];
-  await sendLineMessage(userId,msgs);
+  await sendLineMessage(userId,msgs,'แจ้งสถานะออเดอร์');
 }
 
 // ── Fetch LINE Users from webhook & match with members ──
@@ -5563,7 +5600,7 @@ async function sendUnpaidReminders(){
         {type:'text',text:'ยอดค้าง: '+thb(remaining(o)),size:'lg',weight:'bold',color:'#DC2626',margin:'md'},
         {type:'text',text:'กรุณาชำระเงินด้วยนะคะ 🙏',size:'sm',color:'#666666',margin:'sm'}
       ]},footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ',size:'xxs',color:'#aaaaaa',align:'center'}]}}};
-    await sendLineMessage(m.lineUserId,[flex]);sent++;
+    await sendLineMessage(m.lineUserId,[flex],'ทวงค้างชำระ');sent++;
   }
   toast('📱 ส่งแจ้งเตือน '+sent+' คน ✅');logAction('REMIND_UNPAID',sent+' msgs');
 }
@@ -5586,7 +5623,7 @@ async function sendDailySummaryLine(){
       {type:'separator',margin:'md'},
       {type:'box',layout:'horizontal',contents:[{type:'text',text:'❌ ค้างชำระ',size:'xs',flex:3,color:'#DC2626'},{type:'text',text:thb(unpaid.reduce(function(s,o){return s+remaining(o)},0))+' ('+unpaid.length+')',size:'xs',align:'end',flex:3,color:'#DC2626'}]}
     ]}}};
-  await sendLineMessage(targetUserId,[flex]);
+  await sendLineMessage(targetUserId,[flex],'สรุปยอดรายวัน');
   toast('📊 ส่งสรุปรายวัน ✅');logAction('DAILY_SUMMARY','rev:'+rev);
 }
 
@@ -5631,7 +5668,7 @@ async function sendQuotaInfoLine(mid){
   });
   txt+='\n━━━━━━━━━━━━━\nขอบคุณที่ใช้บริการค่ะ';
   if(s.shopName) txt+='\n'+s.shopName;
-  var r=await sendLineMessage(m.lineUserId,[{type:'text',text:txt}]);
+  var r=await sendLineMessage(m.lineUserId,[{type:'text',text:txt}],'แจ้งโควต้าคงเหลือ');
   if(r&&r.ok) toast('📦 ส่งข้อมูลแพ็คเกจให้ '+m.name+' ✅');
 }
 
@@ -5909,7 +5946,7 @@ async function sendQuotaAlertLine(){
   var flex={type:'flex',altText:'⚠️ โควต้าใกล้หมด!',contents:{type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:'#DC2626',paddingAll:'12px',contents:[{type:'text',text:'⚠️ โควต้าส่วนกลางใกล้หมด!',color:'#ffffff',weight:'bold',size:'md'}]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC}}};
-  await sendLineMessage(targetUserId,[flex]);
+  await sendLineMessage(targetUserId,[flex],'แจ้งเตือนโควต้าใกล้หมด');
   toast('⚠️ ส่งแจ้งเตือนโควต้า ✅');
 }
 
