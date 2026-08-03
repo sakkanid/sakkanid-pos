@@ -117,6 +117,13 @@ tr:last-child td{border-bottom:none}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 /* ═══ ORDER CARD ═══ */
 .o-card{background:var(--wh);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--pr)}
+.svc-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+.svc-card{background:var(--wh);border:2px solid var(--b1);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:.18s;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80px}
+.svc-card:hover{border-color:var(--pr2);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,111,152,.12)}
+.svc-card.sel{border-color:var(--pr);background:var(--prl);box-shadow:0 4px 12px rgba(0,111,152,.2)}
+.svc-card .svc-icon{font-size:30px;margin-bottom:6px;line-height:1}
+.svc-card .svc-name{font-size:13px;font-weight:600;color:var(--t1);line-height:1.3}
+@media(max-width:600px){.svc-card-grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}.svc-card{padding:12px 6px;min-height:72px}.svc-card .svc-icon{font-size:26px}.svc-card .svc-name{font-size:12px}}
 .o-card.st-wash{border-left-color:var(--am)}.o-card.st-ready{border-left-color:var(--gn)}.o-card.st-ship{border-left-color:var(--pp)}.o-card.st-done{border-left-color:var(--b2)}.o-card.st-cancel{border-left-color:var(--rd)}
 .o-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .o-id{font-family:var(--fm);font-weight:700;font-size:13px;color:var(--pr)}
@@ -1200,69 +1207,91 @@ function renderExtras(){
 }
 function removeExtra(i){orderExtras.splice(i,1);renderExtras();calcOrderTotal()}
 
-// ═══ ADD ITEM MODAL ═══
+// ═══ ADD ITEM MODAL — แบบการ์ด ═══
+var CAT_ICONS={'ซัก อบ รีด':'👔','ซัก อบ พับ':'👕','ซัก อบ พับ เร่งด่วน':'⚡','ซักแห้ง':'🧥','รีด':'♨️','ซักรองเท้า':'👟','ทำความสะอาด':'🧹','เครื่องนอน':'🛏️','ชุดเครื่องนอน':'🛏️','อื่นๆ(หมอน/ตุ๊กตา/ผ้าม่าน/กระเป๋า)':'🧸','อื่นๆ':'🧸'};
+function catIcon(c){return CAT_ICONS[c]||'🧺'}
 function openAddItemModal(){
+  window._aiSelCat='';window._aiSelType='';window._aiSelOpt='';
   $('moAddItemIn').innerHTML=
     '<div class="modal-head"><h3>➕ เพิ่มรายการซัก</h3><button class="modal-close" onclick="closeMo(\'moAddItem\')">&times;</button></div>'+
-    '<div class="modal-body">'+
-    '<div class="form-group"><label class="form-label">หมวดบริการ</label><select id="ai-cat" onchange="onAICatChange()"><option value="">— เลือก —</option>'+
-    CATS_UNIQUE.map(c=>'<option>'+c+'</option>').join('')+'</select></div>'+
-    '<div class="form-group"><label class="form-label">ประเภทผ้า</label><select id="ai-type" onchange="onAITypeChange()"><option value="">— เลือกหมวดก่อน —</option></select></div>'+
-    '<div class="form-group"><label class="form-label">ตัวเลือก</label><select id="ai-opt" onchange="fillAIPrice()"><option value="">— ไม่มี —</option></select></div>'+
+    '<div class="modal-body" style="max-height:70vh;overflow-y:auto">'+
+    '<div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">1️⃣ เลือกหมวดบริการ</div>'+
+    '<div id="ai-cat-cards" class="svc-card-grid">'+
+    CATS_UNIQUE.map(function(c){return '<div class="svc-card" onclick="selectAICat(\''+c.replace(/'/g,"\\'")+'\',this)"><div class="svc-icon">'+catIcon(c)+'</div><div class="svc-name">'+c+'</div></div>'}).join('')+
+    '</div>'+
+    '<div id="ai-type-area" style="display:none;margin-top:16px"><div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">2️⃣ เลือกประเภทผ้า</div><div id="ai-type-cards" class="svc-card-grid"></div></div>'+
+    '<div id="ai-opt-area" style="display:none;margin-top:16px"><div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">3️⃣ เลือกตัวเลือก</div><div id="ai-opt-cards" class="svc-card-grid"></div></div>'+
+    '<div id="ai-qty-area" style="display:none;margin-top:16px;padding:14px;background:var(--prl);border-radius:12px">'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">ราคา/ชิ้น (฿)</label><input id="ai-price" type="number"><div id="ai-price-hint" style="display:none;font-size:11px;margin-top:4px"></div></div>'+
-    '<div class="form-group"><label class="form-label">จำนวน</label><input id="ai-qty" type="number" value="1" min="1"></div>'+
+    '<div class="form-group"><label class="form-label">ราคา/ชิ้น (฿)</label><input id="ai-price" type="number" oninput="updateAIPreview()"><div id="ai-price-hint" style="display:none;font-size:11px;margin-top:4px"></div></div>'+
+    '<div class="form-group"><label class="form-label">จำนวน</label><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-out" onclick="aiQtyChange(-1)" style="padding:8px 14px;font-size:18px">−</button><input id="ai-qty" type="number" value="1" min="1" style="text-align:center;font-weight:700;font-size:18px" oninput="updateAIPreview()"><button class="btn btn-out" onclick="aiQtyChange(1)" style="padding:8px 14px;font-size:18px">+</button></div></div>'+
+    '</div>'+
+    '<div id="ai-preview" style="text-align:center;font-size:15px;font-weight:700;color:var(--pr);margin-top:4px"></div>'+
     '</div></div>'+
-    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moAddItem\')">ยกเลิก</button><button class="btn btn-pr" onclick="confirmAddItem()">✅ เพิ่มรายการ</button></div>';
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moAddItem\')">ยกเลิก</button><button class="btn btn-pr btn-lg" onclick="confirmAddItem()" id="ai-confirm-btn" style="display:none">✅ เพิ่มลงตะกร้า</button></div>';
   openMo('moAddItem');
 }
-function onAICatChange(){
-  const cat=$('ai-cat').value;
-  const types=[...new Set(CAT.filter(x=>x.c===cat).map(x=>x.t))];
-  $('ai-type').innerHTML='<option value="">— เลือก —</option>'+types.map(t=>'<option>'+t+'</option>').join('');
-  $('ai-opt').innerHTML='<option value="">—</option>';$('ai-price').value='';
+function selectAICat(cat,el){
+  window._aiSelCat=cat;window._aiSelType='';window._aiSelOpt='';
+  document.querySelectorAll('#ai-cat-cards .svc-card').forEach(function(c){c.classList.remove('sel')});
+  if(el) el.classList.add('sel');
+  var types=[...new Set(CAT.filter(function(x){return x.c===cat}).map(function(x){return x.t}))];
+  $('ai-type-cards').innerHTML=types.map(function(t){return '<div class="svc-card" onclick="selectAIType(\''+t.replace(/'/g,"\\'")+'\',this)"><div class="svc-name">'+t+'</div></div>'}).join('');
+  $('ai-type-area').style.display='block';
+  $('ai-opt-area').style.display='none';$('ai-qty-area').style.display='none';$('ai-confirm-btn').style.display='none';
+  setTimeout(function(){$('ai-type-area').scrollIntoView({behavior:'smooth',block:'nearest'})},100);
 }
-function onAITypeChange(){
-  const cat=$('ai-cat').value,type=$('ai-type').value;
-  const opts=[...new Set(CAT.filter(x=>x.c===cat&&x.t===type).map(x=>x.o).filter(Boolean))];
+function selectAIType(type,el){
+  window._aiSelType=type;window._aiSelOpt='';
+  document.querySelectorAll('#ai-type-cards .svc-card').forEach(function(c){c.classList.remove('sel')});
+  if(el) el.classList.add('sel');
+  var opts=[...new Set(CAT.filter(function(x){return x.c===window._aiSelCat&&x.t===type}).map(function(x){return x.o}).filter(Boolean))];
   if(opts.length){
-    $('ai-opt').innerHTML='<option value="">— เลือก —</option>'+opts.map(o=>'<option>'+o+'</option>').join('');
-    $('ai-opt').disabled=false;
+    $('ai-opt-cards').innerHTML=opts.map(function(o){return '<div class="svc-card" onclick="selectAIOpt(\''+o.replace(/'/g,"\\'")+'\',this)"><div class="svc-name">'+o+'</div></div>'}).join('');
+    $('ai-opt-area').style.display='block';$('ai-qty-area').style.display='none';$('ai-confirm-btn').style.display='none';
+    setTimeout(function(){$('ai-opt-area').scrollIntoView({behavior:'smooth',block:'nearest'})},100);
   }else{
-    $('ai-opt').innerHTML='<option value="">— ไม่มีตัวเลือก —</option>';
-    $('ai-opt').disabled=true;
-    fillAIPrice();
+    $('ai-opt-area').style.display='none';
+    showAIQty();
   }
 }
-function fillAIPrice(){
-  const cat=$('ai-cat').value,type=$('ai-type').value,opt=$('ai-opt').value;
-  const item=CAT.find(x=>x.c===cat&&x.t===type&&(x.o===opt||(!opt&&!x.o)));
+function selectAIOpt(opt,el){
+  window._aiSelOpt=opt;
+  document.querySelectorAll('#ai-opt-cards .svc-card').forEach(function(c){c.classList.remove('sel')});
+  if(el) el.classList.add('sel');
+  showAIQty();
+}
+function showAIQty(){
+  var item=CAT.find(function(x){return x.c===window._aiSelCat&&x.t===window._aiSelType&&(x.o===window._aiSelOpt||(!window._aiSelOpt&&!x.o))});
   if(item){
-    $('ai-price').value=item.p;
-    // Show min++ indicator
+    $('ai-price').value=item.p;$('ai-qty').value=1;
     var hint=$('ai-price-hint');
     if(hint){
-      if(item.pt==='min++'){
-        hint.innerHTML='<span style="color:var(--am)">💡 ราคาเริ่มต้น '+thb(item.p)+' — แก้ไขราคาได้ตามจริง</span>';
-        hint.style.display='block';
-        $('ai-price').style.border='2px solid var(--am)';
-      }else{
-        hint.innerHTML='';hint.style.display='none';
-        $('ai-price').style.border='';
-      }
+      if(item.pt==='min++'){hint.innerHTML='<span style="color:var(--am)">💡 ราคาเริ่มต้น '+thb(item.p)+' — แก้ไขได้ตามจริง</span>';hint.style.display='block';$('ai-price').style.border='2px solid var(--am)'}
+      else{hint.innerHTML='';hint.style.display='none';$('ai-price').style.border=''}
     }
   }
+  $('ai-qty-area').style.display='block';$('ai-confirm-btn').style.display='inline-flex';
+  updateAIPreview();
+  setTimeout(function(){$('ai-qty-area').scrollIntoView({behavior:'smooth',block:'nearest'})},100);
 }
+function aiQtyChange(d){var q=$('ai-qty');var v=(parseInt(q.value)||1)+d;if(v<1)v=1;q.value=v;updateAIPreview()}
+function updateAIPreview(){
+  var p=parseFloat($('ai-price')?$('ai-price').value:0)||0;
+  var q=parseInt($('ai-qty')?$('ai-qty').value:1)||1;
+  var el=$('ai-preview');if(el) el.textContent='รวม '+thb(p*q)+' ('+q+' ชิ้น × '+thb(p)+')';
+}
+function onAICatChange(){}
+function onAITypeChange(){}
+function fillAIPrice(){}
 function confirmAddItem(){
-  const cat=$('ai-cat').value,type=$('ai-type').value,opt=$('ai-opt')?$('ai-opt').value:'';
+  const cat=window._aiSelCat,type=window._aiSelType,opt=window._aiSelOpt||'';
   const price=parseFloat($('ai-price')?$('ai-price').value:0)||0;
   const qty=parseInt($('ai-qty')?$('ai-qty').value:1)||1;
   if(!cat||!type||!price){toast('กรุณาเลือกรายการให้ครบ','err');return}
   const item=CAT.find(x=>x.c===cat&&x.t===type&&(x.o===opt||(!opt&&!x.o)));
   const newItem={c:cat,t:type,o:opt,qty,p:price,k:item?item.k:0,ce:item?item.ce:'',te:item?item.te:'',oe:item?item.oe:''};
-
   if(window._editAddMode&&editOid){
-    // Adding item to existing order (edit mode)
     const o=gO(editOid);if(o){
       o.items.push(newItem);
       closeMo('moAddItem');
@@ -1272,10 +1301,9 @@ function confirmAddItem(){
     }
     window._editAddMode=false;
   }else{
-    // Adding item to new order
     orderItems.push(newItem);
     closeMo('moAddItem');renderOrderItems();calcOrderTotal();
-    toast('เพิ่ม '+type+(opt?' '+opt:'')+' x'+qty);
+    toast('✅ เพิ่ม '+type+(opt?' '+opt:'')+' x'+qty);
   }
 }
 function renderOrderItems(){
