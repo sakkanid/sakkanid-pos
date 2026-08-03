@@ -27,7 +27,13 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;overflow:hidden;height:100vh}
 /* ═══ LOGIN ═══ */
-#lockScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#004E6B,#006F98 35%,#1ABBEF 70%,#7FD2FD 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+#lockScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#004E6B,#006F98 35%,#1ABBEF 70%,#7FD2FD 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:20px}
+.login-card{display:flex;background:rgba(255,255,255,.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.2);border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.3);max-width:840px;width:100%;min-height:480px}
+.login-left{flex:1;background:linear-gradient(160deg,#F4F9FB,#E3F2FA);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;position:relative}
+.login-mascot{width:100%;max-width:300px;height:auto}
+.login-tagline{color:#006F98;font-weight:700;font-size:17px;margin-top:12px;letter-spacing:.5px}
+.login-right{flex:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center}
+@media(max-width:720px){.login-card{flex-direction:column;min-height:auto;max-width:420px}.login-left{padding:28px 20px}.login-mascot{max-width:180px}.login-right{padding:28px 20px}}
 .lock-logo{font-size:44px;font-weight:800;margin-bottom:6px;text-shadow:0 4px 30px rgba(0,0,0,.25);letter-spacing:-.5px}
 .lock-sub{opacity:.85;font-size:14px;margin-bottom:40px;font-weight:500;letter-spacing:2px}
 .user-grid{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:24px}
@@ -184,14 +190,49 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
 
 <!-- ═══ LOGIN SCREEN ═══ -->
 <div id="lockScreen">
-  <div class="lock-logo" id="lockLogo">🫧 SAKKANID</div>
-  <div class="lock-sub" id="lockSub">Laundry POS System</div>
-  <div id="userGrid" class="user-grid" style="max-height:300px;overflow-y:auto;flex-wrap:wrap;justify-content:center"></div>
-  <div id="pinArea" class="pin-area" style="display:none">
-    <div style="font-size:13px;opacity:.8;margin-bottom:4px" id="pinUser"></div>
-    <div class="pin-dots" id="pinDots"></div>
-    <div class="pin-pad" id="pinPad"></div>
-    <div class="pin-msg" id="pinMsg"></div>
+  <div class="login-card">
+    <div class="login-left">
+      <svg viewBox="0 0 320 320" class="login-mascot" xmlns="http://www.w3.org/2000/svg">
+        <!-- ฟองสบู่ตกแต่ง -->
+        <circle cx="55" cy="60" r="14" fill="#7FD2FD" opacity=".5"/>
+        <circle cx="270" cy="80" r="10" fill="#1ABBEF" opacity=".4"/>
+        <circle cx="285" cy="230" r="16" fill="#7FD2FD" opacity=".45"/>
+        <circle cx="45" cy="250" r="11" fill="#1ABBEF" opacity=".4"/>
+        <!-- ตะกร้าผ้า -->
+        <ellipse cx="160" cy="285" rx="80" ry="14" fill="#004E6B" opacity=".12"/>
+        <path d="M105 175 L215 175 L205 265 Q204 275 194 275 L126 275 Q116 275 115 265 Z" fill="#fff" stroke="#006F98" stroke-width="4"/>
+        <line x1="120" y1="195" x2="128" y2="258" stroke="#C5EDFB" stroke-width="3"/>
+        <line x1="145" y1="195" x2="149" y2="258" stroke="#C5EDFB" stroke-width="3"/>
+        <line x1="170" y1="195" x2="170" y2="258" stroke="#C5EDFB" stroke-width="3"/>
+        <line x1="195" y1="195" x2="191" y2="258" stroke="#C5EDFB" stroke-width="3"/>
+        <line x1="215" y1="200" x2="105" y2="200" stroke="#006F98" stroke-width="4"/>
+        <!-- เสื้อผ้าในตะกร้า -->
+        <path d="M125 178 Q140 155 160 165 Q180 155 195 178 Z" fill="#1ABBEF" opacity=".85"/>
+        <path d="M135 172 Q155 150 175 172" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <!-- ไม้แขวนเสื้อ (โลโก้ร้าน) -->
+        <circle cx="160" cy="88" r="6" fill="none" stroke="#004E6B" stroke-width="4"/>
+        <path d="M160 94 L160 108" stroke="#004E6B" stroke-width="4" stroke-linecap="round"/>
+        <path d="M160 108 L108 138 Q104 141 108 143 L212 143 Q216 141 212 138 Z" fill="none" stroke="#004E6B" stroke-width="4" stroke-linejoin="round"/>
+        <!-- ฟองสบู่ลอย -->
+        <circle cx="230" cy="130" r="20" fill="#7FD2FD" opacity=".3"/>
+        <circle cx="236" cy="123" r="5" fill="#fff" opacity=".7"/>
+        <circle cx="95" cy="120" r="14" fill="#1ABBEF" opacity=".25"/>
+        <circle cx="99" cy="115" r="4" fill="#fff" opacity=".7"/>
+      </svg>
+      <div class="login-tagline">สะอาด สะดวก ครบวงจร</div>
+    </div>
+    <div class="login-right">
+      <div class="lock-logo" id="lockLogo">🫧 SAKKANID</div>
+      <div class="lock-sub" id="lockSub">Laundry POS System</div>
+      <div style="font-size:14px;opacity:.85;margin-bottom:16px" id="loginWelcome">เลือกผู้ใช้เพื่อเข้าสู่ระบบ</div>
+      <div id="userGrid" class="user-grid" style="max-height:280px;overflow-y:auto;flex-wrap:wrap;justify-content:center"></div>
+      <div id="pinArea" class="pin-area" style="display:none">
+        <div style="font-size:14px;opacity:.9;margin-bottom:10px;font-weight:600" id="pinUser"></div>
+        <div class="pin-dots" id="pinDots"></div>
+        <div class="pin-pad" id="pinPad"></div>
+        <div class="pin-msg" id="pinMsg"></div>
+      </div>
+    </div>
   </div>
 </div>
 
