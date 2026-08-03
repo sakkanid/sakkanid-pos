@@ -1308,12 +1308,23 @@ function confirmAddItem(){
 }
 function renderOrderItems(){
   const el=$('orderItemsList');if(!el) return;
-  if(!orderItems.length){el.innerHTML='<div style="color:var(--t3);font-size:14px;padding:12px;text-align:center">ยังไม่มีรายการ — กดปุ่มเพิ่มรายการซัก</div>';return}
-  el.innerHTML='<table style="font-size:14px"><tr><th>รายการ</th><th style="width:60px">จำนวน</th><th style="width:80px">ราคา</th><th style="width:40px"></th></tr>'+
-    orderItems.map((it,i)=>
-      '<tr><td style="font-weight:600">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td><td style="text-align:right;font-weight:700">'+thb(it.p*it.qty)+'</td>'+
-      '<td><button class="btn btn-rd btn-sm" onclick="removeItem('+i+')" style="padding:4px 8px;font-size:14px">✕</button></td></tr>'
-    ).join('')+'</table>';
+  if(!orderItems.length){el.innerHTML='<div style="color:var(--t3);font-size:14px;padding:16px;text-align:center;background:var(--bg);border-radius:12px;border:2px dashed var(--b1)">🛒 ยังไม่มีรายการ<br><span style="font-size:12px">กดปุ่มด้านบนเพื่อเพิ่มรายการซัก</span></div>';return}
+  el.innerHTML=orderItems.map((it,i)=>
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--wh);border:1px solid var(--b1);border-radius:12px;margin-bottom:8px">'+
+    '<div style="font-size:24px">'+catIcon(it.c)+'</div>'+
+    '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">'+it.t+(it.o?' · '+it.o:'')+'</div><div style="font-size:11px;color:var(--t3)">'+it.c+' · '+thb(it.p)+'/ชิ้น</div></div>'+
+    '<div style="display:flex;align-items:center;gap:6px"><button class="btn btn-out btn-sm" onclick="itemQtyChange('+i+',-1)" style="padding:4px 10px;font-size:16px;font-weight:700">−</button>'+
+    '<span style="font-weight:700;min-width:24px;text-align:center;font-size:15px">'+it.qty+'</span>'+
+    '<button class="btn btn-out btn-sm" onclick="itemQtyChange('+i+',1)" style="padding:4px 10px;font-size:16px;font-weight:700">+</button></div>'+
+    '<div style="font-weight:700;color:var(--pr);min-width:60px;text-align:right">'+thb(it.p*it.qty)+'</div>'+
+    '<button class="btn btn-rd btn-sm" onclick="removeItem('+i+')" style="padding:4px 8px;font-size:13px">🗑️</button>'+
+    '</div>'
+  ).join('');
+}
+function itemQtyChange(i,d){
+  if(!orderItems[i]) return;
+  orderItems[i].qty=Math.max(1,(orderItems[i].qty||1)+d);
+  renderOrderItems();calcOrderTotal();
 }
 function removeItem(i){orderItems.splice(i,1);renderOrderItems();calcOrderTotal()}
 function calcOrderTotal(){
@@ -2019,9 +2030,10 @@ function openBedsetForm(m){
     '<div class="modal-head"><h3>🛏️ Set เครื่องนอน</h3><button class="modal-close" onclick="closeMo(\'moBedset\')">&times;</button></div>'+
     '<div class="modal-body" style="overflow-y:auto;-webkit-overflow-scrolling:touch">'+
     '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong> · '+fmtPhone(m.phone)+'</div>'+
-    // Step 1: Select SET package (price comes from here)
-    '<div class="form-group"><label class="form-label">เลือก Set Package</label><select id="bs-set" onchange="bsSetChange();bsCalcNet()" style="font-size:14px">'+
-    BED_SETS.map(function(b,i){return '<option value="'+i+'">'+b.label+' — '+thb(b.price)+'</option>'}).join('')+'</select></div>'+
+    // Step 1: Select SET package (price comes from here) — แบบการ์ด
+    '<div class="form-group"><label class="form-label">1️⃣ เลือก Set Package</label><div id="bs-set-cards" class="svc-card-grid">'+
+    BED_SETS.map(function(b,i){return '<div class="svc-card'+(i===0?' sel':'')+'" onclick="selectBsSet('+i+',this)"><div class="svc-icon">🛏️</div><div class="svc-name">'+b.label+'</div><div style="font-size:12px;color:var(--pr);font-weight:700;margin-top:2px">'+thb(b.price)+'</div></div>'}).join('')+
+    '</div><input type="hidden" id="bs-set" value="0"></div>'+
     '<div id="bs-set-price" style="background:var(--gnl);padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin-bottom:12px">ราคา Set: '+thb(BED_SETS[0].price)+'</div>'+
     // Step 2: Specify items (tracking only, no extra charge)
     '<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ระบุรายการเครื่องนอน <span style="font-size:11px;color:var(--t3);font-weight:400">(ไม่คิดเงินเพิ่ม)</span></div>'+
@@ -2048,6 +2060,12 @@ function openBedsetForm(m){
     '<div id="bs-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(BED_SETS[0].price)+'</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moBedset\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveBedset()">💾 บันทึก</button></div>';
   openMo('moBedset');
+}
+function selectBsSet(idx,el){
+  var hidden=$('bs-set');if(hidden) hidden.value=idx;
+  document.querySelectorAll('#bs-set-cards .svc-card').forEach(function(c){c.classList.remove('sel')});
+  if(el) el.classList.add('sel');
+  bsSetChange();bsCalcNet();
 }
 function bsSetChange(){
   var idx=parseInt($('bs-set')?$('bs-set').value:0);
@@ -2147,8 +2165,9 @@ function openCleaningForm(m){
     '<div class="modal-head"><h3>🧹 จองทำความสะอาด</h3><button class="modal-close" onclick="closeMo(\'moCleaning\')">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong></div>'+
-    '<div class="form-group"><label class="form-label">ประเภทห้อง</label><select id="cn-type" onchange="if($(&apos;cn-price&apos;))$(&apos;cn-price&apos;)._userEdited=false;cnCalcNet()">'+
-    CLN_SVCS.map((s,i)=>'<option value="'+i+'">'+s.label+' — เริ่มต้น '+thb(s.minPrice)+'</option>').join('')+'</select></div>'+
+    '<div class="form-group"><label class="form-label">1️⃣ เลือกประเภทห้อง</label><div id="cn-type-cards" class="svc-card-grid">'+
+    CLN_SVCS.map(function(s,i){return '<div class="svc-card'+(i===0?' sel':'')+'" onclick="selectCnType('+i+',this)"><div class="svc-icon">'+clnIcon(s.label)+'</div><div class="svc-name">'+s.label+'</div><div style="font-size:11px;color:var(--pr);font-weight:700;margin-top:2px">เริ่ม '+thb(s.minPrice)+'</div></div>'}).join('')+
+    '</div><input type="hidden" id="cn-type" value="0"></div>'+
     '<div class="form-group"><label class="form-label">💰 ราคาค่าบริการ (฿) — กรอกราคาจริง</label><input id="cn-price" type="number" value="'+CLN_SVCS[0].minPrice+'" min="0" oninput="this._userEdited=true;cnCalcNet()"></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">วันนัด (dd/mm/yyyy)</label><input id="cn-date" type="date" value="'+defaultPickupDate()+'"></div>'+
@@ -2168,6 +2187,24 @@ function openCleaningForm(m){
     '<div id="cn-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: '+thb(CLN_SVCS[0].minPrice)+'</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moCleaning\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveCleaning()">💾 บันทึก</button></div>';
   openMo('moCleaning');
+}
+function clnIcon(label){
+  var l=(label||'').toLowerCase();
+  if(l.indexOf('คอนโด')>=0||l.indexOf('ห้อง')>=0) return '🏢';
+  if(l.indexOf('บ้าน')>=0) return '🏠';
+  if(l.indexOf('ออฟฟิศ')>=0||l.indexOf('สำนักงาน')>=0) return '🏬';
+  if(l.indexOf('โซฟา')>=0) return '🛋️';
+  if(l.indexOf('พรม')>=0) return '🧶';
+  if(l.indexOf('รถ')>=0) return '🚗';
+  return '🧹';
+}
+function selectCnType(idx,el){
+  var hidden=$('cn-type');if(hidden) hidden.value=idx;
+  document.querySelectorAll('#cn-type-cards .svc-card').forEach(function(c){c.classList.remove('sel')});
+  if(el) el.classList.add('sel');
+  var priceEl=$('cn-price');
+  if(priceEl&&!priceEl._userEdited){priceEl.value=CLN_SVCS[idx].minPrice}
+  cnCalcNet();
 }
 function cnPaidChange(){if($('cn-pay-detail'))$('cn-pay-detail').style.display=$('cn-paid').value==='1'?'block':'none'}
 function saveCleaning(){
