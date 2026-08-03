@@ -3371,12 +3371,28 @@ function renderSettingsBackup(){
     '<hr style="margin:14px 0"><div class="card-title" style="font-size:13px;color:var(--rd)">🗑️ ล้างข้อมูลทั้งหมด</div>'+
     '<button class="btn btn-rd btn-sm" onclick="clearAllData()">ล้างข้อมูลทั้งหมด (ไม่สามารถย้อนกลับ)</button></div>';
 }
-function clearOrdersOnly(){
+async function clearOrdersOnly(){
   if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
-  if(!confirm('⚠️ ล้างประวัติออเดอร์ทั้งหมด?\n\nออเดอร์ '+(DB.orders||[]).length+' รายการจะถูกลบ\n(สมาชิก ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
+  if(!confirm('⚠️ ล้างประวัติออเดอร์ทั้งหมด?\n\nออเดอร์ '+(DB.orders||[]).length+' รายการจะถูกลบ (ทั้งในเครื่องและ Cloud)\n(สมาชิก ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
   if(!confirm('❗ ยืนยันอีกครั้ง — ลบออเดอร์ทั้งหมดจริงหรือ? ไม่สามารถย้อนกลับได้')) return;
-  DB.orders=[];DB.docs=[];saveDB();
-  toast('🗑️ ล้างประวัติออเดอร์แล้ว ✅');logAction('CLEAR_ORDERS','all orders cleared');
+  DB.orders=[];DB.docs=[];DB.orderSeq=0;saveDB();
+  // ล้างใน Google Sheets ด้วย (ไม่งั้น sync pull กลับมา)
+  if(getApiUrl()){
+    toast('🔄 กำลังล้างข้อมูลใน Cloud...','info');
+    try{
+      var r=await jsonpCall('clearSheet','orders');
+      if(r&&r.ok){
+        toast('🗑️ ล้างประวัติออเดอร์ทั้งในเครื่องและ Cloud แล้ว ✅');
+      }else{
+        toast('⚠️ ล้างในเครื่องแล้ว แต่ Cloud อาจยังไม่ล้าง','warn');
+      }
+    }catch(e){
+      toast('⚠️ ล้างในเครื่องแล้ว — Cloud ล้างไม่ได้: '+e.message,'warn');
+    }
+  }else{
+    toast('🗑️ ล้างประวัติออเดอร์แล้ว ✅');
+  }
+  logAction('CLEAR_ORDERS','all orders cleared');
   renderPage(curPage);
 }
 function clearAllData(){
@@ -5349,14 +5365,14 @@ async function sendDailySummaryLine(){
 // ═══ แชทกับลูกค้า — เปิด LINE OA Chat ═══
 function chatWithCustomer(mid){
   var m=gM(mid);if(!m) return;
-  var s=getShopSettings();
-  var oaId=(s.lineOaId||'').replace('@','');
-  // เปิด LINE OA Manager chat (ต้อง login OA Manager)
-  if(m.lineName){
-    toast('💬 เปิด LINE — ค้นหา "'+m.lineName+'" ในแชท','info');
+  var searchName=m.lineName||m.name||'';
+  // LINE ไม่มี URL เปิดแชทรายคนได้ — เปิดหน้าแชท OA + copy ชื่อให้ค้นหา
+  if(navigator.clipboard&&searchName){
+    navigator.clipboard.writeText(searchName).then(function(){
+      toast('📋 คัดลอกชื่อ "'+searchName+'" แล้ว — วางในช่องค้นหาแชท LINE','info');
+    }).catch(function(){});
   }
-  // เปิด LINE OA Manager
-  window.open('https://manager.line.biz/','_blank');
+  window.open('https://chat.line.biz/','_blank');
 }
 async function sendQuotaInfoLine(mid){
   var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
