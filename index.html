@@ -515,6 +515,28 @@ function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
 function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
 function fmtISO(iso){if(!iso) return '';try{return fmtDate(new Date(iso))}catch(e){return iso}}
+// ═══ แสดงวันที่แบบไทย (วัน/เดือน/ปี) ใต้ช่อง date ═══
+function thaiDateLabel(iso){
+  if(!iso) return '';
+  try{
+    var p=iso.split('-');if(p.length!==3) return '';
+    var months=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var buddhistYear=parseInt(p[0])+543;
+    return '📅 '+parseInt(p[2])+' '+months[parseInt(p[1])]+' '+buddhistYear;
+  }catch(e){return ''}
+}
+function attachDateLabel(inputId){
+  var inp=$(inputId);if(!inp) return;
+  var lblId=inputId+'-thai';
+  var existing=document.getElementById(lblId);
+  if(!existing){
+    existing=document.createElement('div');existing.id=lblId;
+    existing.style.cssText='font-size:12px;color:var(--pr);font-weight:600;margin-top:4px';
+    inp.parentNode.appendChild(existing);
+  }
+  existing.textContent=thaiDateLabel(inp.value);
+  inp.addEventListener('change',function(){existing.textContent=thaiDateLabel(inp.value)});
+}
 function thaiNow(){var d=new Date();return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function todayStr(){return new Date().toISOString().slice(0,10)}
 function defaultPickupDate(){const d=new Date();d.setDate(d.getDate()+3);return d.toISOString().slice(0,10)}
@@ -522,7 +544,17 @@ function toast(msg,type='ok'){
   const el=document.createElement('div');el.className='toast toast-'+type;el.textContent=msg;
   $('toastBox').appendChild(el);setTimeout(()=>el.remove(),3000);
 }
-function openMo(id){$(id).classList.add('show')}
+function openMo(id){
+  $(id).classList.add('show');
+  // แนบ label วันที่ไทยให้ทุก date input ในโมดัลอัตโนมัติ
+  setTimeout(function(){
+    var mo=$(id);if(!mo) return;
+    mo.querySelectorAll('input[type="date"]').forEach(function(inp){
+      if(!inp.id) inp.id='dt_'+Math.random().toString(36).slice(2,8);
+      if(!document.getElementById(inp.id+'-thai')) attachDateLabel(inp.id);
+    });
+  },50);
+}
 function closeMo(id){$(id).classList.remove('show')}
 function saveDB(){localStorage.setItem('sj_db',JSON.stringify(DB))}
 function loadDB(){
@@ -1171,7 +1203,7 @@ function openCreateOrderModal(m){
     '<div class="form-group" id="co-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="co-addr" value="'+((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):'')||'')+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'co\')" style="white-space:nowrap">📍 คำนวณระยะทาง</button></div><div id="co-map-result" style="font-size:12px;margin-top:4px"></div>'+
     '<label class="form-label" style="margin-top:8px">🗺️ ลิงก์ Google Maps (สำหรับคนขนส่ง)</label><input id="co-maplink" placeholder="วางลิงก์ Google Maps ที่นี่ (คัดลอกจากแอป Maps)"></div>'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy +3วัน)</label><input id="co-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
+    '<div class="form-group"><label class="form-label">วันนัดรับ (นับจากวันนี้ +3 วัน)</label><input id="co-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
     '<div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="co-disc" type="number" value="0" oninput="calcOrderTotal()"></div>'+
     '</div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="co-note" placeholder="หมายเหตุ (แสดงในบิล)"></div>'+
@@ -1181,7 +1213,7 @@ function openCreateOrderModal(m){
     '<div id="co-pay-method" style="display:none">'+
     '<div class="form-group"><label class="form-label">วิธีชำระ</label><select id="co-method">'+
     getPayMethods().map(m=>'<option>'+m.name+'</option>').join('')+'</select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="co-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="co-paydate" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="co-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="co-payamt" type="number" placeholder="กรอกยอดเงิน"></div>'+
     '</div>'+
@@ -1463,7 +1495,7 @@ function openPayModal(oid){
     '<div class="form-group"><label class="form-label">จำนวนเงินที่รับ (฿)</label><input id="pay-amt" type="number" value="'+rem+'"></div>'+
     '<div class="form-group"><label class="form-label">วิธีชำระ</label><select id="pay-method">'+
     getPayMethods().map(m=>'<option>'+m.name+'</option>').join('')+'</select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="pay-date" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="pay-date" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="pay-time" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moPay\')">ยกเลิก</button><button class="btn btn-am" onclick="sendQrPayment(\''+oid+'\')">📲 ส่ง QR ชำระ</button><button class="btn btn-gn btn-lg" onclick="confirmPay()">✅ ยืนยันรับเงิน</button></div>';
@@ -1792,7 +1824,7 @@ function openEditOrder(oid){
     getActivePromos().map(function(p,i){return '<option value="'+i+'" '+(o.promo===p.name?'selected':'')+'>'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="eo-disc" type="number" value="'+(o.disc||0)+'" onchange="eoRecalc()"></div>'+
-    '<div class="form-group"><label class="form-label">วันนัดรับ (dd/mm/yyyy)</label><input id="eo-pickup" type="date" value="'+(o.pickupDate||'')+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">วันนัดรับ</label><input id="eo-pickup" type="date" value="'+(o.pickupDate||'')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="eo-note" value="'+(o.note||'')+'"></div>'+
     '<div id="eo-total-box" class="card" style="background:var(--bg);box-shadow:none;text-align:right;font-size:16px;font-weight:700;color:var(--pr);margin-top:10px">'+calcEditTotalDisplay(o)+'</div>'+
     '</div>'+
@@ -2007,7 +2039,7 @@ function openBuyPkgForm(m){
     getPayMethods().map(m=>'<option>'+m.name+'</option>').join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">🎁 โปรโมชั่น</label><select id="bp-promo" onchange="bpCalcTotal()"><option value="">— ไม่ใช้โปร —</option>'+
     getActivePromos().map(function(p,i){return '<option value="'+i+'">'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':p.type==='buyXfreeY'?' ('+p.buyX+'แถม'+p.freeY+')':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="bp-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="bp-paydate" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="bp-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '</div>'+
     '<div id="bp-total-box" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: ฿0</div>'+
@@ -2192,7 +2224,7 @@ function openCleaningForm(m){
     '</div><input type="hidden" id="cn-type" value="0"></div>'+
     '<div class="form-group"><label class="form-label">💰 ราคาค่าบริการ (฿) — กรอกราคาจริง</label><input id="cn-price" type="number" value="'+CLN_SVCS[0].minPrice+'" min="0" oninput="this._userEdited=true;cnCalcNet()"></div>'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">วันนัด (dd/mm/yyyy)</label><input id="cn-date" type="date" value="'+defaultPickupDate()+'"></div>'+
+    '<div class="form-group"><label class="form-label">วันนัดทำความสะอาด</label><input id="cn-date" type="date" value="'+defaultPickupDate()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="cn-time" type="time" value="09:00"></div>'+
     '</div>'+
     '<div class="form-group"><label class="form-label">ห้อง/สถานที่</label><input id="cn-room" value="'+(m.addrType==='condo'?m.proj+' '+m.room:m.village+' '+m.houseNo)+'"></div>'+
@@ -2202,7 +2234,7 @@ function openCleaningForm(m){
     '<div class="form-group"><label class="form-label">สถานะชำระเงิน</label><select id="cn-paid" onchange="cnPaidChange()"><option value="0">❌ ยังไม่ชำระ — รอชำระภายหลัง</option><option value="1">✅ ชำระเงินทันที</option></select></div>'+
     '<div id="cn-pay-detail" style="display:none"><div class="form-group"><label class="form-label">วิธีชำระ</label><select id="cn-method">'+
     getPayMethods().map(function(pm){return '<option>'+pm.name+'</option>'}).join('')+'</select></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ (dd/mm/yyyy)</label><input id="cn-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="cn-paydate" type="date" value="'+todayStr()+'"></div>'+
     '<div class="form-group"><label class="form-label">เวลา</label><input id="cn-paytime" type="time" value="'+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="cn-payamt" type="number" placeholder="กรอกยอดเงิน"></div></div>'+
     '</div>'+
