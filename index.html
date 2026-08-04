@@ -507,8 +507,44 @@ let DB=null;
 const $=id=>document.getElementById(id);
 function genId(prefix){
   const key=prefix==='LDR'||prefix==='BED'||prefix==='CLN'||prefix==='PKB'?'orderSeq':prefix==='SKN'?'memberSeq':'quotaSeq';
-  DB[key]=(DB[key]||0)+1;
-  return prefix+'-'+String(DB[key]).padStart(4,'0');
+  // กัน ID ซ้ำ: หาเลขสูงสุดที่มีอยู่จริง (เผื่อ counter ตามข้อมูลจาก Cloud/webhook ไม่ทัน)
+  var maxExisting=0,id,n;
+  if(key==='orderSeq'){
+    (DB.orders||[]).forEach(function(o){id=String(o&&o.id||'');n=parseInt(id.replace(/^[A-Za-z]+-/,''),10)||0;if(n>maxExisting)maxExisting=n});
+  }else if(key==='memberSeq'){
+    (DB.members||[]).forEach(function(m){id=String(m&&m.id||'');if(id.indexOf('SKN-')===0){n=parseInt(id.slice(4),10)||0;if(n>maxExisting)maxExisting=n}});
+  }else{
+    [].concat(DB.quotas||[],DB.expenses||[],DB.orders||[]).forEach(function(x){id=String(x&&x.id||'');if(id.indexOf(prefix+'-')===0){n=parseInt(id.slice(prefix.length+1),10)||0;if(n>maxExisting)maxExisting=n}});
+  }
+  var next=Math.max((DB[key]||0),maxExisting)+1;
+  DB[key]=next;
+  return prefix+'-'+String(next).padStart(4,'0');
+}
+// ═══ ซ่อม ID สมาชิกที่ซ้ำ — เก็บคนที่มียอดซื้อสูงสุดไว้เลขเดิม, คนที่เหลือได้เลขใหม่ ═══
+function fixDuplicateMemberIds(silent){
+  var groups={};
+  (DB.members||[]).forEach(function(m){if(!m||!m.id)return;(groups[m.id]=groups[m.id]||[]).push(m)});
+  var fixed=0,detail=[];
+  Object.keys(groups).forEach(function(id){
+    var arr=groups[id];
+    if(arr.length<2) return;
+    // เรียงให้คนยอดซื้อสูงสุด (เจ้าของออเดอร์จริง) อยู่หน้า → เก็บ ID เดิมไว้
+    arr.sort(function(a,b){return (Number(b.spend)||0)-(Number(a.spend)||0)});
+    for(var i=1;i<arr.length;i++){
+      var newId=genId('SKN');
+      detail.push(id+'→'+newId+' ('+(arr[i].name||'')+')');
+      arr[i].id=newId;
+      fixed++;
+    }
+  });
+  if(fixed){
+    saveDB();if(typeof pushPriceToCloud==='function'){} // ensure sync via saveDB debounce
+    logAction('FIX_DUP_ID','ซ่อม ID ซ้ำ '+fixed+' ราย: '+detail.join(', '));
+    if(!silent) toast('🔧 ซ่อม ID สมาชิกซ้ำ '+fixed+' รายการ ✅');
+  }else if(!silent){
+    toast('✅ ไม่พบ ID สมาชิกซ้ำ');
+  }
+  return fixed;
 }
 function gO(oid){return DB.orders.find(o=>o.id===oid)}
 function gM(mid){return DB.members.find(m=>m.id===mid)}
@@ -747,7 +783,7 @@ function initApp(){
   // Initial sync from cloud
   if(getApiUrl()){
     toast('🔄 กำลังดึงข้อมูลจาก Cloud...','info');
-    syncPullAll().then(function(){renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
+    syncPullAll().then(function(){fixDuplicateMemberIds(true);renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
     startAutoPull();
   }
   startDailyReportSchedule();
@@ -2420,9 +2456,10 @@ function showCalDay(dateStr){
 
 // ═══ MEMBERS PAGE ═══
 function renderMembersPage(c){
+  fixDuplicateMemberIds(true); // ซ่อม ID ซ้ำอัตโนมัติเมื่อเปิดหน้าสมาชิก (เงียบ)
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
     '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
 }
 function renderMemberTable(list){
