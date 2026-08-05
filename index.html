@@ -548,6 +548,9 @@ function fixDuplicateMemberIds(silent){
 }
 function gO(oid){return DB.orders.find(o=>o.id===oid)}
 function gM(mid){return DB.members.find(m=>m.id===mid)}
+// ── Lead vs สมาชิกเต็มตัว: มีเบอร์โทร = เต็มตัว, ไม่มีเบอร์ = Lead 🌱 ──
+function validPhone(p){var s=String(p||'').replace(/[^0-9]/g,'');return s.length>=9}
+function isLead(m){return m&&!validPhone(m.phone)}
 function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
 function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
@@ -2457,20 +2460,37 @@ function showCalDay(dateStr){
 // ═══ MEMBERS PAGE ═══
 function renderMembersPage(c){
   fixDuplicateMemberIds(true); // ซ่อม ID ซ้ำอัตโนมัติเมื่อเปิดหน้าสมาชิก (เงียบ)
-  c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก ('+DB.members.length+' คน)</div>'+
+  if(!window._memFilter) window._memFilter='all';
+  var leadCnt=DB.members.filter(isLead).length;
+  var fullCnt=DB.members.length-leadCnt;
+  c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก — ✅ เต็มตัว '+fullCnt+' · 🌱 Lead '+leadCnt+'</div>'+
+    '<div class="filter-bar" style="margin-bottom:10px">'+
+      memFilterChip('all','ทั้งหมด ('+DB.members.length+')')+
+      memFilterChip('full','✅ สมาชิกเต็มตัว ('+fullCnt+')')+
+      memFilterChip('lead','🌱 Lead — ยังไม่มีเบอร์ ('+leadCnt+')')+'</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
     '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
-    '<div id="memPageList">'+renderMemberTable(DB.members)+'</div></div>';
+    (window._memFilter==='lead'?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">💡 Lead = ทักแชทเข้ามาแล้ว แต่ยังไม่มีเบอร์ — กดที่รายชื่อ → ✏️ แก้ไข → ใส่เบอร์ แล้วเซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
+    '<div id="memPageList">'+renderMemberTable(memListFiltered())+'</div></div>';
+}
+function memFilterChip(f,label){return '<div class="filter-chip'+(window._memFilter===f?' act':'')+'" onclick="setMemFilter(\''+f+'\')">'+label+'</div>'}
+function setMemFilter(f){window._memFilter=f;renderPage('members')}
+function memListFiltered(){
+  var q=($('memPageSearch')?$('memPageSearch').value:'').toLowerCase();
+  return DB.members.filter(function(m){
+    if(window._memFilter==='lead'&&!isLead(m)) return false;
+    if(window._memFilter==='full'&&isLead(m)) return false;
+    if(q&&!((m.name||'').toLowerCase().includes(q)||String(m.phone||'').includes(q))) return false;
+    return true;
+  });
 }
 function renderMemberTable(list){
   if(!list.length) return '<div class="empty-state"><div class="es-text">ไม่มีสมาชิก</div></div>';
   return '<table><tr><th>ID</th><th>ชื่อ</th><th>เบอร์</th><th>แต้ม</th><th>ยอดซื้อ</th><th>ระดับ</th></tr>'+
-    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong></td><td>'+fmtPhone(m.phone)+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
+    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-am" style="font-size:10px">🌱 Lead</span>':'')+'</td><td>'+(fmtPhone(m.phone)||'<span style="color:var(--am);font-size:12px">— ยังไม่มีเบอร์</span>')+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
 }
 function filterMembersPage(){
-  const q=($('memPageSearch')?$('memPageSearch').value:'').toLowerCase();
-  const list=DB.members.filter(m=>(m.name||'').toLowerCase().includes(q)||String(m.phone||"").includes(q));
-  $('memPageList').innerHTML=renderMemberTable(list);
+  $('memPageList').innerHTML=renderMemberTable(memListFiltered());
 }
 // ═══ ส่ง QR ชำระเงิน แยกต่างหาก (แอดมินเลือกส่งเอง) ═══
 
@@ -3967,6 +3987,7 @@ function viewMemberDetail(mid){
   $('moDetailIn').innerHTML=
     '<div class="modal-head"><h3>👤 '+m.name+'</h3><button class="modal-close" onclick="closeMo(\'moDetail\')">&times;</button></div>'+
     '<div class="modal-body" style="overflow-y:auto;max-height:65vh">'+
+    (isLead(m)?'<div style="padding:10px 12px;background:var(--aml);border-radius:8px;margin-bottom:12px;font-size:13px;color:#8A6D0A">🌱 <strong>นี่คือ Lead</strong> — ลูกค้าทักแชทเข้ามาแต่ยังไม่มีเบอร์โทร<br>กด <b>✏️ แก้ไข</b> ด้านล่าง → ใส่เบอร์ → เซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
     '<div class="grid g4" style="margin-bottom:14px">'+
     '<div class="kpi"><div class="kpi-lbl">แต้ม</div><div class="kpi-val">'+m.pts+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">ยอดซื้อ</div><div class="kpi-val">'+thb(m.spend)+'</div></div>'+
@@ -4044,6 +4065,7 @@ function openEditMember(mid){
 }
 function saveEditMember(mid){
   const m=gM(mid);if(!m) return;
+  var wasLead=isLead(m); // ก่อนแก้ไข ยังไม่มีเบอร์?
   m.name=$('em-name').value.trim()||m.name;m.nick=$('em-nick').value.trim();
   var rawPhone=$('em-phone').value.trim().replace(/[^0-9]/g,'');
   if(rawPhone&&rawPhone.charAt(0)!=='0') rawPhone='0'+rawPhone;
@@ -4055,7 +4077,10 @@ function saveEditMember(mid){
   m.proj=$('em-proj')?$('em-proj').value.trim():'';
   m.room=$('em-room')?$('em-room').value.trim():'';
   m.pts=parseInt($('em-pts').value)||0;m.level=$('em-level').value;
-  saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);toast('แก้ไขสำเร็จ ✅');
+  saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);
+  // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ ──
+  if(wasLead&&!isLead(m)){toast('🎉 อัปเกรด '+m.name+' เป็นสมาชิกเต็มตัวแล้ว!');logAction('PROMOTE_MEMBER',mid+' Lead→สมาชิกเต็มตัว');}
+  else toast('แก้ไขสำเร็จ ✅');
   const mo=$('moEditMem');if(mo) mo.remove();renderPage(curPage);
 }
 function deleteMember(mid){
