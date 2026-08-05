@@ -546,6 +546,24 @@ function fixDuplicateMemberIds(silent){
   }
   return fixed;
 }
+// ── ปรับรหัสสมาชิกที่ไม่ใช่ SKN- (เช่น MBR- จาก webhook เวอร์ชันเก่า) ให้เป็น SKN- + อัปเดต reference ──
+function normalizeMemberIds(silent){
+  var renamed=0,detail=[];
+  (DB.members||[]).forEach(function(m){
+    if(!m||!m.id)return;
+    if(String(m.id).indexOf('SKN-')===0)return;
+    var oldId=m.id;var newId=genId('SKN');
+    (DB.orders||[]).forEach(function(o){if(o.mid===oldId)o.mid=newId});
+    (DB.quotas||[]).forEach(function(q){if(q.mid===oldId)q.mid=newId});
+    m.id=newId;renamed++;detail.push(oldId+'→'+newId+' ('+(m.name||'')+')');
+  });
+  if(renamed){
+    saveDB();
+    logAction('NORMALIZE_ID','แปลงรหัสสมาชิกเป็น SKN '+renamed+' ราย: '+detail.join(', '));
+    if(!silent) toast('🔧 ปรับรหัสสมาชิกเป็น SKN '+renamed+' รายการ ✅');
+  }
+  return renamed;
+}
 function gO(oid){return DB.orders.find(o=>o.id===oid)}
 function gM(mid){return DB.members.find(m=>m.id===mid)}
 // ── Lead vs สมาชิกเต็มตัว: มีเบอร์โทร = เต็มตัว, ไม่มีเบอร์ = Lead 🌱 ──
@@ -562,6 +580,7 @@ var STATUS_EN={'รับผ้ารอส่งซัก':'Received – awaiti
 function statusEn(st){st=String(st||'');if(STATUS_EN[st])return STATUS_EN[st];if(st.indexOf('รับผ้า')>=0)return 'Received';if(st.indexOf('ซัก')>=0)return 'Washing';if(st.indexOf('พร้อม')>=0)return 'Ready';if(st.indexOf('จัดส่ง')>=0)return 'Out for delivery';if(st.indexOf('เสร็จ')>=0||st.indexOf('ปิด')>=0)return 'Completed';return st}
 // ── เทมเพลตข้อความ LINE ค่าเริ่มต้น (ไทย/อังกฤษ) ──
 var LINE_TPL_DEF={
+  leadGreet:{th:'สวัสดีค่ะ {name} 🫧\n\nขอบคุณที่ทักมาหา {shop} นะคะ 💙\nทางร้านบันทึกข้อมูลเบื้องต้นของคุณไว้ให้แล้วค่ะ 📝\n\nหากต้องการสมัครสมาชิกเต็มตัว เพื่อรับแต้มสะสมและสิทธิพิเศษ รบกวนแจ้ง "ชื่อ + เบอร์โทร" กลับมาในแชทนี้ หรือแจ้งที่ร้านได้เลยนะคะ\n\nมีอะไรให้ดูแลเรื่องซักรีด ทักมาได้ตลอดเลยค่ะ 🧺✨',en:'Hi {name} 🫧\n\nThank you for contacting {shop} 💙\nWe have saved your basic info 📝\n\nTo become a full member (earn points & perks), please reply with your "name + phone number", or let our staff know.\n\nFeel free to message us anytime for laundry service 🧺✨'},
   welcome:{th:'สวัสดีค่ะ {name} 🫧\n\nยินดีต้อนรับสู่ {shop}\nสมัครสมาชิกสำเร็จแล้ว ✅\n\nรหัสสมาชิก: {id}\nระดับ: {level}\nแต้มต้อนรับ: {pts} แต้ม 🎉\n\nขอบคุณที่ใช้บริการค่ะ 💙',en:'Hi {name} 🫧\n\nWelcome to {shop}!\nYour membership is confirmed ✅\n\nMember ID: {id}\nTier: {level}\nWelcome points: {pts} 🎉\n\nThank you 💙'},
   statusUpdate:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙',en:'Hi {name} 🫧\n{shop}\nOrder {id} — Status: {status}\nThank you 💙'},
   billCollect:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏',en:'Hi {name} 🫧\n{shop}\nOrder: {id}\nOutstanding balance: {amount}\nPlease complete your payment 🙏'},
@@ -850,7 +869,7 @@ function initApp(){
   // Initial sync from cloud
   if(getApiUrl()){
     toast('🔄 กำลังดึงข้อมูลจาก Cloud...','info');
-    syncPullAll().then(function(){fixDuplicateMemberIds(true);renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
+    syncPullAll().then(function(){normalizeMemberIds(true);fixDuplicateMemberIds(true);renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
     startAutoPull();
   }
   startDailyReportSchedule();
@@ -2568,6 +2587,7 @@ function showCalDay(dateStr){
 
 // ═══ MEMBERS PAGE ═══
 function renderMembersPage(c){
+  normalizeMemberIds(true); // แปลงรหัสที่ไม่ใช่ SKN (เช่น MBR-) ให้เป็น SKN อัตโนมัติ
   fixDuplicateMemberIds(true); // ซ่อม ID ซ้ำอัตโนมัติเมื่อเปิดหน้าสมาชิก (เงียบ)
   if(!window._memFilter) window._memFilter='all';
   var leadCnt=DB.members.filter(isLead).length;
@@ -4642,7 +4662,9 @@ function renderLineTemplates(){
   };
   return '<div class="card"><div class="card-title">📱 LINE Message Templates</div>'+
     '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
-    row('🎉','ต้อนรับสมาชิกใหม่','welcome')+
+    '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">💬 <b>ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)</b> = ข้อความที่ลูกค้าใหม่ได้รับทันทีที่ทักแชทเข้ามา (ยังไม่ต้องเป็นสมาชิก/ยังไม่ได้แต้ม) — ต่างจาก "ต้อนรับสมาชิกใหม่" ที่ส่งตอนสมัครเป็นสมาชิกเต็มตัว<br><span style="color:var(--am)">⚠️ ข้อความนี้ส่งจากฝั่ง Apps Script — หลังแก้ไขต้อง "อัปเดต + Deploy Apps Script ใหม่" ถึงจะมีผล</span></div>'+
+    row('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก / ยังไม่เป็นสมาชิก)','leadGreet')+
+    row('🎉','ต้อนรับสมาชิกใหม่ (ตอนสมัครเป็นสมาชิกเต็มตัว)','welcome')+
     row('📋','แจ้งสถานะ','statusUpdate')+
     row('💰','เรียกเก็บเงิน','billCollect')+
     row('✅','ผ้าพร้อมส่ง','ready')+
@@ -4651,12 +4673,20 @@ function renderLineTemplates(){
 function saveLineTemplates(){
   var s=getShopSettings();
   s.lineTemplates={
+    leadGreet:$('lt-leadGreet')?$('lt-leadGreet').value:'',leadGreetEn:$('lt-leadGreet-en')?$('lt-leadGreet-en').value:'',
     welcome:$('lt-welcome')?$('lt-welcome').value:'',welcomeEn:$('lt-welcome-en')?$('lt-welcome-en').value:'',
     statusUpdate:$('lt-statusUpdate')?$('lt-statusUpdate').value:'',statusUpdateEn:$('lt-statusUpdate-en')?$('lt-statusUpdate-en').value:'',
     billCollect:$('lt-billCollect')?$('lt-billCollect').value:'',billCollectEn:$('lt-billCollect-en')?$('lt-billCollect-en').value:'',
     ready:$('lt-ready')?$('lt-ready').value:'',readyEn:$('lt-ready-en')?$('lt-ready-en').value:''
   };
-  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();toast('บันทึก LINE Templates สำเร็จ ✅');
+  saveDB();
+  // push settings ขึ้น Cloud ทันที เพื่อให้ Apps Script (webhook) อ่านข้อความตอบกลับใหม่ได้
+  var sset=getShopSettings();
+  if(sset.apiUrl){
+    var rows=Object.keys(sset).map(function(k){var v=sset[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}});
+    fetch(sset.apiUrl+'?action=replaceAll&sheet=settings',{method:'POST',mode:'no-cors',body:JSON.stringify({rows:rows})});
+  }
+  toast('บันทึก LINE Templates สำเร็จ ✅ (☁️ sync แล้ว)');
 }
 
 // ═══ MISSING FUNCTIONS — UTILITY ═══
