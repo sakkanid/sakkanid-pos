@@ -551,6 +551,25 @@ function gM(mid){return DB.members.find(m=>m.id===mid)}
 // ── Lead vs สมาชิกเต็มตัว: มีเบอร์โทร = เต็มตัว, ไม่มีเบอร์ = Lead 🌱 ──
 function validPhone(p){var s=String(p||'').replace(/[^0-9]/g,'');return s.length>=9}
 function isLead(m){return m&&!validPhone(m.phone)}
+// ── ภาษาข้อความ LINE รายสมาชิก (ไทย/อังกฤษ) ──
+function memLang(m){return (m&&m.lang==='en')?'en':'th'}
+function L(m,th,en){return memLang(m)==='en'?en:th}
+var STATUS_EN={'รับผ้ารอส่งซัก':'Received – awaiting wash','รับผ้า':'Received','รับจอง':'Booked','ยืนยันนัด':'Confirmed','ระหว่างการซัก':'Washing','พร้อมส่ง':'Ready for pickup','จัดส่ง':'Out for delivery','กำลังจัดส่ง':'Out for delivery','กำลังดำเนินการ':'In progress','เสร็จสิ้น':'Completed','ปิดงาน':'Closed','ยกเลิก':'Cancelled'};
+function statusEn(st){st=String(st||'');if(STATUS_EN[st])return STATUS_EN[st];if(st.indexOf('รับผ้า')>=0)return 'Received';if(st.indexOf('ซัก')>=0)return 'Washing';if(st.indexOf('พร้อม')>=0)return 'Ready';if(st.indexOf('จัดส่ง')>=0)return 'Out for delivery';if(st.indexOf('เสร็จ')>=0||st.indexOf('ปิด')>=0)return 'Completed';return st}
+// ── เทมเพลตข้อความ LINE ค่าเริ่มต้น (ไทย/อังกฤษ) ──
+var LINE_TPL_DEF={
+  welcome:{th:'สวัสดีค่ะ {name} 🫧\n\nยินดีต้อนรับสู่ {shop}\nสมัครสมาชิกสำเร็จแล้ว ✅\n\nรหัสสมาชิก: {id}\nระดับ: {level}\nแต้มต้อนรับ: {pts} แต้ม 🎉\n\nขอบคุณที่ใช้บริการค่ะ 💙',en:'Hi {name} 🫧\n\nWelcome to {shop}!\nYour membership is confirmed ✅\n\nMember ID: {id}\nTier: {level}\nWelcome points: {pts} 🎉\n\nThank you 💙'},
+  statusUpdate:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙',en:'Hi {name} 🫧\n{shop}\nOrder {id} — Status: {status}\nThank you 💙'},
+  billCollect:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏',en:'Hi {name} 🫧\n{shop}\nOrder: {id}\nOutstanding balance: {amount}\nPlease complete your payment 🙏'},
+  ready:{th:'สวัสดีค่ะ {name} 🫧\nผ้าของคุณพร้อมส่งแล้วค่ะ!\nออเดอร์: {id}\nขอบคุณค่ะ 💙',en:'Hi {name} 🫧\nYour laundry is ready!\nOrder: {id}\nThank you 💙'}
+};
+function fillLineTpl(m,key,vars){
+  var s=getShopSettings();var tpl=s.lineTemplates||{};var en=memLang(m)==='en';
+  var def=LINE_TPL_DEF[key]||{th:'',en:''};
+  var t=en?(tpl[key+'En']||def.en):(tpl[key]||def.th);
+  vars=vars||{};Object.keys(vars).forEach(function(k){t=t.split('{'+k+'}').join(vars[k])});
+  return t;
+}
 // ── escape สำหรับใส่ในค่า attribute ของ input (กันเครื่องหมาย " พัง) ──
 function attrEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}
 // ── แสดงชื่อภาษาอังกฤษตัวเล็กใต้ชื่อไทย (ในตารางราคา) ──
@@ -694,26 +713,35 @@ function getOCardClass(st){
   if(st==='ยกเลิก') return 'st-cancel';
   return '';
 }
-// ── สีประจำสถานะ (สำหรับแถบ filter) ──
+// ── สีประจำสถานะ (โทนเข้ากับแบรนด์ฟ้า #006F98) ──
 function statusColor(st){
   st=String(st||'');
-  if(st.includes('รับผ้า')||st==='รับจอง') return '#3B82C4';
-  if(st.includes('ระหว่าง')||st==='ยืนยันนัด') return '#C4820A';
-  if(st.includes('พร้อมส่ง')) return '#0D8A6A';
-  if(st.includes('จัดส่ง')||st==='กำลังดำเนินการ') return '#7C3AED';
-  if(st.includes('เสร็จสิ้น')||st==='ปิดงาน') return '#6B7A88';
-  if(st==='ยกเลิก') return '#DC2626';
+  if(st.includes('รับผ้า')||st==='รับจอง') return '#2C7BE5';   // ฟ้าน้ำเงิน — เพิ่งรับเข้า
+  if(st.includes('ระหว่าง')||st==='ยืนยันนัด') return '#C77D0A'; // อำพัน — กำลังทำ
+  if(st.includes('พร้อมส่ง')) return '#0E9384';                 // เขียวเทอร์คอยซ์ — พร้อม
+  if(st.includes('จัดส่ง')||st==='กำลังดำเนินการ') return '#5B5BD6'; // ม่วงคราม — กำลังส่ง
+  if(st.includes('เสร็จสิ้น')||st==='ปิดงาน') return '#6B7A88';  // เทา — จบ
+  if(st==='ยกเลิก') return '#E5484D';                           // แดง
   if(st.includes('รอชำระ')||st.includes('ค้าง')) return '#D6336C';
-  return '#3B82C4';
+  return '#2C7BE5';
 }
-// ── หมวดบริการของออเดอร์ (ไอคอน+ชื่อ+สี) ให้ดูออกในหน้าเดียว ──
+// อันดับสถานะ (เรียงคอลัมน์บอร์ดตาม flow งาน)
+function statusRank(st){
+  st=String(st||'');
+  if(st.includes('รับผ้า')||st==='รับจอง') return 1;
+  if(st.includes('ระหว่าง')||st==='ยืนยันนัด') return 2;
+  if(st.includes('พร้อมส่ง')) return 3;
+  if(st.includes('จัดส่ง')||st==='กำลังดำเนินการ') return 4;
+  return 5;
+}
+// ── หมวดบริการของออเดอร์ (ไอคอน+ชื่อ+สี โทนเข้าแบรนด์) ──
 function orderCat(o){
   var t=(o&&o.type)||'';var id=String(o&&o.id||'');
-  if(t==='cleaning'||id.indexOf('CLN')===0) return {icon:'🧹',label:'ทำความสะอาด',color:'#7C3AED'};
-  if(t==='bedset'||id.indexOf('BED')===0) return {icon:'🛏️',label:'เครื่องนอน',color:'#C4820A'};
-  if(t==='quota') return {icon:'🎫',label:'ใช้โควต้า',color:'#0D8A6A'};
-  if(t==='pkg_buy'||id.indexOf('PKB')===0) return {icon:'📦',label:'ซื้อ Package',color:'#D6336C'};
-  return {icon:'👕',label:'ซักรีด',color:'#006F98'};
+  if(t==='cleaning'||id.indexOf('CLN')===0) return {icon:'🧹',label:'ทำความสะอาด',color:'#5B5BD6'}; // ม่วงคราม
+  if(t==='bedset'||id.indexOf('BED')===0) return {icon:'🛏️',label:'เครื่องนอน',color:'#C77D0A'};   // อำพัน
+  if(t==='quota') return {icon:'🎫',label:'ใช้โควต้า',color:'#0E9384'};                              // เขียวเทอร์คอยซ์
+  if(t==='pkg_buy'||id.indexOf('PKB')===0) return {icon:'📦',label:'ซื้อ Package',color:'#D6336C'};  // ชมพูมาเจนต้า
+  return {icon:'👕',label:'ซักรีด',color:'#006F98'};                                                 // ฟ้าแบรนด์
 }
 function catBadge(o){var c=orderCat(o);return '<span class="badge" style="background:'+c.color+'22;color:'+c.color+';font-weight:700">'+c.icon+' '+c.label+'</span>'}
 // ── แสดงเวลานัด (แก้ค่าเพี้ยน 1899-12-30...Z จาก Google Sheets ให้เหลือ HH:MM) ──
@@ -1205,7 +1233,8 @@ function openNewMemberModal(){
     '<div class="form-group"><label class="form-label">LINE ID</label><input id="nm-line" type="text"></div>'+
     '<div class="form-group"><label class="form-label">LINE User ID <span style="font-size:10px;color:var(--t3)">(Uxxxxxxxx — ได้จาก webhook)</span></label><input id="nm-line-uid" type="text" placeholder="ลูกค้า Add OA → ได้อัตโนมัติ"></div>'+
     '</div>'+
-    '<div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="nm-addr" onchange="toggleAddr()"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทที่อยู่</label><select id="nm-addr" onchange="toggleAddr()"><option value="condo">คอนโด</option><option value="house">บ้าน/หมู่บ้าน</option></select></div>'+
+    '<div class="form-group"><label class="form-label">🌐 ภาษาข้อความ LINE</label><select id="nm-lang"><option value="th">🇹🇭 ไทย</option><option value="en">🇬🇧 English</option></select></div></div>'+
     '<div id="nm-addr-detail" class="grid g2">'+
     '<div class="form-group"><label class="form-label">โครงการ</label><input id="nm-proj" type="text"></div>'+
     '<div class="form-group"><label class="form-label">ห้อง</label><input id="nm-room" type="text" inputmode="text"></div>'+
@@ -1239,6 +1268,7 @@ function saveNewMember(){
     lineId:$('nm-line')?$('nm-line').value.trim():'',
     lineName:$('nm-linename')?$('nm-linename').value.trim():'',
     lineUserId:$('nm-line-uid')?$('nm-line-uid').value.trim():'',
+    lang:$('nm-lang')?$('nm-lang').value:'th',
     pts:welcomePts,spend:0,level:'ทั่วไป',joinDate:fmtDate()
   };
   DB.members.push(m);saveDB();
@@ -2042,20 +2072,60 @@ function cancelOrder(oid){
 // ═══ ORDERS PAGE ═══
 function renderOrdersPage(c){
   const all=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
-  const allStatuses=[...new Set(all.map(o=>o.status))];
+  if(!window._orderView) window._orderView='board';
+  var tg=function(v,label){return '<button class="btn btn-sm '+(window._orderView===v?'btn-pr':'btn-out')+'" onclick="setOrderView(\''+v+'\')" style="padding:5px 12px">'+label+'</button>'};
   c.innerHTML='<div class="card" style="padding:10px;margin-bottom:12px">'+
-    '<div class="search-box" style="width:100%"><input id="orderTagSearch" placeholder="🔍 ค้นหา / สแกนเลขจากป้ายผ้า (กรอกบางส่วนได้)" oninput="searchOrdersByTag(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();searchOrdersByTag(this.value)}" style="font-size:14px;padding:8px 12px 8px 34px" autocomplete="off"></div>'+
-    '<div style="font-size:11px;color:var(--t3);margin-top:4px">พิมพ์เลขออเดอร์บางส่วน / ชื่อ / เบอร์โทร หรือสแกนบาร์โค้ดบนบิล — ค้นทุกสถานะ แล้วเลือกออเดอร์ที่ต้องการ</div></div>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<div class="search-box" style="flex:1;min-width:200px"><input id="orderTagSearch" placeholder="🔍 ค้นหา / สแกนเลขจากป้ายผ้า (กรอกบางส่วนได้)" oninput="searchOrdersByTag(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();searchOrdersByTag(this.value)}" style="font-size:14px;padding:8px 12px 8px 34px" autocomplete="off"></div>'+
+    '<div style="display:flex;gap:4px">'+tg('board','🗂️ บอร์ด')+tg('list','📋 รายการ')+'</div></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-top:4px">พิมพ์เลขออเดอร์บางส่วน / ชื่อ / เบอร์โทร หรือสแกนบาร์โค้ดบนบิล — ค้นทุกสถานะ แล้วเลือกออเดอร์</div></div>'+
     '<div id="ordersSearchResult"></div>'+
-    '<div id="ordersDefaultView"><div class="filter-bar">'+
+    '<div id="ordersDefaultView">'+(window._orderView==='board'?renderOrderBoard(all):renderOrderList(all))+'</div>';
+}
+function setOrderView(v){window._orderView=v;renderPage('orders')}
+function renderOrderList(all){
+  const allStatuses=[...new Set(all.map(o=>o.status))].sort(function(a,b){return statusRank(a)-statusRank(b)});
+  var h='<div class="filter-bar">'+
     '<div class="filter-chip act" onclick="filterOrders(this,\'all\')">ทั้งหมด ('+all.length+')</div>'+
-    allStatuses.map(st=>{
-      const cnt=all.filter(o=>o.status===st).length;
-      const col=statusColor(st);
+    allStatuses.map(function(st){
+      var cnt=all.filter(function(o){return o.status===st}).length;var col=statusColor(st);
       return '<div class="filter-chip" data-scol="'+col+'" onclick="filterOrders(this,\''+st+'\')" style="border-color:'+col+';color:'+col+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+';margin-right:5px;vertical-align:middle"></span>'+st+' ('+cnt+')</div>';
     }).join('')+'</div>'+
-    '<div id="ordersContainer">'+all.reverse().map(o=>orderCardHTML(o)).join('')+'</div></div>';
-  if(!all.length) $('ordersContainer').innerHTML='<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
+    '<div id="ordersContainer">'+(all.length?all.slice().reverse().map(function(o){return orderCardHTML(o)}).join(''):'<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>')+'</div>';
+  return h;
+}
+// ═══ มุมมองบอร์ด (Kanban) — แยกคอลัมน์ตามสถานะ ═══
+function renderOrderBoard(all){
+  if(!all.length) return '<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
+  var statuses=[...new Set(all.map(function(o){return o.status}))].sort(function(a,b){return statusRank(a)-statusRank(b)});
+  var h='<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;align-items:flex-start">';
+  statuses.forEach(function(st){
+    var col=statusColor(st);
+    var items=all.filter(function(o){return o.status===st}).slice().reverse();
+    h+='<div style="flex:0 0 260px;max-width:280px;background:var(--bg);border-radius:12px;padding:8px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;background:'+col+';color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;margin-bottom:8px"><span>'+st+'</span><span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 8px;font-size:12px">'+items.length+'</span></div>'+
+      items.map(function(o){return boardCardHTML(o)}).join('')+
+      '</div>';
+  });
+  h+='</div>';
+  return h;
+}
+function boardCardHTML(o){
+  var cat=orderCat(o);var paid=isPaidCheck(o);var editable=isEditable(o);
+  var bs='padding:5px 10px;font-size:11.5px;font-weight:600';
+  var acts='';
+  if(editable) acts+='<button class="btn btn-gn btn-sm" style="'+bs+'" onclick="event.stopPropagation();advanceStatus(\''+o.id+'\')">▶ สถานะ</button>';
+  if(editable&&!paid) acts+='<button class="btn btn-am btn-sm" style="'+bs+'" onclick="event.stopPropagation();openPayModal(\''+o.id+'\')">💰 เก็บเงิน</button>';
+  acts+='<button class="btn btn-out btn-sm" style="'+bs+'" onclick="event.stopPropagation();showOrderDetail(\''+o.id+'\')">👁️ ดู</button>';
+  acts+='<button class="btn btn-out btn-sm" style="'+bs+'" onclick="event.stopPropagation();showBill(\''+o.id+'\')">🧾 บิล</button>';
+  if(o.type==='laundry'||o.type==='bedset'||o.type==='quota') acts+='<button class="btn btn-out btn-sm" style="'+bs+'" onclick="event.stopPropagation();printGarmentTags(\''+o.id+'\')">🏷️ ป้าย</button>';
+  return '<div class="o-card" style="border-left:4px solid '+cat.color+';padding:9px 11px;margin-bottom:8px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)" onclick="showOrderDetail(\''+o.id+'\')">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px"><span class="o-id" style="font-size:13px">'+o.id+'</span><span class="badge" style="background:'+cat.color+'1F;color:'+cat.color+';font-size:10px;font-weight:700;white-space:nowrap">'+cat.icon+' '+cat.label+'</span></div>'+
+    '<div style="font-weight:600;font-size:13px;margin-top:3px">'+(o.mname||'Walk-in')+'</div>'+
+    '<div style="font-size:11px;color:var(--t3)">'+((o.items||[]).length)+' รายการ · '+(o.delivery==='delivery'?'🚗 ส่ง':'🏪 รับที่ร้าน')+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span style="font-weight:700;color:var(--pr)">'+thb(o.net)+'</span>'+(paid?'<span class="badge bg-gn" style="font-size:10px">✅ ชำระแล้ว</span>':'<span class="badge bg-rd" style="font-size:10px">ค้าง '+thb(remaining(o))+'</span>')+'</div>'+
+    (acts?'<div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">'+acts+'</div>':'')+
+    '</div>';
 }
 // ค้นหา/สแกนเลขออเดอร์จากป้ายผ้า — บางส่วนก็เจอ, ทุกสถานะ
 function searchOrdersByTag(q){
@@ -4157,7 +4227,8 @@ function openEditMember(mid){
     '<div class="form-group"><label class="form-label">โครงการ/หมู่บ้าน</label><input id="em-proj" value="'+(m.proj||'')+'"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ห้อง/บ้านเลขที่</label><input id="em-room" value="'+(m.room||m.houseNo||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ระดับ</label><select id="em-level"><option'+(m.level==='ทั่วไป'?' selected':'')+'>ทั่วไป</option><option'+(m.level==='Silver'?' selected':'')+'>Silver</option><option'+(m.level==='Gold'?' selected':'')+'>Gold</option><option'+(m.level==='VIP'?' selected':'')+'>VIP</option></select></div></div>'+
-    '<div class="form-group"><label class="form-label">แต้มสะสม</label><input id="em-pts" type="number" value="'+m.pts+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">แต้มสะสม</label><input id="em-pts" type="number" value="'+m.pts+'"></div>'+
+    '<div class="form-group"><label class="form-label">🌐 ภาษาข้อความ LINE</label><select id="em-lang"><option value="th"'+(memLang(m)==='th'?' selected':'')+'>🇹🇭 ไทย</option><option value="en"'+(memLang(m)==='en'?' selected':'')+'>🇬🇧 English</option></select></div></div>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moEditMem\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveEditMember(\''+mid+'\')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
@@ -4175,6 +4246,7 @@ function saveEditMember(mid){
   m.proj=$('em-proj')?$('em-proj').value.trim():'';
   m.room=$('em-room')?$('em-room').value.trim():'';
   m.pts=parseInt($('em-pts').value)||0;m.level=$('em-level').value;
+  m.lang=$('em-lang')?$('em-lang').value:(m.lang||'th');
   saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);
   // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ ──
   if(wasLead&&!isLead(m)){toast('🎉 อัปเกรด '+m.name+' เป็นสมาชิกเต็มตัวแล้ว!');logAction('PROMOTE_MEMBER',mid+' Lead→สมาชิกเต็มตัว');}
@@ -4197,10 +4269,16 @@ function showLinePreview(oid){
   const o=gO(oid);if(!o) return;
   const s=getShopSettings();const paid=isPaidCheck(o);
   const m=gM(o.mid);const hasLineId=m&&m.lineUserId;
-  let msg='สวัสดีค่ะ '+o.mname+' 🫧\nร้าน '+s.shopName+'\n\nเลขออเดอร์: '+o.id+'\nสถานะ: '+o.status+'\nยอด: '+thb(o.net);
-  if(!paid) msg+='\n\n❌ ยอดค้างชำระ: '+thb(remaining(o))+'\nกรุณาชำระตาม QR ด้านล่าง 🙏';
-  else msg+='\n\n✅ ชำระเงินครบแล้ว';
-  msg+='\n\nขอบคุณที่ใช้บริการค่ะ 💙';
+  let msg;
+  if(memLang(m)==='en'){
+    msg='Hi '+o.mname+' 🫧\n'+s.shopName+'\n\nOrder: '+o.id+'\nStatus: '+statusEn(o.status)+'\nAmount: '+thb(o.net);
+    msg+= paid?'\n\n✅ Paid in full':'\n\n❌ Outstanding: '+thb(remaining(o))+'\nPlease pay via the QR below 🙏';
+    msg+='\n\nThank you 💙';
+  }else{
+    msg='สวัสดีค่ะ '+o.mname+' 🫧\nร้าน '+s.shopName+'\n\nเลขออเดอร์: '+o.id+'\nสถานะ: '+o.status+'\nยอด: '+thb(o.net);
+    msg+= paid?'\n\n✅ ชำระเงินครบแล้ว':'\n\n❌ ยอดค้างชำระ: '+thb(remaining(o))+'\nกรุณาชำระตาม QR ด้านล่าง 🙏';
+    msg+='\n\nขอบคุณที่ใช้บริการค่ะ 💙';
+  }
   const h='<div class="modal-overlay show" id="moLine"><div class="modal"><div class="modal-head"><h3>📱 LINE Preview</h3><button class="modal-close" onclick="document.getElementById(\'moLine\').remove()">&times;</button></div>'+
     '<div class="modal-body"><div style="display:flex;justify-content:center;margin-bottom:12px">'+
     '<div style="background:#7BC67E;border-radius:16px;padding:14px 16px;max-width:300px;color:#fff;font-size:13px;white-space:pre-line;line-height:1.6">'+msg+'</div></div>'+
@@ -4507,9 +4585,8 @@ function checkStorageUsage(){
 function sendBillCollect(oid){
   var o=gO(oid);if(!o) return;
   var m=gM(o.mid);var userId=m?m.lineUserId:'';
-  var s=getShopSettings();var tpl=s.lineTemplates||{};
-  var msg=(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\n\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\n\nกรุณาชำระเงินด้วยนะคะ 🙏')
-    .replace(/\{name\}/g,o.mname).replace(/\{shop\}/g,s.shopName).replace(/\{id\}/g,o.id).replace(/\{amount\}/g,thb(remaining(o)));
+  var s=getShopSettings();
+  var msg=fillLineTpl(m,'billCollect',{name:o.mname,shop:s.shopName,id:o.id,amount:thb(remaining(o))});
   var h='<div class="modal-overlay show" id="moLineBill"><div class="modal"><div class="modal-head"><h3>📱 ส่งบิลเรียกเก็บเงิน</h3><button class="modal-close" onclick="document.getElementById(\'moLineBill\').remove()">&times;</button></div>'+
     '<div class="modal-body"><div style="background:#7BC67E;border-radius:16px;padding:14px 16px;max-width:320px;margin:0 auto;color:#fff;font-size:13px;white-space:pre-line;line-height:1.6">'+msg+'</div>'+
     (userId?'<div style="text-align:center;margin-top:8px;font-size:11px;color:var(--gn)">✅ LINE User ID: '+userId.substring(0,12)+'...</div>':'<div style="text-align:center;margin-top:8px;font-size:11px;color:var(--rd)">⚠️ ลูกค้ายังไม่มี LINE User ID</div>')+
@@ -4531,18 +4608,32 @@ async function doBillCollectLine(oid){
 // ═══ LINE TEMPLATE SETTINGS ═══
 function renderLineTemplates(){
   var s=getShopSettings();var tpl=s.lineTemplates||{};
+  var g=function(k){return tpl[k]||LINE_TPL_DEF[k].th};
+  var ge=function(k){return tpl[k+'En']||LINE_TPL_DEF[k].en};
+  var row=function(icon,label,key){
+    return '<div class="card" style="box-shadow:none;background:var(--bg);margin-bottom:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+icon+' '+label+'</div>'+
+      '<div class="grid g2">'+
+      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇹🇭 ไทย</label><textarea id="lt-'+key+'" rows="4" style="font-size:12px">'+g(key)+'</textarea></div>'+
+      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇬🇧 English</label><textarea id="lt-'+key+'-en" rows="4" style="font-size:12px">'+ge(key)+'</textarea></div>'+
+      '</div></div>';
+  };
   return '<div class="card"><div class="card-title">📱 LINE Message Templates</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts}</p>'+
-    '<div class="form-group"><label class="form-label">🎉 ต้อนรับสมาชิกใหม่</label><textarea id="lt-welcome" rows="4" style="font-size:12px">'+(tpl.welcome||'สวัสดีค่ะ {name} 🫧\n\nยินดีต้อนรับสู่ {shop}\nสมัครสมาชิกสำเร็จแล้ว ✅\n\nรหัสสมาชิก: {id}\nระดับ: {level}\nแต้มต้อนรับ: {pts} แต้ม 🎉\n\nขอบคุณที่ใช้บริการค่ะ 💙')+'</textarea></div>'+
-    '<div class="form-group"><label class="form-label">📋 แจ้งสถานะ</label><textarea id="lt-status" rows="3" style="font-size:12px">'+(tpl.statusUpdate||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
-    '<div class="form-group"><label class="form-label">💰 เรียกเก็บเงิน</label><textarea id="lt-bill" rows="3" style="font-size:12px">'+(tpl.billCollect||'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏')+'</textarea></div>'+
-    '<div class="form-group"><label class="form-label">✅ ผ้าพร้อมส่ง</label><textarea id="lt-ready" rows="3" style="font-size:12px">'+(tpl.ready||'สวัสดีค่ะ {name} 🫧\nผ้าของคุณพร้อมส่งแล้วค่ะ!\nออเดอร์: {id}\nขอบคุณค่ะ 💙')+'</textarea></div>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
+    row('🎉','ต้อนรับสมาชิกใหม่','welcome')+
+    row('📋','แจ้งสถานะ','statusUpdate')+
+    row('💰','เรียกเก็บเงิน','billCollect')+
+    row('✅','ผ้าพร้อมส่ง','ready')+
     '<button class="btn btn-pr" onclick="saveLineTemplates()">💾 บันทึก Templates</button></div>';
 }
 function saveLineTemplates(){
   var s=getShopSettings();
-  s.lineTemplates={welcome:$('lt-welcome')?$('lt-welcome').value:'',statusUpdate:$('lt-status')?$('lt-status').value:'',billCollect:$('lt-bill')?$('lt-bill').value:'',ready:$('lt-ready')?$('lt-ready').value:''};
-  saveDB();toast('บันทึก LINE Templates สำเร็จ ✅');
+  s.lineTemplates={
+    welcome:$('lt-welcome')?$('lt-welcome').value:'',welcomeEn:$('lt-welcome-en')?$('lt-welcome-en').value:'',
+    statusUpdate:$('lt-statusUpdate')?$('lt-statusUpdate').value:'',statusUpdateEn:$('lt-statusUpdate-en')?$('lt-statusUpdate-en').value:'',
+    billCollect:$('lt-billCollect')?$('lt-billCollect').value:'',billCollectEn:$('lt-billCollect-en')?$('lt-billCollect-en').value:'',
+    ready:$('lt-ready')?$('lt-ready').value:'',readyEn:$('lt-ready-en')?$('lt-ready-en').value:''
+  };
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();toast('บันทึก LINE Templates สำเร็จ ✅');
 }
 
 // ═══ MISSING FUNCTIONS — UTILITY ═══
@@ -5528,6 +5619,8 @@ async function sendFlexBill(userId,o,s,docNum){
 }
 async function sendFlexStatus(userId,o,s){
   var paid=isPaidCheck(o);
+  var m=gM(o.mid);var en=memLang(m)==='en';
+  var stTxt=en?statusEn(o.status):o.status;
   var sc='#006F98';
   if(o.status.includes('รับผ้า')) sc='#2563EB';
   else if(o.status.includes('ซัก')||o.status.includes('ดำเนินการ')) sc='#D97706';
@@ -5537,27 +5630,27 @@ async function sendFlexStatus(userId,o,s){
   var bodyC=[
     {type:'text',text:o.id+' | '+o.mname,size:'sm',color:'#333333'},
     {type:'separator',margin:'md'},
-    {type:'text',text:o.status,weight:'bold',size:'lg',color:sc,margin:'md'}
+    {type:'text',text:stTxt,weight:'bold',size:'lg',color:sc,margin:'md'}
   ];
   // แสดงยอดเงินเฉพาะยังไม่ชำระ
   if(!paid){
     bodyC.push({type:'box',layout:'horizontal',margin:'sm',contents:[
-      {type:'text',text:'ยอด / Total',size:'xs',color:'#888888',flex:3},
+      {type:'text',text:en?'Total':'ยอด / Total',size:'xs',color:'#888888',flex:3},
       {type:'text',text:thb(o.net),size:'sm',weight:'bold',flex:2,align:'end'}
     ]});
-    bodyC.push({type:'text',text:'❌ ค้างชำระ '+thb(remaining(o)),size:'xs',color:'#DC2626',weight:'bold',margin:'sm'});
+    bodyC.push({type:'text',text:(en?'❌ Outstanding ':'❌ ค้างชำระ ')+thb(remaining(o)),size:'xs',color:'#DC2626',weight:'bold',margin:'sm'});
   }else{
-    bodyC.push({type:'text',text:'✅ ชำระครบแล้ว',size:'xs',color:'#1D9E75',weight:'bold',margin:'sm'});
+    bodyC.push({type:'text',text:en?'✅ Paid in full':'✅ ชำระครบแล้ว',size:'xs',color:'#1D9E75',weight:'bold',margin:'sm'});
   }
-  if(o.pickupDate) bodyC.push({type:'text',text:'📅 นัดรับ '+fmtJoinDate(o.pickupDate),size:'xs',color:'#888888',margin:'sm'});
+  if(o.pickupDate) bodyC.push({type:'text',text:(en?'📅 Pickup ':'📅 นัดรับ ')+fmtJoinDate(o.pickupDate),size:'xs',color:'#888888',margin:'sm'});
   if(o.type==='quota'&&o.quotaId){
     var q=(DB.quotas||[]).find(function(qt){return qt.id===o.quotaId});
     if(q) bodyC.push({type:'text',text:'📦 โควต้า: '+q.remain+'/'+q.total,size:'xxs',color:'#7C3AED',margin:'sm'});
   }
-  var flex={type:'flex',altText:o.id+' '+o.status,contents:{
+  var flex={type:'flex',altText:o.id+' '+stTxt,contents:{
     type:'bubble',
     header:{type:'box',layout:'vertical',backgroundColor:sc,paddingAll:'12px',contents:[
-      {type:'text',text:'📋 '+o.status,color:'#ffffff',weight:'bold',size:'lg'}
+      {type:'text',text:'📋 '+stTxt,color:'#ffffff',weight:'bold',size:'lg'}
     ]},
     body:{type:'box',layout:'vertical',paddingAll:'12px',contents:bodyC},
     footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[
