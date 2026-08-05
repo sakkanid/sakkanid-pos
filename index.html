@@ -551,6 +551,8 @@ function gM(mid){return DB.members.find(m=>m.id===mid)}
 // ── Lead vs สมาชิกเต็มตัว: มีเบอร์โทร = เต็มตัว, ไม่มีเบอร์ = Lead 🌱 ──
 function validPhone(p){var s=String(p||'').replace(/[^0-9]/g,'');return s.length>=9}
 function isLead(m){return m&&!validPhone(m.phone)}
+// ── escape สำหรับใส่ในค่า attribute ของ input (กันเครื่องหมาย " พัง) ──
+function attrEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}
 function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
 function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
@@ -2957,21 +2959,45 @@ function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;
 function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong></td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function openSvcPriceEdit(type,i){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
-  var label='',price=0,cost=0,expDays=0;
-  if(type==='bed'){label=BED_SETS[i].label;price=BED_SETS[i].price;cost=BED_SETS[i].cost}
-  else if(type==='cln'){label=CLN_SVCS[i].label;price=CLN_SVCS[i].minPrice;cost=CLN_SVCS[i].cost}
-  else if(type==='pkg'){label=PKGS[i].type+' '+PKGS[i].qty;price=PKGS[i].price;cost=PKGS[i].cost;expDays=PKGS[i].expDays}
-  var h='<div class="modal-overlay show" id="moPE2"><div class="modal"><div class="modal-head"><h3>✏️ '+label+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body"><div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+price+'"></div><div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+cost+'"></div></div>'+(type==='pkg'?'<div class="form-group"><label class="form-label">อายุ Package</label><input id="sp-d" type="number" value="'+expDays+'" placeholder="จำนวนวัน"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer;padding:8px;background:var(--bg);border-radius:6px"><input type="checkbox" id="sp-noexp" '+(expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"> <span>♾️ ไม่มีวันหมดอายุ</span></label></div>':'')+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
+  var body='',title='';
+  if(type==='bed'){var b=BED_SETS[i];title='แก้ไข Set เครื่องนอน';
+    body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสขนาด *</label><input id="sp-size" value="'+attrEsc(b.size)+'" placeholder="single/queen/king"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง *</label><input id="sp-label" value="'+attrEsc(b.label)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">รายการในเซ็ต (คั่นด้วยจุลภาค ,)</label><input id="sp-items" value="'+attrEsc((b.items||[]).join(', '))+'" placeholder="ผ้าปูที่นอน, ปลอกหมอน, ผ้านวม"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+b.price+'"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+b.cost+'"></div></div>';
+  }else if(type==='cln'){var s=CLN_SVCS[i];title='แก้ไขบริการทำความสะอาด';
+    body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสประเภท *</label><input id="sp-type" value="'+attrEsc(s.type)+'" placeholder="studio/1br/2br"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง *</label><input id="sp-label" value="'+attrEsc(s.label)+'"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขั้นต่ำ (฿)</label><input id="sp-p" type="number" value="'+s.minPrice+'"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+s.cost+'"></div></div>';
+  }else if(type==='pkg'){var pk=PKGS[i];title='แก้ไข Package';
+    body='<div class="grid g2"><div class="form-group"><label class="form-label">ประเภท Package *</label><input id="sp-type" value="'+attrEsc(pk.type)+'"></div>'+
+    '<div class="form-group"><label class="form-label">จำนวนชิ้น *</label><input id="sp-qty" type="number" value="'+pk.qty+'"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+pk.price+'"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+pk.cost+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">อายุ Package (วัน)</label><input id="sp-d" type="number" value="'+pk.expDays+'"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer;padding:8px;background:var(--bg);border-radius:6px"><input type="checkbox" id="sp-noexp" '+(pk.expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"> <span>♾️ ไม่มีวันหมดอายุ</span></label></div>';
+  }
+  var h='<div class="modal-overlay show" id="moPE2"><div class="modal" style="max-width:520px"><div class="modal-head"><h3>✏️ '+title+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body" style="overflow-y:auto">'+body+'</div><div class="modal-foot"><button class="btn btn-rd" onclick="deleteSvcItem(\''+type+'\','+i+')">🗑️ ลบ</button><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function saveSvcPrice(type,i){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
   var p=parseFloat($('sp-p').value)||0,k=parseFloat($('sp-k').value)||0;
-  if(type==='bed'){BED_SETS[i].price=p;BED_SETS[i].cost=k}
-  else if(type==='cln'){CLN_SVCS[i].minPrice=p;CLN_SVCS[i].cost=k}
-  else if(type==='pkg'){PKGS[i].price=p;PKGS[i].cost=k;PKGS[i].expDays=parseInt($('sp-d').value)||90}
+  if(type==='bed'){var b=BED_SETS[i];b.size=($('sp-size')?$('sp-size').value.trim():'')||b.size;b.label=($('sp-label')?$('sp-label').value.trim():'')||b.label;b.items=($('sp-items')?$('sp-items').value:'').split(',').map(function(x){return x.trim()}).filter(Boolean);b.price=p;b.cost=k}
+  else if(type==='cln'){var s=CLN_SVCS[i];s.type=($('sp-type')?$('sp-type').value.trim():'')||s.type;s.label=($('sp-label')?$('sp-label').value.trim():'')||s.label;s.minPrice=p;s.cost=k}
+  else if(type==='pkg'){var pk=PKGS[i];pk.type=($('sp-type')?$('sp-type').value.trim():'')||pk.type;pk.qty=parseInt($('sp-qty').value)||pk.qty;pk.price=p;pk.cost=k;pk.expDays=parseInt($('sp-d').value)||0}
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('บันทึกสำเร็จ ✅');logAction('EDIT_PRICE',type+' idx:'+i);
+  var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
+}
+function deleteSvcItem(type,i){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  var name=type==='bed'?BED_SETS[i].label:type==='cln'?CLN_SVCS[i].label:PKGS[i].type;
+  if(!confirm('ลบ "'+name+'" ?')) return;
+  if(type==='bed')BED_SETS.splice(i,1);else if(type==='cln')CLN_SVCS.splice(i,1);else PKGS.splice(i,1);
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
+  toast('🗑️ ลบแล้ว');logAction('DEL_PRICE',type+' '+name);
   var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
 }
 function filterPricelist(){
@@ -2984,11 +3010,15 @@ function openAddPriceItem(){
     '<div class="modal-body">'+
     '<div class="form-group"><label class="form-label">หมวดบริการ</label><select id="ap-cat"><option value="">— เลือกหรือพิมพ์ใหม่ —</option>'+CATS_UNIQUE.map(function(c){return '<option>'+c+'</option>'}).join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">หรือพิมพ์หมวดใหม่</label><input id="ap-cat-new" placeholder="เช่น ซักพรม"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">หมวด (EN)</label><input id="ap-ce" placeholder="เช่น Dry Clean"></div>'+
+    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="ap-te" placeholder="เช่น Shirt"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทผ้า/สินค้า *</label><input id="ap-type" placeholder="เช่น เสื้อยืด"></div>'+
     '<div class="form-group"><label class="form-label">ตัวเลือก</label><input id="ap-opt" placeholder="เช่น ตัวสั้น (ไม่บังคับ)"></div></div>'+
+    '<div class="form-group"><label class="form-label">ตัวเลือก (EN)</label><input id="ap-oe" placeholder="เช่น Short"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขาย (฿) *</label><input id="ap-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="ap-cost" type="number" value="0"></div></div>'+
-    '<div class="form-group"><label class="form-label">รหัส SKU (ไม่บังคับ)</label><input id="ap-sku" type="text" placeholder="เช่น DC-001"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทราคา</label><select id="ap-pt"><option value="fixed">ราคาคงที่ (fixed)</option><option value="min">ขั้นต่ำ +เพิ่มได้ (min++)</option></select></div>'+
+    '<div class="form-group"><label class="form-label">รหัส SKU (ไม่บังคับ)</label><input id="ap-sku" type="text" placeholder="เช่น DC-001"></div></div>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moAddPrice\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveAddPriceItem()">💾 เพิ่มรายการ</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
@@ -2999,7 +3029,7 @@ function saveAddPriceItem(){
   var price=parseFloat($('ap-price')?$('ap-price').value:0)||0;
   var cost=parseFloat($('ap-cost')?$('ap-cost').value:0)||0;
   if(!cat||!type||!price){toast('กรอกหมวด ประเภท และราคา','err');return}
-  CAT.push({c:cat,t:type,o:opt,p:price,k:cost,pt:'fixed',sku:$('ap-sku')?$('ap-sku').value.trim():'',ce:'',te:'',oe:''});
+  CAT.push({c:cat,t:type,o:opt,p:price,k:cost,pt:$('ap-pt')?$('ap-pt').value:'fixed',sku:$('ap-sku')?$('ap-sku').value.trim():'',ce:$('ap-ce')?$('ap-ce').value.trim():'',te:$('ap-te')?$('ap-te').value.trim():'',oe:$('ap-oe')?$('ap-oe').value.trim():''});
   // Update CATS_UNIQUE
   if(!CATS_UNIQUE.includes(cat)) CATS_UNIQUE.push(cat);
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
@@ -3892,23 +3922,54 @@ function globalSearch(q){
 function openPriceEdit(idx){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
   const it=CAT[idx];if(!it) return;
-  const h='<div class="modal-overlay show" id="moPriceEdit"><div class="modal"><div class="modal-head"><h3>✏️ แก้ไขราคา</h3><button class="modal-close" onclick="document.getElementById(\'moPriceEdit\').remove()">&times;</button></div>'+
-    '<div class="modal-body">'+
-    '<div style="font-weight:700;margin-bottom:12px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>'+
+  var pt=it.pt||'fixed';
+  const h='<div class="modal-overlay show" id="moPriceEdit"><div class="modal" style="max-width:580px"><div class="modal-head"><h3>✏️ แก้ไขรายการราคา (ซักรีด)</h3><button class="modal-close" onclick="document.getElementById(\'moPriceEdit\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="overflow-y:auto">'+
     '<div class="grid g2">'+
-    '<div class="form-group"><label class="form-label">ราคาขาย (฿)</label><input id="pe-price" type="number" value="'+it.p+'"></div>'+
-    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="pe-cost" type="number" value="'+it.k+'"></div></div></div>'+
-    '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moPriceEdit\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="savePriceEdit('+idx+')">💾 บันทึก</button></div></div></div>';
+    '<div class="form-group"><label class="form-label">หมวดบริการ *</label><input id="pe-c" value="'+attrEsc(it.c)+'"></div>'+
+    '<div class="form-group"><label class="form-label">หมวด (EN)</label><input id="pe-ce" value="'+attrEsc(it.ce||'')+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ประเภทผ้า *</label><input id="pe-t" value="'+attrEsc(it.t)+'"></div>'+
+    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="pe-te" value="'+attrEsc(it.te||'')+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ตัวเลือก</label><input id="pe-o" value="'+attrEsc(it.o||'')+'" placeholder="เช่น ตัวสั้น"></div>'+
+    '<div class="form-group"><label class="form-label">ตัวเลือก (EN)</label><input id="pe-oe" value="'+attrEsc(it.oe||'')+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ราคาขาย (฿) *</label><input id="pe-price" type="number" value="'+it.p+'"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="pe-cost" type="number" value="'+it.k+'"></div></div>'+
+    '<div class="grid g2">'+
+    '<div class="form-group"><label class="form-label">ประเภทราคา</label><select id="pe-pt"><option value="fixed"'+(pt==='fixed'?' selected':'')+'>ราคาคงที่ (fixed)</option><option value="min"'+(pt==='min'?' selected':'')+'>ขั้นต่ำ +เพิ่มได้ (min++)</option></select></div>'+
+    '<div class="form-group"><label class="form-label">รหัส SKU</label><input id="pe-sku" value="'+attrEsc(it.sku||'')+'" placeholder="เช่น DC-001"></div></div>'+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-rd" onclick="deletePriceItem('+idx+')">🗑️ ลบ</button><button class="btn btn-out" onclick="document.getElementById(\'moPriceEdit\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="savePriceEdit('+idx+')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
 function savePriceEdit(idx){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
-  CAT[idx].p=parseFloat($('pe-price').value)||0;
-  CAT[idx].k=parseFloat($('pe-cost').value)||0;
-  logAction('EDIT_PRICE',CAT[idx].c+' '+CAT[idx].t+' → '+thb(CAT[idx].p));
+  var it=CAT[idx];if(!it) return;
+  var c=$('pe-c').value.trim(),t=$('pe-t').value.trim();
+  if(!c||!t){toast('กรอกหมวดบริการและประเภทผ้า','err');return}
+  it.c=c;it.ce=$('pe-ce').value.trim();it.t=t;it.te=$('pe-te').value.trim();
+  it.o=$('pe-o').value.trim();it.oe=$('pe-oe').value.trim();
+  it.p=parseFloat($('pe-price').value)||0;it.k=parseFloat($('pe-cost').value)||0;
+  it.pt=$('pe-pt')?$('pe-pt').value:(it.pt||'fixed');it.sku=$('pe-sku').value.trim();
+  CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(cc){CATS_UNIQUE.push(cc)});
+  logAction('EDIT_PRICE',it.c+' '+it.t+' → '+thb(it.p));
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
-  toast('แก้ไขราคาสำเร็จ ✅');
+  toast('บันทึกสำเร็จ ✅');
   const mo=$('moPriceEdit');if(mo) mo.remove();
+  renderPage('pricelist');
+}
+function deletePriceItem(idx){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  var it=CAT[idx];if(!it) return;
+  if(!confirm('ลบรายการ "'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'" ?')) return;
+  CAT.splice(idx,1);
+  CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(cc){CATS_UNIQUE.push(cc)});
+  logAction('DEL_PRICE',it.c+' '+it.t);
+  saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
+  toast('🗑️ ลบรายการแล้ว');
+  var mo=$('moPriceEdit');if(mo) mo.remove();
   renderPage('pricelist');
 }
 
