@@ -4192,7 +4192,7 @@ function viewMemberDetail(mid){
     '</div></div>'+
     '<div class="card-title" style="margin-top:16px;font-size:13px">📋 ประวัติออเดอร์ ('+orders.length+')</div>'+
     (orders.length?'<table><tr><th>เลข</th><th>ประเภท</th><th>ยอด</th><th>สถานะ</th><th>วันที่</th></tr>'+
-    orders.slice(0,20).map(o=>'<tr><td>'+o.id+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
+    orders.slice(0,20).map(o=>'<tr style="cursor:pointer" onclick="showOrderDetail(\''+o.id+'\')" title="กดเพื่อดูออเดอร์"><td><strong style="color:var(--pr)">'+o.id+' ↗</strong></td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
     (String(m.lineUserId||'').trim().length>=30&&String(m.lineUserId||'').trim().charAt(0)==='U'?'<div class="card-title" style="margin-top:16px;font-size:13px;display:flex;justify-content:space-between;align-items:center"><span>📤 ประวัติส่ง LINE</span><button class="btn btn-out btn-sm" onclick="loadMemberLineLog(\''+String(m.lineUserId).trim()+'\')">🔄 โหลด</button></div><div id="memLineLog" style="font-size:12px;color:var(--t3)">กด "โหลด" เพื่อดูว่าส่งอะไรหาลูกค้าไปบ้าง</div>':'')+
     '</div>'+
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button>'+(isLead(m)?'<button class="btn btn-am btn-sm" onclick="openMatchLeadModal(\''+mid+'\')">🔗 นี่คือสมาชิกเดิม</button>':(!validUid(m.lineUserId)?'<button class="btn btn-gn btn-sm" onclick="openLinkLineModal(\''+mid+'\')">🔗 จับคู่ LINE</button>':''))+'<button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length&&String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+(String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-out" onclick="chatWithCustomer(\''+mid+'\')">💬 แชท LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
@@ -5900,6 +5900,22 @@ async function syncPushAll(silent){
   logAction('SYNC_PUSH','Push to Google Sheets (15 sheets)');
 }
 
+// ── เติม/อัปเดตชื่อ LINE ให้สมาชิกจากชีต line_users (webhook เก็บ displayName ไว้เสมอ) ──
+async function backfillLineNamesFromCloud(){
+  try{
+    if(!getApiUrl())return false;
+    var lu=await jsonpCall('getLineUsers','');
+    if(!lu||!lu.ok||!lu.data||!lu.data.length)return false;
+    var map={};lu.data.forEach(function(u){var id=String(u.userId||'').trim();if(id&&u.displayName)map[id]=u.displayName});
+    var changed=false;
+    (DB.members||[]).forEach(function(m){
+      var uid=String(m.lineUserId||'').trim();
+      if(uid&&map[uid]&&map[uid]!==m.lineName){m.lineName=map[uid];changed=true}
+    });
+    if(changed){saveDB();if(curPage==='members')renderPage('members')}
+    return changed;
+  }catch(e){return false}
+}
 // ── Pull all data from Sheets ──
 async function syncPullAll(){
   toast('📥 กำลังดึงข้อมูลจาก Cloud...','info');
@@ -5944,6 +5960,7 @@ async function syncPullAll(){
       });
     }
     saveDB();
+    backfillLineNamesFromCloud(); // เติมชื่อ LINE ให้สมาชิกที่มี UID แต่ยังไม่มีชื่อ
     toast('✅ ดึงข้อมูลจาก Cloud สำเร็จ!');
     logAction('SYNC_PULL','Pull all data from Google Sheets');
     renderPage(curPage);
@@ -6470,6 +6487,8 @@ async function syncPullSilent(){
         if(m.joinDate&&String(m.joinDate).includes('T')){var dt=new Date(m.joinDate);if(!isNaN(dt.getTime())){var yr=dt.getFullYear();if(yr>2500)yr-=543;m.joinDate=String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+yr}}
         return m});
       if(newMem.length!==(DB.members||[]).length||JSON.stringify(newMem.map(function(m){return m.id}))!==JSON.stringify((DB.members||[]).map(function(m){return m.id}))){DB.members=newMem;changed=true}}
+    // ── merge ชื่อ LINE / UID / ภาษา จาก Cloud แม้รายชื่อ id ไม่เปลี่ยน (ให้ค่าที่ webhook เขียนไหลเข้ามา ไม่ถูกเขียนทับด้วยค่าว่างตอน push) ──
+    if(d.members&&d.members.length){var _mById={};(DB.members||[]).forEach(function(mm){_mById[mm.id]=mm});d.members.forEach(function(sm){var lm=_mById[sm.id];if(!lm)return;['lineName','lineUserId','lang','lineId'].forEach(function(f){if(sm[f]!==undefined&&sm[f]!==''&&sm[f]!==lm[f]){lm[f]=sm[f];changed=true}})})}
     if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
     if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
     if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
@@ -6524,6 +6543,9 @@ async function syncPullSilent(){
         if(s.key&&s.value!==undefined){try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}}
       });
     }
+    // ── เติมชื่อ LINE จาก line_users เป็นระยะ (รอบแรก + ทุก ~5 รอบ) เผื่อ members sheet ยังว่าง ──
+    window._lnTick=(window._lnTick||0)+1;
+    if(window._lnTick===1||window._lnTick%5===0){backfillLineNamesFromCloud()}
     if(changed){
       originalSaveDB();syncStatus='success';lastSyncTime=new Date();updSyncUI();
       toast('🔄 ข้อมูลอัปเดตจาก Cloud','info');
