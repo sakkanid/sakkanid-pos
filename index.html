@@ -553,6 +553,8 @@ function validPhone(p){var s=String(p||'').replace(/[^0-9]/g,'');return s.length
 function isLead(m){return m&&!validPhone(m.phone)}
 // ── escape สำหรับใส่ในค่า attribute ของ input (กันเครื่องหมาย " พัง) ──
 function attrEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}
+// ── แสดงชื่อภาษาอังกฤษตัวเล็กใต้ชื่อไทย (ในตารางราคา) ──
+function enSmall(s){s=String(s||'').trim();return s?'<div style="font-size:10px;color:var(--t3)">'+s+'</div>':''}
 function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
 function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
@@ -2952,28 +2954,32 @@ function showPriceTab(el,tab){
 }
 function renderPriceTable(list){
   return '<table><tr><th>หมวด</th><th>ประเภท</th><th>ตัวเลือก</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+
-    list.map(function(it){var idx=CAT.indexOf(it);return '<tr><td>'+it.c+'</td><td>'+it.t+'</td><td>'+(it.o||'-')+'</td><td><strong>'+thb(it.p)+'</strong></td>'+(canSeeCost()?'<td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(it.p-it.k)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>';
+    list.map(function(it){var idx=CAT.indexOf(it);return '<tr><td>'+it.c+enSmall(it.ce)+'</td><td>'+it.t+enSmall(it.te)+'</td><td>'+(it.o||'-')+enSmall(it.oe)+'</td><td><strong>'+thb(it.p)+'</strong></td>'+(canSeeCost()?'<td>'+thb(it.k)+'</td><td style="color:var(--gn)">'+thb(it.p-it.k)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openPriceEdit('+idx+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>';
 }
-function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong></td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
-function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong></td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
-function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong></td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong>'+enSmall(b.labelEn)+'</td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong>'+enSmall(s.labelEn)+'</td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong>'+enSmall(p.typeEn)+'</td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function openSvcPriceEdit(type,i){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
   var body='',title='';
   if(type==='bed'){var b=BED_SETS[i];title='แก้ไข Set เครื่องนอน';
     body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสขนาด *</label><input id="sp-size" value="'+attrEsc(b.size)+'" placeholder="single/queen/king"></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อแสดง *</label><input id="sp-label" value="'+attrEsc(b.label)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง (ไทย) *</label><input id="sp-label" value="'+attrEsc(b.label)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง (EN)</label><input id="sp-labelEn" value="'+attrEsc(b.labelEn||'')+'" placeholder="เช่น Queen 5Ft Set"></div>'+
     '<div class="form-group"><label class="form-label">รายการในเซ็ต (คั่นด้วยจุลภาค ,)</label><input id="sp-items" value="'+attrEsc((b.items||[]).join(', '))+'" placeholder="ผ้าปูที่นอน, ปลอกหมอน, ผ้านวม"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+b.price+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+b.cost+'"></div></div>';
   }else if(type==='cln'){var s=CLN_SVCS[i];title='แก้ไขบริการทำความสะอาด';
     body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสประเภท *</label><input id="sp-type" value="'+attrEsc(s.type)+'" placeholder="studio/1br/2br"></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อแสดง *</label><input id="sp-label" value="'+attrEsc(s.label)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง (ไทย) *</label><input id="sp-label" value="'+attrEsc(s.label)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อแสดง (EN)</label><input id="sp-labelEn" value="'+attrEsc(s.labelEn||'')+'" placeholder="เช่น 1 Bedroom 1 Bath"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขั้นต่ำ (฿)</label><input id="sp-p" type="number" value="'+s.minPrice+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+s.cost+'"></div></div>';
   }else if(type==='pkg'){var pk=PKGS[i];title='แก้ไข Package';
-    body='<div class="grid g2"><div class="form-group"><label class="form-label">ประเภท Package *</label><input id="sp-type" value="'+attrEsc(pk.type)+'"></div>'+
-    '<div class="form-group"><label class="form-label">จำนวนชิ้น *</label><input id="sp-qty" type="number" value="'+pk.qty+'"></div></div>'+
+    body='<div class="grid g2"><div class="form-group"><label class="form-label">ประเภท Package (ไทย) *</label><input id="sp-type" value="'+attrEsc(pk.type)+'"></div>'+
+    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="sp-typeEn" value="'+attrEsc(pk.typeEn||'')+'" placeholder="เช่น Wash/Dry/Fold"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">จำนวนชิ้น *</label><input id="sp-qty" type="number" value="'+pk.qty+'"></div>'+
+    '<div class="form-group"><label class="form-label" style="opacity:0">.</label><div></div></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+pk.price+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+pk.cost+'"></div></div>'+
     '<div class="form-group"><label class="form-label">อายุ Package (วัน)</label><input id="sp-d" type="number" value="'+pk.expDays+'"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer;padding:8px;background:var(--bg);border-radius:6px"><input type="checkbox" id="sp-noexp" '+(pk.expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"> <span>♾️ ไม่มีวันหมดอายุ</span></label></div>';
@@ -2984,9 +2990,9 @@ function openSvcPriceEdit(type,i){
 function saveSvcPrice(type,i){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
   var p=parseFloat($('sp-p').value)||0,k=parseFloat($('sp-k').value)||0;
-  if(type==='bed'){var b=BED_SETS[i];b.size=($('sp-size')?$('sp-size').value.trim():'')||b.size;b.label=($('sp-label')?$('sp-label').value.trim():'')||b.label;b.items=($('sp-items')?$('sp-items').value:'').split(',').map(function(x){return x.trim()}).filter(Boolean);b.price=p;b.cost=k}
-  else if(type==='cln'){var s=CLN_SVCS[i];s.type=($('sp-type')?$('sp-type').value.trim():'')||s.type;s.label=($('sp-label')?$('sp-label').value.trim():'')||s.label;s.minPrice=p;s.cost=k}
-  else if(type==='pkg'){var pk=PKGS[i];pk.type=($('sp-type')?$('sp-type').value.trim():'')||pk.type;pk.qty=parseInt($('sp-qty').value)||pk.qty;pk.price=p;pk.cost=k;pk.expDays=parseInt($('sp-d').value)||0}
+  if(type==='bed'){var b=BED_SETS[i];b.size=($('sp-size')?$('sp-size').value.trim():'')||b.size;b.label=($('sp-label')?$('sp-label').value.trim():'')||b.label;b.labelEn=$('sp-labelEn')?$('sp-labelEn').value.trim():(b.labelEn||'');b.items=($('sp-items')?$('sp-items').value:'').split(',').map(function(x){return x.trim()}).filter(Boolean);b.price=p;b.cost=k}
+  else if(type==='cln'){var s=CLN_SVCS[i];s.type=($('sp-type')?$('sp-type').value.trim():'')||s.type;s.label=($('sp-label')?$('sp-label').value.trim():'')||s.label;s.labelEn=$('sp-labelEn')?$('sp-labelEn').value.trim():(s.labelEn||'');s.minPrice=p;s.cost=k}
+  else if(type==='pkg'){var pk=PKGS[i];pk.type=($('sp-type')?$('sp-type').value.trim():'')||pk.type;pk.typeEn=$('sp-typeEn')?$('sp-typeEn').value.trim():(pk.typeEn||'');pk.qty=parseInt($('sp-qty').value)||pk.qty;pk.price=p;pk.cost=k;pk.expDays=parseInt($('sp-d').value)||0}
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('บันทึกสำเร็จ ✅');logAction('EDIT_PRICE',type+' idx:'+i);
   var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
@@ -3050,16 +3056,16 @@ function exportPriceCSV(tab){
     CAT.forEach(function(it){csv+=csvQ(it.c)+','+csvQ(it.ce||'')+','+csvQ(it.t)+','+csvQ(it.te||'')+','+csvQ(it.o||'')+','+csvQ(it.oe||'')+','+it.p+','+it.k+','+(it.pt||'fixed')+','+(it.sku||'')+'\n'});
     filename='SAKKANID_pricelist_laundry.csv';
   }else if(tab==='bed'){
-    csv='รหัสขนาด,ชื่อแสดง,ราคา,ต้นทุน\n';
-    BED_SETS.forEach(function(b){csv+=csvQ(b.size)+','+csvQ(b.label)+','+b.price+','+b.cost+'\n'});
+    csv='รหัสขนาด,ชื่อแสดง,ชื่อแสดง(EN),ราคา,ต้นทุน\n';
+    BED_SETS.forEach(function(b){csv+=csvQ(b.size)+','+csvQ(b.label)+','+csvQ(b.labelEn||'')+','+b.price+','+b.cost+'\n'});
     filename='SAKKANID_pricelist_bedset.csv';
   }else if(tab==='cln'){
-    csv='รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ,ต้นทุน\n';
-    CLN_SVCS.forEach(function(s){csv+=csvQ(s.type)+','+csvQ(s.label)+','+s.minPrice+','+s.cost+'\n'});
+    csv='รหัสประเภท,ชื่อแสดง,ชื่อแสดง(EN),ราคาขั้นต่ำ,ต้นทุน\n';
+    CLN_SVCS.forEach(function(s){csv+=csvQ(s.type)+','+csvQ(s.label)+','+csvQ(s.labelEn||'')+','+s.minPrice+','+s.cost+'\n'});
     filename='SAKKANID_pricelist_cleaning.csv';
   }else if(tab==='pkg'){
-    csv='ประเภท,จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\n';
-    PKGS.forEach(function(p){csv+=csvQ(p.type)+','+p.qty+','+p.price+','+p.cost+','+(p.expDays||90)+'\n'});
+    csv='ประเภท,ประเภท(EN),จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\n';
+    PKGS.forEach(function(p){csv+=csvQ(p.type)+','+csvQ(p.typeEn||'')+','+p.qty+','+p.price+','+p.cost+','+(p.expDays||90)+'\n'});
     filename='SAKKANID_pricelist_packages.csv';
   }
   downloadCSV(csv,filename);
@@ -3071,13 +3077,13 @@ function downloadPriceTemplate(tab){
     csv='หมวดบริการ,หมวด(EN),ประเภทผ้า,ประเภท(EN),ตัวเลือก,ตัวเลือก(EN),ราคา,ต้นทุน,ประเภทราคา,SKU\nซักแห้ง,Dry Clean,เสื้อเชิ้ต,Shirt,ตัวสั้น,Short,80,30,fixed,DC-001\nซัก อบ รีด,Wash & Iron,กางเกง,Pants,ขายาว,Long,50,18,fixed,WI-002\n';
     filename='TEMPLATE_pricelist_laundry.csv';
   }else if(tab==='bed'){
-    csv='รหัสขนาด,ชื่อแสดง,ราคา,ต้นทุน\nsingle,Single 3.5Ft,339,120\nqueen,Queen 5Ft,439,150\nking,King 6Ft,539,180\n';
+    csv='รหัสขนาด,ชื่อแสดง,ชื่อแสดง(EN),ราคา,ต้นทุน\nsingle,Single 3.5Ft,Single 3.5Ft,339,120\nqueen,Queen 5Ft,Queen 5Ft,439,150\nking,King 6Ft,King 6Ft,539,180\n';
     filename='TEMPLATE_pricelist_bedset.csv';
   }else if(tab==='cln'){
-    csv='รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ,ต้นทุน\nstudio,Studio (1BR1B),1500,600\n1br,1 ห้องนอน 1 ห้องน้ำ,1800,700\n';
+    csv='รหัสประเภท,ชื่อแสดง,ชื่อแสดง(EN),ราคาขั้นต่ำ,ต้นทุน\nstudio,Studio (1BR1B),Studio (1BR1B),1500,600\n1br,1 ห้องนอน 1 ห้องน้ำ,1 Bedroom 1 Bath,1800,700\n';
     filename='TEMPLATE_pricelist_cleaning.csv';
   }else if(tab==='pkg'){
-    csv='ประเภท,จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\nซัก/อบ/พับ,25,400,150,90\nซัก/อบ/พับ,60,900,350,120\n';
+    csv='ประเภท,ประเภท(EN),จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\nซัก/อบ/พับ,Wash/Dry/Fold,25,400,150,90\nซัก/อบ/พับ,Wash/Dry/Fold,60,900,350,120\n';
     filename='TEMPLATE_pricelist_packages.csv';
   }else if(tab==='members'){
     csv='ชื่อ,ชื่อเล่น,เบอร์โทร,ประเภทที่อยู่,โครงการ/คอนโด,ห้อง,หมู่บ้าน,เลขบ้าน,LINE_ID\nสมชาย ใจดี,ชาย,081-234-5678,condo,Supalai Premier,A-101,,,@somchai\nสมหญิง รักงาน,หญิง,089-876-5432,house,,,พฤกษา,123/45,\n';
@@ -3139,18 +3145,18 @@ function importPriceCSV(tab,fileInput){
       CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
     }else if(tab==='bed'){
       var tmpB=[];
-      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpB.push({size:r[0],label:r[1]||r[0],price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,items:[]})});
-      if(!tmpB.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี รหัสขนาด,ชื่อแสดง,ราคา)','err');fileInput.value='';return}
+      rows.forEach(function(r){if(r.length<5||!r[0]) return;tmpB.push({size:r[0],label:r[1]||r[0],labelEn:r[2]||'',price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,items:[]})});
+      if(!tmpB.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 5 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
       BED_SETS.length=0;tmpB.forEach(function(b){BED_SETS.push(b);count++});
     }else if(tab==='cln'){
       var tmpC=[];
-      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpC.push({type:r[0],label:r[1]||r[0],minPrice:parseFloat(r[2])||0,cost:parseFloat(r[3])||0})});
-      if(!tmpC.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี รหัสประเภท,ชื่อแสดง,ราคาขั้นต่ำ)','err');fileInput.value='';return}
+      rows.forEach(function(r){if(r.length<5||!r[0]) return;tmpC.push({type:r[0],label:r[1]||r[0],labelEn:r[2]||'',minPrice:parseFloat(r[3])||0,cost:parseFloat(r[4])||0})});
+      if(!tmpC.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 5 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
       CLN_SVCS.length=0;tmpC.forEach(function(s){CLN_SVCS.push(s);count++});
     }else if(tab==='pkg'){
       var tmpP=[];
-      rows.forEach(function(r){if(r.length<3||!r[0]) return;tmpP.push({type:r[0],qty:parseInt(r[1])||0,price:parseFloat(r[2])||0,cost:parseFloat(r[3])||0,expDays:parseInt(r[4])||90})});
-      if(!tmpP.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมี ประเภท,จำนวนชิ้น,ราคา)','err');fileInput.value='';return}
+      rows.forEach(function(r){if(r.length<4||!r[0]) return;tmpP.push({type:r[0],typeEn:r[1]||'',qty:parseInt(r[2])||0,price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,expDays:parseInt(r[5])||90})});
+      if(!tmpP.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 6 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
       PKGS.length=0;tmpP.forEach(function(p){PKGS.push(p);count++});
     }
     saveDB();logAction('IMPORT_PRICE',tab+' '+count+' rows');
@@ -4587,7 +4593,8 @@ function mcDeleteBgImage(){var cfg=window._mcSettings||{};delete cfg.bgImage;win
 // ═══ ADD NEW BED_SET / CLN_SVC / PKG ═══
 function openAddBedSet(){
   var h='<div class="modal-overlay show" id="moAddSvc"><div class="modal"><div class="modal-head"><h3>➕ เพิ่ม Set เครื่องนอนใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddSvc\').remove()">&times;</button></div><div class="modal-body">'+
-    '<div class="form-group"><label class="form-label">ชื่อ Set (เช่น Super King 7Ft)</label><input id="as-label" type="text"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อ Set (ไทย) *</label><input id="as-label" type="text" placeholder="เช่น Super King 7Ft"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อ Set (EN)</label><input id="as-labelEn" type="text" placeholder="เช่น Super King 7Ft"></div></div>'+
     '<div class="form-group"><label class="form-label">ขนาด (ID)</label><input id="as-size" type="text" placeholder="เช่น superking"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="as-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="as-cost" type="number" value="0"></div></div>'+
@@ -4597,12 +4604,13 @@ function openAddBedSet(){
 }
 function saveAddBedSet(){
   var label=$('as-label')?$('as-label').value.trim():'';if(!label){toast('กรอกชื่อ Set','err');return}
-  BED_SETS.push({size:$('as-size')?$('as-size').value.trim():'new',label:label,price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,items:($('as-items').value||'').split(',').map(function(s){return s.trim()}).filter(Boolean)});
+  BED_SETS.push({size:$('as-size')?$('as-size').value.trim():'new',label:label,labelEn:$('as-labelEn')?$('as-labelEn').value.trim():'',price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,items:($('as-items').value||'').split(',').map(function(s){return s.trim()}).filter(Boolean)});
   toast('เพิ่ม Set สำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
 }
 function openAddClnSvc(){
   var h='<div class="modal-overlay show" id="moAddSvc"><div class="modal"><div class="modal-head"><h3>➕ เพิ่มบริการ Cleaning ใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddSvc\').remove()">&times;</button></div><div class="modal-body">'+
-    '<div class="form-group"><label class="form-label">ชื่อบริการ (เช่น 4 ห้องนอน)</label><input id="as-label" type="text"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อบริการ (ไทย) *</label><input id="as-label" type="text" placeholder="เช่น 4 ห้องนอน"></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อบริการ (EN)</label><input id="as-labelEn" type="text" placeholder="เช่น 4 Bedrooms"></div></div>'+
     '<div class="form-group"><label class="form-label">ประเภท (ID)</label><input id="as-type" type="text" placeholder="เช่น 4br"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขั้นต่ำ (฿)</label><input id="as-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="as-cost" type="number" value="0"></div></div>'+
@@ -4611,13 +4619,14 @@ function openAddClnSvc(){
 }
 function saveAddClnSvc(){
   var label=$('as-label')?$('as-label').value.trim():'';if(!label){toast('กรอกชื่อ','err');return}
-  CLN_SVCS.push({type:$('as-type')?$('as-type').value.trim():'new',label:label,minPrice:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0});
+  CLN_SVCS.push({type:$('as-type')?$('as-type').value.trim():'new',label:label,labelEn:$('as-labelEn')?$('as-labelEn').value.trim():'',minPrice:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0});
   toast('เพิ่มบริการสำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
 }
 function openAddPkg(){
   var h='<div class="modal-overlay show" id="moAddSvc"><div class="modal"><div class="modal-head"><h3>➕ เพิ่ม Package ใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddSvc\').remove()">&times;</button></div><div class="modal-body">'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทบริการ</label><input id="as-type" type="text" placeholder="เช่น ซัก/อบ/พับ"></div>'+
-    '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="as-qty" type="number"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทบริการ (ไทย) *</label><input id="as-type" type="text" placeholder="เช่น ซัก/อบ/พับ"></div>'+
+    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="as-typeEn" type="text" placeholder="เช่น Wash/Dry/Fold"></div></div>'+
+    '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="as-qty" type="number"></div>'+
     '<div class="grid g3"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="as-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="as-cost" type="number" value="0"></div>'+
     '<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="as-exp" type="number" value="90" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="as-noexp" onchange="if(this.checked){document.getElementById(\'as-exp\').value=0}else{document.getElementById(\'as-exp\').value=90}"> ♾️ ไม่มีวันหมดอายุ</label></div></div>'+
@@ -4626,7 +4635,7 @@ function openAddPkg(){
 }
 function saveAddPkg(){
   var type=$('as-type')?$('as-type').value.trim():'';if(!type){toast('กรอกประเภท','err');return}
-  PKGS.push({type:type,qty:parseInt($('as-qty').value)||0,price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,expDays:parseInt($('as-exp').value)||90});
+  PKGS.push({type:type,typeEn:$('as-typeEn')?$('as-typeEn').value.trim():'',qty:parseInt($('as-qty').value)||0,price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,expDays:parseInt($('as-exp').value)||90});
   toast('เพิ่ม Package สำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
 }
 function mcUpdateSize(key,val){var cfg=window._mcSettings||{};cfg[key]=val;window._mcSettings=cfg}
@@ -5643,9 +5652,9 @@ async function syncPushAll(silent){
     expenses:DB.expenses||[],
     shifts:DB.shifts||[],
     pricelist:CAT.map(function(it){return{c:it.c,ce:it.ce||'',t:it.t,te:it.te||'',o:it.o||'',oe:it.oe||'',p:it.p,k:it.k,pt:it.pt||'fixed',sku:it.sku||''}}),
-    bed_sets:BED_SETS.map(function(b){return{size:b.size,label:b.label,price:b.price,cost:b.cost,items:JSON.stringify(b.items)}}),
-    cln_svcs:CLN_SVCS.map(function(s){return{type:s.type,label:s.label,minPrice:s.minPrice,cost:s.cost}}),
-    packages:PKGS.map(function(p){return{type:p.type,qty:p.qty,price:p.price,cost:p.cost,expDays:p.expDays}}),
+    bed_sets:BED_SETS.map(function(b){return{size:b.size,label:b.label,labelEn:b.labelEn||'',price:b.price,cost:b.cost,items:JSON.stringify(b.items)}}),
+    cln_svcs:CLN_SVCS.map(function(s){return{type:s.type,label:s.label,labelEn:s.labelEn||'',minPrice:s.minPrice,cost:s.cost}}),
+    packages:PKGS.map(function(p){return{type:p.type,typeEn:p.typeEn||'',qty:p.qty,price:p.price,cost:p.cost,expDays:p.expDays}}),
     settings:Object.keys(getShopSettings()).map(function(k){var v=getShopSettings()[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}})
   };
   var success=0;
@@ -5686,17 +5695,17 @@ async function syncPullAll(){
     // Update BED_SETS from bed_sets sheet
     if(d.bed_sets&&d.bed_sets.length){
       BED_SETS.length=0;
-      d.bed_sets.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});
+      d.bed_sets.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,labelEn:b.labelEn||'',price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});
     }
     // Update CLN_SVCS from cln_svcs sheet
     if(d.cln_svcs&&d.cln_svcs.length){
       CLN_SVCS.length=0;
-      d.cln_svcs.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});
+      d.cln_svcs.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,labelEn:s.labelEn||'',minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});
     }
     // Update PKGS from packages sheet
     if(d.packages&&d.packages.length){
       PKGS.length=0;
-      d.packages.forEach(function(p){PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});
+      d.packages.forEach(function(p){PKGS.push({type:p.type,typeEn:p.typeEn||'',qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});
     }
     // Restore settings
     if(d.settings&&d.settings.length){
@@ -6240,8 +6249,8 @@ async function syncPullSilent(){
     if(d.bed_sets&&d.bed_sets.length>0){
       var validBeds=d.bed_sets.filter(function(b){return b.label&&(b.price!==undefined&&b.price!=='')});
       if(validBeds.length>0){
-        var bc=validBeds.some(function(b,i){var o=BED_SETS[i];return !o||Number(b.price)!==o.price});
-        if(bc){BED_SETS.length=0;validBeds.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});changed=true;
+        var bc=validBeds.some(function(b,i){var o=BED_SETS[i];return !o||Number(b.price)!==o.price||(b.labelEn||'')!==(o.labelEn||'')||b.label!==o.label});
+        if(bc){BED_SETS.length=0;validBeds.forEach(function(b){var items=b.items;if(typeof items==='string'){try{items=JSON.parse(items)}catch(e){items=[]}}BED_SETS.push({size:b.size,label:b.label,labelEn:b.labelEn||'',price:Number(b.price)||0,cost:Number(b.cost)||0,items:items||[]})});changed=true;
           console.log('✅ syncPull: BED_SETS updated — '+BED_SETS.length+' items')}
       }
     }
@@ -6249,8 +6258,8 @@ async function syncPullSilent(){
     if(d.cln_svcs&&d.cln_svcs.length>0){
       var validCln=d.cln_svcs.filter(function(s){return s.type&&(s.minPrice!==undefined&&s.minPrice!=='')});
       if(validCln.length>0){
-        var cc=validCln.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice});
-        if(cc){CLN_SVCS.length=0;validCln.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});changed=true;
+        var cc=validCln.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice||(s.labelEn||'')!==(o.labelEn||'')||s.label!==o.label});
+        if(cc){CLN_SVCS.length=0;validCln.forEach(function(s){CLN_SVCS.push({type:s.type,label:s.label,labelEn:s.labelEn||'',minPrice:Number(s.minPrice)||0,cost:Number(s.cost)||0})});changed=true;
           console.log('✅ syncPull: CLN_SVCS updated — '+CLN_SVCS.length+' items')}
       }
     }
@@ -6258,8 +6267,8 @@ async function syncPullSilent(){
     if(d.packages&&d.packages.length>0){
       var validPkg=d.packages.filter(function(p){return p.type&&(p.price!==undefined&&p.price!=='')});
       if(validPkg.length>0){
-        var pc=validPkg.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price});
-        if(pc){PKGS.length=0;validPkg.forEach(function(p){PKGS.push({type:p.type,qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});changed=true;
+        var pc=validPkg.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price||(p.typeEn||'')!==(o.typeEn||'')});
+        if(pc){PKGS.length=0;validPkg.forEach(function(p){PKGS.push({type:p.type,typeEn:p.typeEn||'',qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});changed=true;
           console.log('✅ syncPull: PKGS updated — '+PKGS.length+' items')}
       }
     }
