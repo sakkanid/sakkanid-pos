@@ -551,6 +551,10 @@ function gM(mid){return DB.members.find(m=>m.id===mid)}
 // ── Lead vs สมาชิกเต็มตัว: มีเบอร์โทร = เต็มตัว, ไม่มีเบอร์ = Lead 🌱 ──
 function validPhone(p){var s=String(p||'').replace(/[^0-9]/g,'');return s.length>=9}
 function isLead(m){return m&&!validPhone(m.phone)}
+// ── LINE User ID ที่ใช้ส่งได้จริง (ขึ้นต้น U + ยาว >=30) ──
+function validUid(u){u=String(u||'').trim();return u.length>=30&&u.charAt(0)==='U'}
+// ── นับ "LINE Friend ที่ทักเข้ามาแล้วยังไม่จับคู่/อัปเกรด" = lead ที่มี UID ใช้ได้ ──
+function unmatchedLineCount(){return (DB.members||[]).filter(function(m){return isLead(m)&&validUid(m.lineUserId)}).length}
 // ── ภาษาข้อความ LINE รายสมาชิก (ไทย/อังกฤษ) ──
 function memLang(m){return (m&&m.lang==='en')?'en':'th'}
 function L(m,th,en){return memLang(m)==='en'?en:th}
@@ -2569,7 +2573,7 @@ function renderMembersPage(c){
   var leadCnt=DB.members.filter(isLead).length;
   var fullCnt=DB.members.length-leadCnt;
   c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก — ✅ เต็มตัว '+fullCnt+' · 🟢 LINE Friend '+leadCnt+'</div>'+
-    '<div class="filter-bar" style="margin-bottom:10px">'+
+    (unmatchedLineCount()>0?'<div style="padding:10px 12px;background:#FEF3C7;color:#92400E;border-radius:8px;margin-bottom:10px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>🔔 มี <b>'+unmatchedLineCount()+'</b> LINE Friend ที่ทักเข้ามาแล้ว ยังไม่จับคู่กับสมาชิกเดิม</span><button class="btn btn-am btn-sm" onclick="setMemFilter(\'lead\')">ดูรายการ →</button></div>':'')+'<div class="filter-bar" style="margin-bottom:10px">'+
       memFilterChip('all','ทั้งหมด ('+DB.members.length+')')+
       memFilterChip('full','✅ สมาชิกเต็มตัว ('+fullCnt+')')+
       memFilterChip('lead','🟢 LINE Friend — ยังไม่เป็นสมาชิก ('+leadCnt+')')+'</div>'+
@@ -3554,7 +3558,7 @@ function renderSettingsConnect(s){
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
     (lineOk?'<button class="btn btn-am btn-sm" onclick="testLineSendMessage()">✉️ ทดสอบส่งข้อความ</button>':'')+
-    (lineOk?'<button class="btn btn-gn btn-sm" onclick="fetchLineUsers()">📱 จับคู่ LINE Users</button>':'')+
+    (lineOk?'<button class="btn btn-gn btn-sm" onclick="fetchLineUsers()">📱 จับคู่ LINE Users'+(unmatchedLineCount()>0?' <span class="badge bg-rd" style="font-size:10px">'+unmatchedLineCount()+'</span>':'')+'</button>':'')+
     '</div>'+
     '<div style="margin-top:8px;padding:8px;background:var(--prl);border-radius:6px;font-size:11px"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><strong>🔗 Webhook URL (วางใน LINE Developers → Messaging API)</strong><button class="btn btn-pr btn-sm" style="padding:3px 10px" onclick="copyWebhookUrl()">📋 คัดลอก</button></div><code style="font-size:10px;word-break:break-all;display:block;margin-top:4px">'+(s.apiUrl?s.apiUrl+'?action=lineWebhook':'[ตั้งค่า Apps Script URL ก่อน]')+'</code></div>'+
     '</div></div>'+
@@ -4191,7 +4195,7 @@ function viewMemberDetail(mid){
     orders.slice(0,20).map(o=>'<tr><td>'+o.id+'</td><td>'+o.type+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td><td style="font-size:11px">'+formatBillDate(o.createdAt)+'</td></tr>').join('')+'</table>':'<div style="color:var(--t3);font-size:13px">ยังไม่มีออเดอร์</div>')+
     (String(m.lineUserId||'').trim().length>=30&&String(m.lineUserId||'').trim().charAt(0)==='U'?'<div class="card-title" style="margin-top:16px;font-size:13px;display:flex;justify-content:space-between;align-items:center"><span>📤 ประวัติส่ง LINE</span><button class="btn btn-out btn-sm" onclick="loadMemberLineLog(\''+String(m.lineUserId).trim()+'\')">🔄 โหลด</button></div><div id="memLineLog" style="font-size:12px;color:var(--t3)">กด "โหลด" เพื่อดูว่าส่งอะไรหาลูกค้าไปบ้าง</div>':'')+
     '</div>'+
-    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button><button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length&&String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+(String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-out" onclick="chatWithCustomer(\''+mid+'\')">💬 แชท LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
+    '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moDetail\')">ปิด</button><button class="btn btn-out" onclick="closeMo(\'moDetail\');openEditMember(\''+mid+'\')">✏️ แก้ไข</button>'+(isLead(m)?'<button class="btn btn-am btn-sm" onclick="openMatchLeadModal(\''+mid+'\')">🔗 นี่คือสมาชิกเดิม</button>':(!validUid(m.lineUserId)?'<button class="btn btn-gn btn-sm" onclick="openLinkLineModal(\''+mid+'\')">🔗 จับคู่ LINE</button>':''))+'<button class="btn btn-pr" onclick="closeMo(\'moDetail\');showMemberCard(\''+mid+'\')">🪪 บัตรสมาชิก</button>'+((DB.quotas||[]).filter(function(q){return q.mid===mid&&q.remain>0}).length&&String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-gn" onclick="sendQuotaInfoLine(\''+mid+'\')">📦 ส่งโควต้า LINE</button>':'')+(String(m.lineUserId||'').trim().length>=30?'<button class="btn btn-out" onclick="chatWithCustomer(\''+mid+'\')">💬 แชท LINE</button>':'')+'<button class="btn btn-rd btn-sm" onclick="deleteMember(\''+mid+'\')">🗑️ ลบ</button></div>';
   openMo('moDetail');
 }
 
@@ -5722,6 +5726,87 @@ function linkLineUser(userId,selectId){
   toast('✅ เชื่อม LINE User กับ '+m.name+' สำเร็จ!');
   document.getElementById('moLineUsers').remove();
   fetchLineUsers();
+}
+
+// ══ จับคู่ลัด: รวม LINE ของ "LINE Friend" (lead) เข้ากับสมาชิกเดิม แล้วลบ lead ทิ้ง ══
+function mergeLineIntoMember(targetId,leadId){
+  var t=gM(targetId),l=gM(leadId);
+  if(!t||!l){toast('ไม่พบสมาชิก','err');return}
+  if(t.id===l.id){toast('เป็นคนเดียวกัน','err');return}
+  // ย้ายข้อมูล LINE จาก lead → สมาชิกเดิม
+  if(l.lineUserId) t.lineUserId=l.lineUserId;
+  if(l.lineName) t.lineName=l.lineName;
+  if(l.lineId&&!t.lineId) t.lineId=l.lineId;
+  if(l.lang&&!t.lang) t.lang=l.lang;
+  // รวมแต้ม/ยอดที่ lead อาจมี (ปกติ 0)
+  t.pts=(parseInt(t.pts)||0)+(parseInt(l.pts)||0);
+  t.spend=(parseFloat(t.spend)||0)+(parseFloat(l.spend)||0);
+  // ย้ายออเดอร์/โควต้าที่เคยผูกกับ lead มาที่สมาชิกเดิม
+  (DB.orders||[]).forEach(function(o){if(o.mid===l.id){o.mid=t.id;o.mname=t.name}});
+  (DB.quotas||[]).forEach(function(q){if(q.mid===l.id)q.mid=t.id});
+  // ลบ lead ออก
+  DB.members=(DB.members||[]).filter(function(m){return m.id!==l.id});
+  saveDB();
+  if(getApiUrl()&&typeof syncPushAll==='function'&&curUser) syncPushAll(true);
+  logAction('MERGE_LINE',t.id+' ← '+l.id+' ('+(l.lineName||l.name)+')');
+  var mo=document.getElementById('moLinePair');if(mo)mo.remove();
+  closeMo('moDetail');
+  toast('✅ จับคู่ LINE ของ "'+(l.lineName||l.name)+'" เข้ากับ '+t.name+' แล้ว 🎉');
+  if(curPage==='members') renderPage('members');
+}
+
+// ── เปิดจาก "สมาชิกเต็มตัว": เลือก LINE Friend (คนที่ทักเข้ามา) มาจับคู่ ──
+function openLinkLineModal(targetId){
+  var t=gM(targetId);if(!t)return;
+  var leads=(DB.members||[]).filter(function(m){return m.id!==targetId&&isLead(m)&&validUid(m.lineUserId)});
+  _openLinePairModal('🔗 จับคู่ LINE ให้ '+t.name,
+    leads,
+    'เลือก LINE Friend (คนที่ทักแชทเข้ามา) ที่เป็นคุณ '+t.name,
+    'ยังไม่มี LINE Friend ที่ทักเข้ามารอจับคู่ — ให้ลูกค้าแอด OA แล้วทักแชทก่อน',
+    function(l){return mergeLineIntoMember(targetId,l.id)});
+}
+// ── เปิดจาก "LINE Friend": เลือกสมาชิกเดิมที่จะรับ LINE นี้ ──
+function openMatchLeadModal(leadId){
+  var l=gM(leadId);if(!l)return;
+  var fulls=(DB.members||[]).filter(function(m){return m.id!==leadId&&!isLead(m)});
+  // เรียงคนที่ยังไม่มี UID ขึ้นก่อน
+  fulls.sort(function(a,b){return (validUid(a.lineUserId)?1:0)-(validUid(b.lineUserId)?1:0)});
+  _openLinePairModal('🔗 "'+(l.lineName||l.name)+'" นี่คือสมาชิกเดิมคนไหน?',
+    fulls,
+    'เลือกสมาชิกเดิมที่จะรับ LINE นี้ (ข้อมูล/ประวัติของสมาชิกเดิมอยู่ครบ, LINE Friend นี้จะถูกรวมเข้าไป)',
+    'ยังไม่มีสมาชิกเต็มตัวในระบบให้จับคู่',
+    function(t){return mergeLineIntoMember(t.id,leadId)});
+}
+// ── ตัวช่วยแสดง modal เลือกคน (ใช้ร่วมกันทั้ง 2 ทิศทาง) ──
+function _openLinePairModal(title,list,hint,emptyMsg,onPick){
+  var old=document.getElementById('moLinePair');if(old)old.remove();
+  window._linePairList=list;window._linePairPick=onPick;
+  var rows=list.map(function(m,i){
+    var sub=m.lineName?('💬 '+m.lineName):(fmtPhone(m.phone)||'');
+    var uid=validUid(m.lineUserId)?('<span style="font-size:10px;color:var(--gn)">✅ '+String(m.lineUserId).substring(0,10)+'…</span>'):'';
+    return '<tr style="cursor:pointer" onclick="_pickLinePair('+i+')"><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-gn" style="font-size:9px">🟢 Friend</span>':'')+'<div style="font-size:11px;color:var(--t3)">'+sub+' '+uid+'</div></td><td><button class="btn btn-pr btn-sm">เลือก</button></td></tr>';
+  }).join('');
+  var body=list.length
+    ?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">'+hint+'</div><input id="linePairSearch" placeholder="ค้นหาชื่อ / เบอร์..." oninput="_filterLinePair()" style="width:100%;margin-bottom:8px"><div id="linePairRows"><table>'+rows+'</table></div>'
+    :'<div class="empty-state"><div class="es-text">'+emptyMsg+'</div></div>';
+  var h='<div class="modal-overlay show" id="moLinePair"><div class="modal" style="max-width:520px"><div class="modal-head"><h3>'+title+'</h3><button class="modal-close" onclick="document.getElementById(\'moLinePair\').remove()">&times;</button></div><div class="modal-body" style="overflow-y:auto;max-height:60vh">'+body+'</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moLinePair\').remove()">ปิด</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function _filterLinePair(){
+  var q=($('linePairSearch')?$('linePairSearch').value:'').toLowerCase();
+  var box=$('linePairRows');if(!box)return;
+  var list=window._linePairList||[];
+  var rows=list.map(function(m,i){
+    if(q&&!((m.name||'').toLowerCase().includes(q)||String(m.phone||'').includes(q)||(m.lineName||'').toLowerCase().includes(q)))return '';
+    var sub=m.lineName?('💬 '+m.lineName):(fmtPhone(m.phone)||'');
+    var uid=validUid(m.lineUserId)?('<span style="font-size:10px;color:var(--gn)">✅ '+String(m.lineUserId).substring(0,10)+'…</span>'):'';
+    return '<tr style="cursor:pointer" onclick="_pickLinePair('+i+')"><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-gn" style="font-size:9px">🟢 Friend</span>':'')+'<div style="font-size:11px;color:var(--t3)">'+sub+' '+uid+'</div></td><td><button class="btn btn-pr btn-sm">เลือก</button></td></tr>';
+  }).join('');
+  box.innerHTML='<table>'+rows+'</table>';
+}
+function _pickLinePair(i){
+  var m=(window._linePairList||[])[i];if(!m)return;
+  var fn=window._linePairPick;if(typeof fn==='function') fn(m);
 }
 
 // ═══ GOOGLE SHEETS SYNC ═══
