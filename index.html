@@ -694,6 +694,34 @@ function getOCardClass(st){
   if(st==='ยกเลิก') return 'st-cancel';
   return '';
 }
+// ── สีประจำสถานะ (สำหรับแถบ filter) ──
+function statusColor(st){
+  st=String(st||'');
+  if(st.includes('รับผ้า')||st==='รับจอง') return '#3B82C4';
+  if(st.includes('ระหว่าง')||st==='ยืนยันนัด') return '#C4820A';
+  if(st.includes('พร้อมส่ง')) return '#0D8A6A';
+  if(st.includes('จัดส่ง')||st==='กำลังดำเนินการ') return '#7C3AED';
+  if(st.includes('เสร็จสิ้น')||st==='ปิดงาน') return '#6B7A88';
+  if(st==='ยกเลิก') return '#DC2626';
+  if(st.includes('รอชำระ')||st.includes('ค้าง')) return '#D6336C';
+  return '#3B82C4';
+}
+// ── หมวดบริการของออเดอร์ (ไอคอน+ชื่อ+สี) ให้ดูออกในหน้าเดียว ──
+function orderCat(o){
+  var t=(o&&o.type)||'';var id=String(o&&o.id||'');
+  if(t==='cleaning'||id.indexOf('CLN')===0) return {icon:'🧹',label:'ทำความสะอาด',color:'#7C3AED'};
+  if(t==='bedset'||id.indexOf('BED')===0) return {icon:'🛏️',label:'เครื่องนอน',color:'#C4820A'};
+  if(t==='quota') return {icon:'🎫',label:'ใช้โควต้า',color:'#0D8A6A'};
+  if(t==='pkg_buy'||id.indexOf('PKB')===0) return {icon:'📦',label:'ซื้อ Package',color:'#D6336C'};
+  return {icon:'👕',label:'ซักรีด',color:'#006F98'};
+}
+function catBadge(o){var c=orderCat(o);return '<span class="badge" style="background:'+c.color+'22;color:'+c.color+';font-weight:700">'+c.icon+' '+c.label+'</span>'}
+// ── แสดงเวลานัด (แก้ค่าเพี้ยน 1899-12-30...Z จาก Google Sheets ให้เหลือ HH:MM) ──
+function cleanTimeStr(t){
+  t=String(t||'').trim();if(!t) return '';
+  if(t.indexOf('T')>=0||t.indexOf('Z')>=0){try{var d=new Date(t);if(!isNaN(d.getTime()))return d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false})}catch(e){}}
+  return /^\d{1,2}:\d{2}/.test(t)?t.slice(0,5):t;
+}
 function netOf(o){return Math.max(0,(o.net||0))}
 function paidTotal(o){return (o.payHist||[]).reduce((s,p)=>s+p.amt,0)}
 function isPaidCheck(o){return paidTotal(o)>=netOf(o)}
@@ -1044,7 +1072,6 @@ function renderDashboard(c){
     '<button class="btn btn-pr btn-lg" onclick="navTo(\'laundry\')" style="justify-content:center">👕 รับผ้าใหม่</button>'+
     '<button class="btn btn-gn btn-lg" onclick="navTo(\'orders\')" style="justify-content:center">📋 ดูออเดอร์</button>'+
     '<button class="btn btn-out btn-lg" onclick="sendDailySummaryLine()" style="justify-content:center">📊 สรุปยอดวันนี้</button>'+
-    '<button class="btn btn-out btn-lg" onclick="sendUnpaidReminders()" style="justify-content:center;color:var(--rd)">⚠️ แจ้งค้างชำระ</button>'+
     '</div></div></div>'+
     // Recent orders + Shift
     '<div class="grid g2" style="margin-top:16px">'+
@@ -1116,11 +1143,11 @@ function orderCardHTML(o){
   actions+='<button class="btn btn-out btn-sm" onclick="showBill(\''+o.id+'\')">🧾 บิล</button>';
   if(!paid) actions+='<button class="btn btn-out btn-sm" onclick="sendBillCollect(\''+o.id+'\')" style="color:var(--am)">📱 เรียกเก็บเงิน</button>';
   actions+='<button class="btn btn-out btn-sm" onclick="showOrderDetail(\''+o.id+'\')">👁️ ดู</button>';
-  if(o.type==='laundry'||o.type==='bedset') actions+='<button class="btn btn-out btn-sm" onclick="printGarmentTags(\''+o.id+'\')">🏷️ ป้าย</button>';
+  if(o.type==='laundry'||o.type==='bedset'||o.type==='quota') actions+='<button class="btn btn-out btn-sm" onclick="printGarmentTags(\''+o.id+'\')">🏷️ ป้าย</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="duplicateOrder(\''+o.id+'\')">📋 ซ้ำ</button>';
   if(editable) actions+='<button class="btn btn-out btn-sm" onclick="openCancelModal(\''+o.id+'\')" style="color:var(--rd)">❌ ยกเลิก</button>';
-  return '<div class="o-card '+getOCardClass(o.status)+'">'+
-    '<div class="o-head"><span class="o-id">'+o.id+'</span><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span><span class="o-date">'+o.createdAt+'</span></div>'+
+  return '<div class="o-card '+getOCardClass(o.status)+'" style="border-left:4px solid '+orderCat(o).color+'">'+
+    '<div class="o-head" style="flex-wrap:wrap;gap:4px"><span class="o-id">'+o.id+'</span>'+catBadge(o)+'<span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span><span class="o-date">'+o.createdAt+'</span></div>'+
     '<div class="o-cust">'+(o.mname||'Walk-in')+'</div>'+
     '<div class="o-info">'+((o.items||[]).length)+' รายการ · '+(o.delivery==='delivery'?'🚗 Delivery':'🏪 รับที่ร้าน')+'</div>'+
     '<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span class="o-total">'+thb(o.net)+'</span>'+
@@ -2024,7 +2051,8 @@ function renderOrdersPage(c){
     '<div class="filter-chip act" onclick="filterOrders(this,\'all\')">ทั้งหมด ('+all.length+')</div>'+
     allStatuses.map(st=>{
       const cnt=all.filter(o=>o.status===st).length;
-      return '<div class="filter-chip" onclick="filterOrders(this,\''+st+'\')">'+st+' ('+cnt+')</div>';
+      const col=statusColor(st);
+      return '<div class="filter-chip" data-scol="'+col+'" onclick="filterOrders(this,\''+st+'\')" style="border-color:'+col+';color:'+col+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+';margin-right:5px;vertical-align:middle"></span>'+st+' ('+cnt+')</div>';
     }).join('')+'</div>'+
     '<div id="ordersContainer">'+all.reverse().map(o=>orderCardHTML(o)).join('')+'</div></div>';
   if(!all.length) $('ordersContainer').innerHTML='<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
@@ -2047,7 +2075,10 @@ function searchOrdersByTag(q){
 }
 function clearOrderTagSearch(){var i=$('orderTagSearch');if(i)i.value='';searchOrdersByTag('')}
 function filterOrders(el,st){
-  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('act'));el.classList.add('act');
+  document.querySelectorAll('#ordersDefaultView .filter-chip').forEach(function(c){c.classList.remove('act');var sc=c.getAttribute('data-scol');c.style.background='';c.style.color=sc||'';c.style.borderColor=sc||''});
+  el.classList.add('act');
+  var mycol=el.getAttribute('data-scol');
+  if(mycol){el.style.background=mycol;el.style.color='#fff';el.style.borderColor=mycol}
   const all=DB.orders.filter(o=>!['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status));
   const filtered=st==='all'?all:all.filter(o=>o.status===st);
   $('ordersContainer').innerHTML=filtered.length?filtered.reverse().map(o=>orderCardHTML(o)).join(''):'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์ในสถานะนี้</div></div>';
@@ -2456,7 +2487,7 @@ function showCalDay(dateStr){
       '<div class="o-card '+getOCardClass(o.status)+'" style="cursor:pointer" onclick="showOrderDetail(\''+o.id+'\')">'+
       '<div class="o-head"><span class="o-id">'+o.id+'</span><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></div>'+
       '<div class="o-cust">'+o.mname+'</div>'+
-      '<div class="o-info">📍 '+(o.deliveryAddr||'-')+' · '+(o.cleanTime||'')+' · '+thb(o.net)+'</div>'+
+      '<div class="o-info">📍 '+(o.deliveryAddr||'-')+(cleanTimeStr(o.cleanTime)?' · ⏰ '+cleanTimeStr(o.cleanTime)+' น.':'')+' · '+thb(o.net)+'</div>'+
       '<div style="margin-top:4px">'+(isPaidCheck(o)?'<span class="badge bg-gn">ชำระแล้ว</span>':'<span class="badge bg-rd">ค้าง '+thb(remaining(o))+'</span>')+'</div></div>'
     ).join('')+'<button class="btn btn-out" onclick="startNewOrder(\'cln\')" style="margin-top:8px">➕ เพิ่มงาน</button>';
 }
@@ -2467,14 +2498,14 @@ function renderMembersPage(c){
   if(!window._memFilter) window._memFilter='all';
   var leadCnt=DB.members.filter(isLead).length;
   var fullCnt=DB.members.length-leadCnt;
-  c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก — ✅ เต็มตัว '+fullCnt+' · 🌱 Lead '+leadCnt+'</div>'+
+  c.innerHTML='<div class="card"><div class="card-title">👥 สมาชิก — ✅ เต็มตัว '+fullCnt+' · 🟢 LINE Friend '+leadCnt+'</div>'+
     '<div class="filter-bar" style="margin-bottom:10px">'+
       memFilterChip('all','ทั้งหมด ('+DB.members.length+')')+
       memFilterChip('full','✅ สมาชิกเต็มตัว ('+fullCnt+')')+
-      memFilterChip('lead','🌱 Lead — ยังไม่มีเบอร์ ('+leadCnt+')')+'</div>'+
+      memFilterChip('lead','🟢 LINE Friend — ยังไม่เป็นสมาชิก ('+leadCnt+')')+'</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
     '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="importRegMember()">📥 นำเข้าจาก LINE</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
-    (window._memFilter==='lead'?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">💡 Lead = ทักแชทเข้ามาแล้ว แต่ยังไม่มีเบอร์ — กดที่รายชื่อ → ✏️ แก้ไข → ใส่เบอร์ แล้วเซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
+    (window._memFilter==='lead'?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">💡 LINE Friend = ทักแชทเข้ามาแล้ว แต่ยังไม่มีเบอร์ (ยังไม่เป็นสมาชิกเต็มตัว) — กดที่รายชื่อ → ✏️ แก้ไข → ใส่เบอร์ แล้วเซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
     '<div id="memPageList">'+renderMemberTable(memListFiltered())+'</div></div>';
 }
 function memFilterChip(f,label){return '<div class="filter-chip'+(window._memFilter===f?' act':'')+'" onclick="setMemFilter(\''+f+'\')">'+label+'</div>'}
@@ -2490,8 +2521,8 @@ function memListFiltered(){
 }
 function renderMemberTable(list){
   if(!list.length) return '<div class="empty-state"><div class="es-text">ไม่มีสมาชิก</div></div>';
-  return '<table><tr><th>ID</th><th>ชื่อ</th><th>เบอร์</th><th>แต้ม</th><th>ยอดซื้อ</th><th>ระดับ</th></tr>'+
-    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-am" style="font-size:10px">🌱 Lead</span>':'')+'</td><td>'+(fmtPhone(m.phone)||'<span style="color:var(--am);font-size:12px">— ยังไม่มีเบอร์</span>')+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
+  return '<table><tr><th>ID</th><th>ชื่อ</th><th>ชื่อ LINE</th><th>เบอร์</th><th>แต้ม</th><th>ยอดซื้อ</th><th>ระดับ</th></tr>'+
+    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-gn" style="font-size:10px">🟢 LINE Friend</span>':'')+'</td><td style="font-size:12px;color:var(--t2)">'+(m.lineName?'💬 '+m.lineName:'<span style="color:var(--t3)">-</span>')+'</td><td>'+(fmtPhone(m.phone)||'<span style="color:var(--am);font-size:12px">— ยังไม่มีเบอร์</span>')+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
 }
 function filterMembersPage(){
   $('memPageList').innerHTML=renderMemberTable(memListFiltered());
@@ -2737,7 +2768,7 @@ function rptQuota(){
 function rptCleaning(){
   var orders=DB.orders.filter(function(o){return o.type==='cleaning'}).reverse();
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="card-title" style="margin:0">🧹 Cleaning ('+orders.length+')</div><button class="btn btn-out btn-sm" onclick="exportReportCSV(\'cleaning\')">📤 Export</button></div>'+
-    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>วันนัด</th><th>ยอด</th><th>สถานะ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+(o.items[0]?o.items[0].t:'')+'</td><td>'+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์</div></div>');
+    (orders.length?'<table><tr><th>เลข</th><th>ลูกค้า</th><th>ประเภท</th><th>วันนัด</th><th>ยอด</th><th>สถานะ</th></tr>'+orders.map(function(o){return '<tr><td>'+o.id+'</td><td>'+o.mname+'</td><td>'+(o.items[0]?o.items[0].t:'')+'</td><td>'+fmtISO(o.pickupDate)+(cleanTimeStr(o.cleanTime)?' '+cleanTimeStr(o.cleanTime)+' น.':'')+'</td><td>'+thb(o.net)+'</td><td><span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span></td></tr>'}).join('')+'</table>':'<div class="empty-state"><div class="es-text">ไม่มีออเดอร์</div></div>');
 }
 function rptLaundry(){
   var orders=DB.orders.filter(function(o){return o.type==='laundry'}).reverse();
@@ -2982,7 +3013,7 @@ function openSvcPriceEdit(type,i){
     '<div class="form-group"><label class="form-label" style="opacity:0">.</label><div></div></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+pk.price+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+pk.cost+'"></div></div>'+
-    '<div class="form-group"><label class="form-label">อายุ Package (วัน)</label><input id="sp-d" type="number" value="'+pk.expDays+'"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer;padding:8px;background:var(--bg);border-radius:6px"><input type="checkbox" id="sp-noexp" '+(pk.expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"> <span>♾️ ไม่มีวันหมดอายุ</span></label></div>';
+    '<div class="form-group"><label class="form-label">อายุ Package (วัน)</label><input id="sp-d" type="number" value="'+pk.expDays+'" style="max-width:180px"'+(pk.expDays==0?' disabled':'')+'><label style="display:inline-flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="sp-noexp" style="width:auto;min-height:0;margin:0" '+(pk.expDays==0?'checked':'')+' onchange="var d=document.getElementById(\'sp-d\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"><span>♾️ ไม่มีวันหมดอายุ</span></label></div>';
   }
   var h='<div class="modal-overlay show" id="moPE2"><div class="modal" style="max-width:520px"><div class="modal-head"><h3>✏️ '+title+'</h3><button class="modal-close" onclick="document.getElementById(\'moPE2\').remove()">&times;</button></div><div class="modal-body" style="overflow-y:auto">'+body+'</div><div class="modal-foot"><button class="btn btn-rd" onclick="deleteSvcItem(\''+type+'\','+i+')">🗑️ ลบ</button><button class="btn btn-out" onclick="document.getElementById(\'moPE2\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveSvcPrice(\''+type+'\','+i+')">💾 บันทึก</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
@@ -4054,7 +4085,7 @@ function viewMemberDetail(mid){
   $('moDetailIn').innerHTML=
     '<div class="modal-head"><h3>👤 '+m.name+'</h3><button class="modal-close" onclick="closeMo(\'moDetail\')">&times;</button></div>'+
     '<div class="modal-body" style="overflow-y:auto;max-height:65vh">'+
-    (isLead(m)?'<div style="padding:10px 12px;background:var(--aml);border-radius:8px;margin-bottom:12px;font-size:13px;color:#8A6D0A">🌱 <strong>นี่คือ Lead</strong> — ลูกค้าทักแชทเข้ามาแต่ยังไม่มีเบอร์โทร<br>กด <b>✏️ แก้ไข</b> ด้านล่าง → ใส่เบอร์ → เซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
+    (isLead(m)?'<div style="padding:10px 12px;background:var(--gnl);border-radius:8px;margin-bottom:12px;font-size:13px;color:#0D8A6A">🟢 <strong>นี่คือ LINE Friend</strong> (ยังไม่เป็นสมาชิกเต็มตัว) — ลูกค้าทักแชทเข้ามาแต่ยังไม่มีเบอร์โทร<br>กด <b>✏️ แก้ไข</b> ด้านล่าง → ใส่เบอร์ → เซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
     '<div class="grid g4" style="margin-bottom:14px">'+
     '<div class="kpi"><div class="kpi-lbl">แต้ม</div><div class="kpi-val">'+m.pts+'</div></div>'+
     '<div class="kpi"><div class="kpi-lbl">ยอดซื้อ</div><div class="kpi-val">'+thb(m.spend)+'</div></div>'+
@@ -4359,7 +4390,7 @@ function buildBillHTML(o){
   // ── Customer ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>'+
     '<div style="font-size:13px;font-weight:700">'+o.mname+' · '+fmtPhone(o.mphone)+'</div>';
-  if(o.pickupDate) h+='<div style="font-size:12px;font-weight:700">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(o.cleanTime?' '+o.cleanTime:'')+'</div>';
+  if(o.pickupDate) h+='<div style="font-size:12px;font-weight:700">'+(o.type==='cleaning'?'🧹 วันนัด: ':'📅 วันนัดรับ: ')+fmtISO(o.pickupDate)+(cleanTimeStr(o.cleanTime)?' '+cleanTimeStr(o.cleanTime)+' น.':'')+'</div>';
   h+='<div style="font-size:12px">'+(o.delivery==='delivery'?'🚗 จัดส่ง: '+o.deliveryAddr:o.delivery==='onsite'?'📍 '+o.deliveryAddr:'🏪 รับที่ร้าน')+'</div>';
   // ── Items — grouped by category + compact ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
@@ -4629,7 +4660,7 @@ function openAddPkg(){
     '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="as-qty" type="number"></div>'+
     '<div class="grid g3"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="as-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="as-cost" type="number" value="0"></div>'+
-    '<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="as-exp" type="number" value="90" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="as-noexp" onchange="if(this.checked){document.getElementById(\'as-exp\').value=0}else{document.getElementById(\'as-exp\').value=90}"> ♾️ ไม่มีวันหมดอายุ</label></div></div>'+
+    '<div class="form-group"><label class="form-label">อายุ (วัน)</label><input id="as-exp" type="number" value="90" style="max-width:180px" placeholder="0 = ไม่มีวันหมดอายุ"><label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="as-noexp" style="width:auto;min-height:0;margin:0" onchange="var d=document.getElementById(\'as-exp\');if(this.checked){d.value=0;d.disabled=true}else{d.value=90;d.disabled=false}"><span>♾️ ไม่มีวันหมดอายุ</span></label></div></div>'+
     '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moAddSvc\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveAddPkg()">💾 เพิ่ม</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
 }
@@ -5841,24 +5872,42 @@ function printGarmentTags(oid){
   var s=getShopSettings();var tc=s.tagConfig||{};
   var totalQty=(o.items||[]).reduce(function(s,i){return s+(i.qty||1)},0);
   var tagNum=0;
-  var h='';
-  (o.items||[]).forEach(function(it){
-    for(var q=0;q<(it.qty||1);q++){
-      tagNum++;
-      h+='<div style="border:2px dashed #000;padding:8px 12px;margin:6px 0;page-break-inside:avoid;width:'+(tc.width||70)+'mm;font-family:Tahoma,Arial,sans-serif">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center">'+
-        '<div style="font-size:'+(tc.idSize||18)+'px;font-weight:900;color:#000">'+o.id+'</div>'+
-        '<div style="font-size:'+(tc.numSize||16)+'px;font-weight:900;color:#000">'+tagNum+'/'+totalQty+'</div></div>'+
-        (tc.showItem!==false?'<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>':'')+
-        (tc.showCust!==false?'<div style="font-size:12px;font-weight:600;color:#000">'+o.mname+'</div>':'')+
-        (tc.showPhone?'<div style="font-size:11px;color:#000">📱 '+fmtPhone(o.mphone)+'</div>':'')+
-        (tc.showDate!==false?'<div style="font-size:11px;color:#000">'+fmtDate()+'</div>':'')+
-        (tc.showPickup&&o.pickupDate?'<div style="font-size:11px;color:#000">📅 นัดรับ '+fmtISO(o.pickupDate)+'</div>':'')+
-        '</div>';
-    }
-  });
+  var h='';var tagLabel=totalQty+' ป้าย';
+  if(o.type==='quota'){
+    // ── ออเดอร์ใช้โควต้า → ป้ายสรุป 1 ใบ (กันยาวเกินเวลาลูกค้าใช้เยอะ) ──
+    var cats={};(o.items||[]).forEach(function(it){var k=(it.c||it.t||'รายการ');cats[k]=(cats[k]||0)+(it.qty||1)});
+    var lines=Object.keys(cats).map(function(k){return k+' × '+cats[k]}).join(' · ');
+    h='<div style="border:2px dashed #000;padding:10px 14px;margin:6px 0;page-break-inside:avoid;width:'+(tc.width||70)+'mm;font-family:Tahoma,Arial,sans-serif">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="font-size:'+(tc.idSize||18)+'px;font-weight:900;color:#000">'+o.id+'</div>'+
+      '<div style="font-size:13px;font-weight:900;color:#000">🎫 โควต้า</div></div>'+
+      '<div style="font-size:20px;font-weight:900;color:#000;text-align:center;margin:5px 0;border:2px solid #000;border-radius:6px;padding:4px">รวม '+totalQty+' ชิ้น</div>'+
+      (lines?'<div style="font-size:12px;font-weight:700;color:#000">'+lines+'</div>':'')+
+      (tc.showCust!==false?'<div style="font-size:12px;font-weight:600;color:#000">'+o.mname+'</div>':'')+
+      (tc.showPhone?'<div style="font-size:11px;color:#000">📱 '+fmtPhone(o.mphone)+'</div>':'')+
+      (tc.showDate!==false?'<div style="font-size:11px;color:#000">'+fmtDate()+'</div>':'')+
+      (tc.showPickup&&o.pickupDate?'<div style="font-size:11px;color:#000">📅 นัดรับ '+fmtISO(o.pickupDate)+'</div>':'')+
+      '</div>';
+    tagLabel='1 ป้ายสรุป · รวม '+totalQty+' ชิ้น';
+  }else{
+    (o.items||[]).forEach(function(it){
+      for(var q=0;q<(it.qty||1);q++){
+        tagNum++;
+        h+='<div style="border:2px dashed #000;padding:8px 12px;margin:6px 0;page-break-inside:avoid;width:'+(tc.width||70)+'mm;font-family:Tahoma,Arial,sans-serif">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center">'+
+          '<div style="font-size:'+(tc.idSize||18)+'px;font-weight:900;color:#000">'+o.id+'</div>'+
+          '<div style="font-size:'+(tc.numSize||16)+'px;font-weight:900;color:#000">'+tagNum+'/'+totalQty+'</div></div>'+
+          (tc.showItem!==false?'<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px">'+it.c+' · '+it.t+(it.o?' · '+it.o:'')+'</div>':'')+
+          (tc.showCust!==false?'<div style="font-size:12px;font-weight:600;color:#000">'+o.mname+'</div>':'')+
+          (tc.showPhone?'<div style="font-size:11px;color:#000">📱 '+fmtPhone(o.mphone)+'</div>':'')+
+          (tc.showDate!==false?'<div style="font-size:11px;color:#000">'+fmtDate()+'</div>':'')+
+          (tc.showPickup&&o.pickupDate?'<div style="font-size:11px;color:#000">📅 นัดรับ '+fmtISO(o.pickupDate)+'</div>':'')+
+          '</div>';
+      }
+    });
+  }
   // แสดง preview modal ก่อนพิมพ์
-  var modal='<div class="modal-overlay show" id="moTag"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🏷️ ป้ายติดผ้า ('+totalQty+' ป้าย)</h3><button class="modal-close" onclick="document.getElementById(\'moTag\').remove()">&times;</button></div>'+
+  var modal='<div class="modal-overlay show" id="moTag"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🏷️ ป้ายติดผ้า ('+tagLabel+')</h3><button class="modal-close" onclick="document.getElementById(\'moTag\').remove()">&times;</button></div>'+
     '<div class="modal-body"><div style="max-height:400px;overflow-y:auto;background:#fff;padding:10px">'+h+'</div></div>'+
     '<div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moTag\').remove()">ปิด</button><button class="btn btn-out" onclick="openTagConfig()">⚙️ ตั้งค่าป้าย</button><button class="btn btn-pr" onclick="doPrintTags()">🖨️ พิมพ์</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',modal);
