@@ -3553,9 +3553,10 @@ function renderSettingsConnect(s){
     '<div class="form-group"><label class="form-label">LIFF ID <span style="font-size:10px;color:var(--t3)">(สำหรับ LINE Login สมัครสมาชิก)</span></label><input id="cn-liff-id" type="text" value="'+(s.liffId||'')+'" placeholder="1234567890-abcdefgh"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
+    (lineOk?'<button class="btn btn-am btn-sm" onclick="testLineSendMessage()">✉️ ทดสอบส่งข้อความ</button>':'')+
     (lineOk?'<button class="btn btn-gn btn-sm" onclick="fetchLineUsers()">📱 จับคู่ LINE Users</button>':'')+
     '</div>'+
-    (lineOk?'<div style="margin-top:8px;padding:8px;background:var(--prl);border-radius:6px;font-size:11px"><strong>Webhook URL (ตั้งค่าใน LINE Developers):</strong><br><code style="font-size:10px;word-break:break-all">'+(s.apiUrl||'[ตั้งค่า API URL ก่อน]')+'?action=lineWebhook</code></div>':'')+
+    '<div style="margin-top:8px;padding:8px;background:var(--prl);border-radius:6px;font-size:11px"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><strong>🔗 Webhook URL (วางใน LINE Developers → Messaging API)</strong><button class="btn btn-pr btn-sm" style="padding:3px 10px" onclick="copyWebhookUrl()">📋 คัดลอก</button></div><code style="font-size:10px;word-break:break-all;display:block;margin-top:4px">'+(s.apiUrl?s.apiUrl+'?action=lineWebhook':'[ตั้งค่า Apps Script URL ก่อน]')+'</code></div>'+
     '</div></div>'+
     // Daily Report
     '<div class="card"><div class="card-title">📊 รายงานประจำวันทาง LINE</div>'+
@@ -3615,6 +3616,24 @@ function saveConnectionSettings(){
     toast('☁️ Sync ตั้งค่าขึ้น Cloud แล้ว');
   }
   showSettingsTab(document.querySelector('.tab.act'),'connect');
+}
+function copyWebhookUrl(){
+  var s=getShopSettings();
+  if(!s.apiUrl){toast('⚠️ ตั้งค่า Apps Script URL ก่อน','err');return}
+  var url=s.apiUrl+'?action=lineWebhook';
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){toast('📋 คัดลอก Webhook URL แล้ว ✅')}).catch(function(){prompt('คัดลอก Webhook URL นี้:',url)});
+  }else{prompt('คัดลอก Webhook URL นี้:',url)}
+}
+async function testLineSendMessage(){
+  var s=getShopSettings();
+  if(!s.lineChannelToken){toast('⚠️ ใส่ Channel Access Token ก่อน','err');return}
+  var uid=prompt('✉️ ทดสอบส่งข้อความ\n\nใส่ LINE User ID ปลายทาง (ขึ้นต้นด้วย U ตามด้วยตัวอักษร 32 ตัว)\nวิธีหา: ให้เจ้าของร้านแอด OA ใหม่แล้วทักแชท จากนั้นดู User ID ในหน้า "📱 จับคู่ LINE Users"',(s.dailyReportTo||''));
+  if(!uid) return;
+  uid=uid.trim();
+  if(uid.length<30||uid[0]!=='U'){toast('⚠️ User ID ไม่ถูกต้อง (ต้องขึ้นต้นด้วย U)','err');return}
+  toast('✉️ กำลังส่งข้อความทดสอบ...','info');
+  await sendLineMessage(uid,[{type:'text',text:'✅ ทดสอบระบบ LINE จาก '+(s.shopName||'ร้าน')+'\nถ้าคุณเห็นข้อความนี้ แปลว่า Token ใหม่ใช้งานได้แล้วค่ะ 🫧'}],'ทดสอบระบบ');
 }
 async function testApiConnection(){
   var url=$('cn-api-url')?$('cn-api-url').value.trim():'';
