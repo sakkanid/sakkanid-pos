@@ -2734,6 +2734,8 @@ function openQuoteBuilder(qid){
     '<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อลูกค้า</label><input id="q-name" value="'+attrEsc(q?q.custName:'')+'" placeholder="ชื่อลูกค้า / บริษัท"></div>'+
     '<div class="form-group"><label class="form-label">เบอร์โทร</label><input id="q-phone" value="'+attrEsc(q?q.custPhone:'')+'"></div></div>'+
     '<div class="form-group"><label class="form-label">ที่อยู่ (ถ้ามี)</label><input id="q-addr" value="'+attrEsc(q?q.custAddr:'')+'"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">เลขประจำตัวผู้เสียภาษี (ถ้ามี)</label><input id="q-taxid" value="'+attrEsc(q?q.taxId:'')+'" placeholder="เลข 13 หลัก"></div>'+
+    '<div class="form-group"><label class="form-label">สาขา</label><input id="q-branch" list="q-branch-list" value="'+attrEsc(q?(q.branch||''):'')+'" placeholder="สำนักงานใหญ่ / สาขา..."><datalist id="q-branch-list"><option value="สำนักงานใหญ่"></option><option value="สาขา 1"></option></datalist></div></div>'+
     '<div class="card-title" style="font-size:13px;margin-top:10px">📋 เพิ่มรายการจากตารางราคา</div>'+
     '<div class="grid" style="grid-template-columns:1fr 1fr 72px auto;gap:6px;align-items:end">'+
     '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">หมวด</label><select id="q-cat" onchange="quoteCatChange()"><option value="">— เลือกหมวด —</option>'+cats.map(function(cc){return '<option>'+cc+'</option>'}).join('')+'</select></div>'+
@@ -2752,7 +2754,9 @@ function openQuoteBuilder(qid){
     '<div id="q-items"></div>'+
     '<div class="grid g2" style="margin-top:8px"><div class="form-group"><label class="form-label">ส่วนลด (฿)</label><input id="q-disc" type="number" value="'+(q&&q.disc?q.disc:0)+'" oninput="renderQuoteItems()"></div>'+
     '<div class="form-group"><label class="form-label">ใบเสนอราคามีอายุ (วัน)</label><input id="q-valid" type="number" value="'+(q&&q.validDays?q.validDays:30)+'"></div></div>'+
-    '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="q-note" value="'+attrEsc(q?q.note:'')+'" placeholder="เช่น ราคานี้ยังไม่รวมค่าจัดส่ง / ราคาอาจเปลี่ยนตามจำนวนจริง"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">เครดิต (วัน) <span style="font-size:10px;color:var(--t3)">0/ว่าง = ไม่แสดง</span></label><input id="q-credit" type="number" value="'+(q&&q.creditDays?q.creditDays:0)+'" placeholder="เช่น 15, 30"></div>'+
+    '<div class="form-group"><label class="form-label">ยอดรวมทั้งสิ้น</label><select id="q-showtotal"><option value="1"'+(!q||q.showTotal!==false?' selected':'')+'>✅ แสดงยอดรวม</option><option value="0"'+(q&&q.showTotal===false?' selected':'')+'>🚫 ซ่อนยอดรวม (ให้ดูราคาต่อหน่วยก่อน)</option></select></div></div>'+
+    '<div class="form-group"><label class="form-label">หมายเหตุ <span style="font-size:10px;color:var(--t3)">(กด Enter ขึ้นบรรทัดใหม่ได้)</span></label><textarea id="q-note" rows="3" style="width:100%;font-size:13px" placeholder="เช่น ราคานี้ยังไม่รวมค่าจัดส่ง">'+String(q&&q.note?q.note:'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea></div>'+
     '</div><div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="document.getElementById(\'moQuote\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveQuote(false)">💾 บันทึก</button><button class="btn btn-gn" onclick="saveQuote(true)">💾 บันทึก + พิมพ์</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
   renderQuoteItems();
@@ -2820,9 +2824,13 @@ function saveQuote(thenPrint){
     custName:$('q-name')?$('q-name').value.trim():'',
     custPhone:$('q-phone')?$('q-phone').value.trim():'',
     custAddr:$('q-addr')?$('q-addr').value.trim():'',
+    taxId:$('q-taxid')?$('q-taxid').value.trim():'',
+    branch:$('q-branch')?$('q-branch').value.trim():'',
     items:window._qItems.slice(),
     disc:parseFloat($('q-disc')?$('q-disc').value:0)||0,
     validDays:parseInt($('q-valid')?$('q-valid').value:30)||30,
+    creditDays:parseInt($('q-credit')?$('q-credit').value:0)||0,
+    showTotal:$('q-showtotal')?$('q-showtotal').value==='1':true,
     note:$('q-note')?$('q-note').value.trim():'',
     by:curUser?(curUser.nick||curUser.name||''):''
   };
@@ -2846,33 +2854,60 @@ function printQuote(qid){
   var s=getShopSettings();var bc=s.billConfig||{};var color=(s.pdfConfig&&s.pdfConfig.colorQuotation)||'#C4820A';
   var sub=(q.items||[]).reduce(function(a,it){return a+(Number(it.price)||0)*(Number(it.qty)||0)},0);
   var tot=Math.max(0,sub-(Number(q.disc)||0));
-  var h='<div style="width:210mm;max-width:100%;font-family:var(--ff);font-size:13px;padding:24px;color:#000;background:#fff;font-weight:600">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">';
-  h+='<div>'+(s.logo?'<img src="'+s.logo+'" style="height:50px;margin-bottom:4px"><br>':'')+'<div style="font-size:18px;font-weight:700">'+(s.shopName||'')+'</div>';
-  h+='<div style="font-size:11px;color:#666">'+(s.address||'')+'<br>'+(s.phone||'')+' · '+(s.lineOA||'')+'</div>';
-  if(bc.taxId)h+='<div style="font-size:11px;color:#666">เลขประจำตัวผู้เสียภาษี: '+bc.taxId+'</div>';
+  var showTot=q.showTotal!==false;
+  var ph=fmtPhone(s.phone)||'';var line=s.lineOA||'';
+  var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;')};
+  var h='<div style="width:210mm;max-width:100%;font-family:var(--ff);font-size:13px;color:#1a1a1a;background:#fff;font-weight:500;-webkit-print-color-adjust:exact;print-color-adjust:exact">';
+  h+='<div style="height:8px;background:'+color+'"></div>';
+  h+='<div style="padding:22px 26px">';
+  // Header
+  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px">';
+  h+='<div style="max-width:58%">'+(s.logo?'<img src="'+s.logo+'" style="height:52px;margin-bottom:6px"><br>':'')+'<div style="font-size:19px;font-weight:800;color:'+color+'">'+(s.shopName||'')+'</div>';
+  if(s.address)h+='<div style="font-size:11px;color:#555;margin-top:2px">'+esc(s.address)+'</div>';
+  h+='<div style="font-size:12px;color:#333;margin-top:5px;font-weight:600">'+(ph?'📞 '+ph:'')+(ph&&line?'&nbsp;&nbsp;·&nbsp;&nbsp;':'')+(line?'LINE: '+line:'')+'</div>';
+  if(bc.taxId)h+='<div style="font-size:11px;color:#777;margin-top:2px">เลขผู้เสียภาษี: '+bc.taxId+'</div>';
   h+='</div>';
-  h+='<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:'+color+'">ใบเสนอราคา</div><div style="font-size:12px;color:#666">Quotation</div>';
-  h+='<div style="font-size:13px;margin-top:6px"><strong>เลขที่:</strong> '+q.id+'</div>';
-  h+='<div style="font-size:12px"><strong>วันที่:</strong> '+(q.date||fmtISO(q.createdAt))+'</div></div></div>';
-  h+='<div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px"><div style="font-weight:700;margin-bottom:4px">ข้อมูลลูกค้า</div>';
-  if(q.custName)h+='<div><strong>ชื่อ:</strong> '+q.custName+'</div>';
+  h+='<div style="text-align:right"><div style="display:inline-block;background:'+color+';color:#fff;padding:8px 20px;border-radius:8px"><div style="font-size:19px;font-weight:800;letter-spacing:1px">ใบเสนอราคา</div><div style="font-size:10px;opacity:.9;letter-spacing:2px">QUOTATION</div></div>';
+  h+='<div style="font-size:13px;margin-top:10px"><strong>เลขที่:</strong> '+q.id+'</div>';
+  h+='<div style="font-size:12px;color:#555"><strong>วันที่:</strong> '+(q.date||fmtISO(q.createdAt))+'</div></div></div>';
+  // Customer
+  h+='<div style="background:#faf8f3;border:1px solid '+color+'40;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px">';
+  h+='<div style="font-weight:700;color:'+color+';margin-bottom:5px">ข้อมูลลูกค้า</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 18px">';
+  if(q.custName)h+='<div><strong>ชื่อ:</strong> '+esc(q.custName)+'</div>';
+  if(q.taxId)h+='<div><strong>เลขผู้เสียภาษี:</strong> '+esc(q.taxId)+'</div>';
+  if(q.branch)h+='<div><strong>สาขา:</strong> '+esc(q.branch)+'</div>';
   if(q.custPhone)h+='<div><strong>โทร:</strong> '+fmtPhone(q.custPhone)+'</div>';
-  if(q.custAddr)h+='<div><strong>ที่อยู่:</strong> '+q.custAddr+'</div>';
-  if(!q.custName&&!q.custPhone&&!q.custAddr)h+='<div style="color:#999">—</div>';
-  h+='</div>';
-  h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px"><tr style="background:#f0f0f0"><th style="text-align:center;padding:6px;border:1px solid #ddd">ลำดับ</th><th style="text-align:left;padding:6px;border:1px solid #ddd">รายการ</th><th style="text-align:center;padding:6px;border:1px solid #ddd">จำนวน</th><th style="text-align:right;padding:6px;border:1px solid #ddd">ราคา/หน่วย</th><th style="text-align:right;padding:6px;border:1px solid #ddd">จำนวนเงิน</th></tr>';
-  (q.items||[]).forEach(function(it,i){h+='<tr><td style="padding:6px;border:1px solid #ddd;text-align:center">'+(i+1)+'</td><td style="padding:6px;border:1px solid #ddd">'+it.desc+'</td><td style="padding:6px;border:1px solid #ddd;text-align:center">'+it.qty+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb(it.price)+'</td><td style="padding:6px;border:1px solid #ddd;text-align:right">'+thb((Number(it.price)||0)*(Number(it.qty)||0))+'</td></tr>'});
-  h+='</table>';
-  h+='<div style="display:flex;justify-content:flex-end"><div style="width:250px">';
-  if(q.disc)h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>ส่วนลด</span><span style="color:red">-'+thb(q.disc)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:6px 0;border-top:2px solid #333;margin-top:4px"><span>ยอดรวมทั้งสิ้น</span><span>'+thb(tot)+'</span></div>';
+  if(q.custAddr)h+='<div style="grid-column:1/3"><strong>ที่อยู่:</strong> '+esc(q.custAddr)+'</div>';
+  if(!q.custName&&!q.custPhone&&!q.custAddr&&!q.taxId)h+='<div style="color:#999">—</div>';
   h+='</div></div>';
-  h+='<div style="margin-top:12px;padding:8px;background:#FEF3C7;border-radius:6px;text-align:center;font-size:12px;color:#92400E;font-weight:700">💰 ใบเสนอราคานี้มีอายุ '+(q.validDays||30)+' วัน · ราคาอาจเปลี่ยนแปลงตามจำนวน/สภาพจริงของผ้า</div>';
-  if(q.note)h+='<div style="margin-top:8px;font-size:11px;color:#666"><strong>หมายเหตุ:</strong> '+q.note+'</div>';
-  h+='<div style="margin-top:20px;display:flex;justify-content:space-between;font-size:11px;color:#999"><div>'+(s.shopName||'')+' · '+(s.phone||'')+'</div><div>ใบเสนอราคา เลขที่ '+q.id+'</div></div>';
-  if(bc.footerImage)h+='<div style="text-align:center;margin-top:8px"><img src="'+bc.footerImage+'" style="max-height:40px"></div>';
+  // Table
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">';
+  h+='<thead><tr style="background:'+color+';color:#fff"><th style="padding:9px 6px;text-align:center;width:38px">#</th><th style="padding:9px 8px;text-align:left">รายการ</th><th style="padding:9px 6px;text-align:center;width:56px">จำนวน</th><th style="padding:9px 8px;text-align:right;width:92px">ราคา/หน่วย</th><th style="padding:9px 8px;text-align:right;width:100px">จำนวนเงิน</th></tr></thead><tbody>';
+  (q.items||[]).forEach(function(it,i){var bg=i%2?'#fafafa':'#ffffff';h+='<tr style="background:'+bg+'"><td style="padding:8px 6px;text-align:center;border-bottom:1px solid #eee">'+(i+1)+'</td><td style="padding:8px;border-bottom:1px solid #eee">'+esc(it.desc)+'</td><td style="padding:8px 6px;text-align:center;border-bottom:1px solid #eee">'+it.qty+'</td><td style="padding:8px;text-align:right;border-bottom:1px solid #eee">'+thb(it.price)+'</td><td style="padding:8px;text-align:right;border-bottom:1px solid #eee">'+thb((Number(it.price)||0)*(Number(it.qty)||0))+'</td></tr>'});
+  h+='</tbody></table>';
+  // Summary (ซ่อนได้)
+  if(showTot){
+    h+='<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><div style="width:280px">';
+    if(q.disc)h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 10px"><span>รวมย่อย</span><span>'+thb(sub)+'</span></div>';
+    if(q.disc)h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 10px"><span>ส่วนลด</span><span style="color:#C92A2A">-'+thb(q.disc)+'</span></div>';
+    h+='<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:9px 12px;background:'+color+';color:#fff;border-radius:8px;margin-top:4px"><span>ยอดรวมทั้งสิ้น</span><span>'+thb(tot)+'</span></div>';
+    h+='</div></div>';
+  }
+  // Terms
+  var terms=['ใบเสนอราคานี้มีอายุ '+(q.validDays||30)+' วัน'];
+  if(q.creditDays>0)terms.push('เครดิต '+q.creditDays+' วัน');
+  h+='<div style="margin-top:6px;padding:8px 12px;background:#FEF3C7;border-radius:8px;font-size:12px;color:#8a5a00;font-weight:600">📌 '+terms.join('&nbsp;&nbsp;·&nbsp;&nbsp;')+'</div>';
+  if(q.note)h+='<div style="margin-top:8px;font-size:12px;color:#444"><strong>หมายเหตุ:</strong><div style="white-space:pre-line;margin-top:2px">'+esc(q.note)+'</div></div>';
+  // Signatures
+  h+='<div style="display:flex;justify-content:space-between;gap:48px;margin-top:44px;font-size:12px">';
+  h+='<div style="flex:1;text-align:center"><div style="border-bottom:1px dotted #888;height:32px"></div><div style="margin-top:6px;font-weight:600">ผู้เสนอราคา</div><div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
+  h+='<div style="flex:1;text-align:center"><div style="border-bottom:1px dotted #888;height:32px"></div><div style="margin-top:6px;font-weight:600">ผู้อนุมัติ / ผู้รับบริการ</div><div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
   h+='</div>';
+  // Footer
+  h+='<div style="margin-top:22px;padding-top:10px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#999"><div>'+(s.shopName||'')+(ph?' · '+ph:'')+'</div><div>ใบเสนอราคา '+q.id+'</div></div>';
+  if(bc.footerImage)h+='<div style="text-align:center;margin-top:8px"><img src="'+bc.footerImage+'" style="max-height:40px"></div>';
+  h+='</div></div>';
   $('moBillIn').innerHTML='<div class="modal-head"><h3>📄 ใบเสนอราคา — '+q.id+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+q.id+'\')">📸 บันทึกรูป</button><button class="btn btn-pr" onclick="doPrint(\''+q.id+'\',\'a4\')">🖨️ พิมพ์ A4</button><button class="btn btn-out" onclick="doPrint(\''+q.id+'\',\'a5\')">🖨️ A5</button></div>';
@@ -3535,7 +3570,7 @@ function showSettingsTab(el,tab){
 function renderSettingsShop(s){
   return '<div class="grid g2"><div class="card"><div class="card-title">🏪 ข้อมูลร้านค้า</div>'+
     '<div class="form-group"><label class="form-label">ชื่อร้าน</label><input id="st-name" value="'+s.shopName+'"></div>'+
-    '<div class="form-group"><label class="form-label">เบอร์โทร</label><input id="st-phone" value="'+s.phone+'"></div>'+
+    '<div class="form-group"><label class="form-label">เบอร์โทร</label><input id="st-phone" value="'+(fmtPhone(s.phone)||s.phone||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">LINE OA</label><input id="st-line" value="'+(s.lineOA||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ที่อยู่</label><input id="st-addr" value="'+(s.address||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ข้อความท้ายบิล</label><input id="st-footer" value="'+(s.billFooter||'')+'"></div>'+
@@ -3963,7 +3998,7 @@ function addPayMethod(){
 function saveSettings(){
   const s=getShopSettings();
   s.shopName=$('st-name')?$('st-name').value:s.shopName;
-  s.phone=$('st-phone')?$('st-phone').value:s.phone;
+  s.phone=$('st-phone')?(fmtPhone($('st-phone').value)||$('st-phone').value):s.phone; // เก็บแบบมีขีด กัน Sheets ตัดเลข 0 หน้า
   s.lineOA=$('st-line')?$('st-line').value:s.lineOA;
   s.address=$('st-addr')?$('st-addr').value:s.address;
   s.billFooter=$('st-footer')?$('st-footer').value:s.billFooter;
