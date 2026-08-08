@@ -2906,7 +2906,7 @@ function printQuote(qid){
   h+='<div style="font-size:12px;color:#333;margin-top:5px;font-weight:600">'+(ph?'📞 '+ph:'')+(ph&&line?'&nbsp;&nbsp;·&nbsp;&nbsp;':'')+(line?'LINE: '+line:'')+'</div>';
   if(bc.taxId)h+='<div style="font-size:11px;color:#777;margin-top:2px">เลขผู้เสียภาษี: '+bc.taxId+'</div>';
   h+='</div>';
-  h+='<div style="text-align:right"><div style="display:inline-block;background:'+color+';color:#fff;padding:8px 20px;border-radius:8px"><div style="font-size:19px;font-weight:800;letter-spacing:1px">ใบเสนอราคา</div><div style="font-size:10px;opacity:.9;letter-spacing:2px">QUOTATION</div></div>';
+  h+='<div style="text-align:right"><div style="display:inline-block;background:'+color+';color:#fff;padding:12px 22px 10px;border-radius:8px;line-height:1.5"><div style="font-size:19px;font-weight:800;letter-spacing:1px;line-height:1.6">ใบเสนอราคา</div><div style="font-size:10px;opacity:.9;letter-spacing:2px;line-height:1.4">QUOTATION</div></div>';
   h+='<div style="font-size:13px;margin-top:10px"><strong>เลขที่:</strong> '+q.id+'</div>';
   h+='<div style="font-size:12px;color:#555"><strong>วันที่:</strong> '+(q.date||fmtISO(q.createdAt))+'</div></div></div>';
   // Customer
