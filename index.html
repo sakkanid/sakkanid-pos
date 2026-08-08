@@ -2769,6 +2769,7 @@ function openQuoteBuilder(qid){
     '<div class="form-group"><label class="form-label">ใบเสนอราคามีอายุ (วัน)</label><input id="q-valid" type="number" value="'+(q&&q.validDays?q.validDays:30)+'"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">เครดิต (วัน) <span style="font-size:10px;color:var(--t3)">0/ว่าง = ไม่แสดง</span></label><input id="q-credit" type="number" value="'+(q&&q.creditDays?q.creditDays:0)+'" placeholder="เช่น 15, 30"></div>'+
     '<div class="form-group"><label class="form-label">ยอดรวมทั้งสิ้น</label><select id="q-showtotal"><option value="1"'+(!q||q.showTotal!==false?' selected':'')+'>✅ แสดงยอดรวม</option><option value="0"'+(q&&q.showTotal===false?' selected':'')+'>🚫 ซ่อนยอดรวม (ให้ดูราคาต่อหน่วยก่อน)</option></select></div></div>'+
+    '<div class="form-group"><label class="form-label">💳 วิธีการชำระเงิน</label><select id="q-showpay"><option value="1"'+(!q||q.showPay!==false?' selected':'')+'>✅ แสดง — โอนเงินเข้าบัญชีธนาคาร (พร้อมเลขบัญชี)</option><option value="0"'+(q&&q.showPay===false?' selected':'')+'>🚫 ไม่แสดง</option></select><div style="font-size:10px;color:var(--t3)">ดึงบัญชีจาก ตั้งค่า → ตั้งค่าบิล → 🏦 บัญชีรับโอนเงิน</div></div>'+
     '<div class="form-group"><label class="form-label">หมายเหตุ <span style="font-size:10px;color:var(--t3)">(กด Enter ขึ้นบรรทัดใหม่ได้)</span></label><textarea id="q-note" rows="3" style="width:100%;font-size:13px" placeholder="เช่น ราคานี้ยังไม่รวมค่าจัดส่ง">'+String(q&&q.note?q.note:'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea></div>'+
     '</div><div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="document.getElementById(\'moQuote\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveQuote(false)">💾 บันทึก</button><button class="btn btn-gn" onclick="saveQuote(true)">💾 บันทึก + พิมพ์</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
@@ -2844,6 +2845,7 @@ function saveQuote(thenPrint){
     validDays:parseInt($('q-valid')?$('q-valid').value:30)||30,
     creditDays:parseInt($('q-credit')?$('q-credit').value:0)||0,
     showTotal:$('q-showtotal')?$('q-showtotal').value==='1':true,
+    showPay:$('q-showpay')?$('q-showpay').value==='1':true,
     note:$('q-note')?$('q-note').value.trim():'',
     by:curUser?(curUser.nick||curUser.name||''):''
   };
@@ -2911,7 +2913,7 @@ function printQuote(qid){
   var terms=['ใบเสนอราคานี้มีอายุ '+(q.validDays||30)+' วัน'];
   if(q.creditDays>0)terms.push('เครดิต '+q.creditDays+' วัน');
   h+='<div style="margin-top:6px;padding:8px 12px;background:#FEF3C7;border-radius:8px;font-size:12px;color:#8a5a00;font-weight:600">📌 '+terms.join('&nbsp;&nbsp;·&nbsp;&nbsp;')+'</div>';
-  if(bc.bankName||bc.bankAccNo){h+='<div style="margin-top:8px;padding:9px 12px;background:#EEF6FB;border:1px solid #B6DDF0;border-radius:8px;font-size:12px"><span style="font-weight:700;color:#006F98">🏦 ชำระโดยโอนเข้าบัญชี:</span> '+[bc.bankName?esc(bc.bankName):'',bc.bankAccName?esc(bc.bankAccName):'',bc.bankAccNo?esc(bc.bankAccNo):''].filter(Boolean).join(' · ')+'</div>'}
+  if(q.showPay!==false&&(bc.bankName||bc.bankAccNo)){h+='<div style="margin-top:8px;padding:9px 12px;background:#EEF6FB;border:1px solid #B6DDF0;border-radius:8px;font-size:12px"><span style="font-weight:700;color:#006F98">💳 วิธีชำระเงิน: โอนเงินเข้าบัญชีธนาคาร</span><div style="margin-top:2px">'+[bc.bankName?'ธนาคาร'+esc(bc.bankName):'',bc.bankAccName?'ชื่อบัญชี '+esc(bc.bankAccName):'',bc.bankAccNo?'เลขที่บัญชี '+esc(bc.bankAccNo):''].filter(Boolean).join(' · ')+'</div></div>'}
   if(q.note)h+='<div style="margin-top:8px;font-size:12px;color:#444"><strong>หมายเหตุ:</strong><div style="white-space:pre-line;margin-top:2px">'+esc(q.note)+'</div></div>';
   // Signatures
   var signImg=bc.signImage?'<img src="'+bc.signImage+'" style="max-height:44px;max-width:150px;object-fit:contain">':'';
@@ -3617,7 +3619,7 @@ function renderSettingsShop(s){
     '<div class="form-group"><label class="form-label">เลขที่บัญชี</label><input id="bc-accno" value="'+attrEsc((s.billConfig||{}).bankAccNo||'')+'" placeholder="xxx-x-xxxxx-x"></div></div>'+
     '<div style="font-size:12px;font-weight:700;color:var(--pr);margin:6px 0 2px">✍️ ลายเซ็น / ตราประทับร้าน (ผู้เสนอราคา — แสดงในใบเสนอราคา)</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">อัปโหลดลายเซ็น/ตราประทับ <span style="font-size:10px;color:var(--t3)">(PNG พื้นใส ≤500KB)</span></label><input type="file" accept="image/*" onchange="bcUploadSignImage(event)" style="font-size:12px">'+((s.billConfig||{}).signImage?'<div style="margin-top:6px"><img src="'+(s.billConfig).signImage+'" style="height:48px;border:1px solid var(--bd);border-radius:4px;background:#fff"> <button class="btn btn-rd btn-sm" onclick="bcRemoveSign()">ลบ</button></div>':'')+'</div>'+
-    '<div class="form-group"><label class="form-label">ชื่อผู้เสนอราคา / ตำแหน่ง <span style="font-size:10px;color:var(--t3)">(ใต้ลายเซ็น)</span></label><input id="bc-signname" value="'+attrEsc((s.billConfig||{}).signName||'')+'" placeholder="เช่น คุณรพัสรา (เจ้าของร้าน)"></div></div>'+
+    '<div class="form-group"><label class="form-label">ชื่อผู้เสนอราคา / ตำแหน่ง <span style="font-size:10px;color:var(--t3)">(ใต้ลายเซ็น)</span></label><input id="bc-signname" value="'+attrEsc((s.billConfig||{}).signName||'')+'" placeholder="กรอก ชื่อ-นามสกุล แสดงในใบเสนอราคาทุกครั้ง"></div></div>'+
     '<div class="grid g3" style="margin:8px 0;font-size:12px">'+
     '<label><input type="checkbox" id="bc-logo" '+(((s.billConfig||{}).showLogo!==false)?'checked':'')+' style="width:auto"> แสดงโลโก้</label>'+
     '<label><input type="checkbox" id="bc-pts" '+(((s.billConfig||{}).showPoints!==false)?'checked':'')+' style="width:auto"> แสดงแต้ม</label>'+
