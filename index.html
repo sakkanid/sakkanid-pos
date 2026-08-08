@@ -77,8 +77,8 @@ body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;l
 .content{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 24px}
 /* ── Kanban board: เลื่อนแนวนอนดูครบทุกคอลัมน์ + แถบเลื่อนเห็นชัด ── */
 .kanban-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:10px;-webkit-overflow-scrolling:touch}
-.kanban-scroll::-webkit-scrollbar{height:12px}
-.kanban-scroll::-webkit-scrollbar-thumb{background:var(--pr);border-radius:6px}
+.kanban-scroll::-webkit-scrollbar{height:14px}
+.kanban-scroll::-webkit-scrollbar-thumb{background:var(--pr);border-radius:7px;border:2px solid var(--prl,#e5eef3)}
 .kanban-scroll::-webkit-scrollbar-thumb:hover{background:#005579}
 .kanban-scroll::-webkit-scrollbar-track{background:var(--prl,#e5eef3);border-radius:6px}
 .kanban-row{display:flex;gap:10px;width:max-content;align-items:flex-start}
@@ -2145,9 +2145,9 @@ function renderOrderList(all){
 function renderOrderBoard(all){
   if(!all.length) return '<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
   var statuses=[...new Set(all.map(function(o){return o.status}))].sort(function(a,b){return statusRank(a)-statusRank(b)});
-  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:11px;color:var(--t3)">↔️ เลื่อนดูทุกสถานะ ('+statuses.length+' คอลัมน์)</span>'+
-    '<button class="btn btn-out btn-sm" style="padding:2px 10px" onclick="kanbanScroll(-1)">◀</button>'+
-    '<button class="btn btn-out btn-sm" style="padding:2px 10px" onclick="kanbanScroll(1)">▶</button></div>';
+  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:12px;color:var(--pr);font-weight:600">↔️ '+statuses.length+' สถานะ — เลื่อนดู:</span>'+
+    '<button class="btn btn-pr" style="padding:6px 18px;font-size:16px;font-weight:800;box-shadow:0 2px 6px rgba(0,80,130,.25)" onclick="kanbanScroll(-1)">◀</button>'+
+    '<button class="btn btn-pr" style="padding:6px 18px;font-size:16px;font-weight:800;box-shadow:0 2px 6px rgba(0,80,130,.25)" onclick="kanbanScroll(1)">▶</button></div>';
   h+='<div class="kanban-scroll" id="kanbanScroll"><div class="kanban-row">';
   statuses.forEach(function(st){
     var col=statusColor(st);
