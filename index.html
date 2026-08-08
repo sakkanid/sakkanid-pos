@@ -1766,8 +1766,11 @@ function doPrint(oid,paperSize){
   else{pa.className='';styleEl.innerHTML='@media print{@page{size:80mm 300mm;margin:1mm 2mm}}'}
   document.head.appendChild(styleEl);
   pa.style.display='block';
+  // ── ตั้งชื่อไฟล์ PDF ตอน "Save as PDF" = ชื่อเดียวกับตอนบันทึกรูป ──
+  var _oldTitle=document.title;
+  if(window._billFileName){document.title=safeFileName(window._billFileName)}
   window.print();
-  setTimeout(function(){pa.style.display='none';pa.className='';if(styleEl)styleEl.remove()},500);
+  setTimeout(function(){pa.style.display='none';pa.className='';if(styleEl)styleEl.remove();document.title=_oldTitle},800);
 }
 // ── ทำชื่อไฟล์ให้ปลอดภัย (ตัดอักขระที่ใช้ตั้งชื่อไฟล์ไม่ได้) ──
 function safeFileName(s){return String(s||'').replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ').trim().replace(/ /g,'_')}
@@ -1779,7 +1782,7 @@ function saveBillImage(oid){
   if(typeof html2canvas==='undefined'){toast('กำลังโหลด... ลองกดอีกครั้ง','warn');return}
   toast('📸 กำลังบันทึกรูปบิล...','info');
   var fname=window._billFileName?safeFileName(window._billFileName):('SAKKANID_bill_'+oid+'_'+todayStr().replace(/-/g,''));
-  html2canvas(billEl,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:billEl.scrollWidth,height:billEl.scrollHeight}).then(function(canvas){
+  html2canvas(billEl,{scale:2,backgroundColor:'#ffffff',useCORS:true,scrollX:0,scrollY:0,width:billEl.offsetWidth,height:billEl.offsetHeight,windowWidth:billEl.offsetWidth,windowHeight:billEl.offsetHeight}).then(function(canvas){
     var link=document.createElement('a');
     link.download=fname+'.png';
     link.href=canvas.toDataURL('image/png');
