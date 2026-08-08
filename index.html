@@ -1761,6 +1761,8 @@ function doPrint(oid,paperSize){
   window.print();
   setTimeout(function(){pa.style.display='none';pa.className='';if(styleEl)styleEl.remove()},500);
 }
+// ── ทำชื่อไฟล์ให้ปลอดภัย (ตัดอักขระที่ใช้ตั้งชื่อไฟล์ไม่ได้) ──
+function safeFileName(s){return String(s||'').replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ').trim().replace(/ /g,'_')}
 function saveBillImage(oid){
   // จับภาพเฉพาะบิล ไม่รวม padding ของ modal
   var billEl=$('moBillIn').querySelector('.modal-body > div');
@@ -1768,9 +1770,10 @@ function saveBillImage(oid){
   if(!billEl){toast('ไม่พบบิล','err');return}
   if(typeof html2canvas==='undefined'){toast('กำลังโหลด... ลองกดอีกครั้ง','warn');return}
   toast('📸 กำลังบันทึกรูปบิล...','info');
+  var fname=window._billFileName?safeFileName(window._billFileName):('SAKKANID_bill_'+oid+'_'+todayStr().replace(/-/g,''));
   html2canvas(billEl,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:billEl.scrollWidth,height:billEl.scrollHeight}).then(function(canvas){
     var link=document.createElement('a');
-    link.download='SAKKANID_bill_'+oid+'_'+todayStr().replace(/-/g,'')+'.png';
+    link.download=fname+'.png';
     link.href=canvas.toDataURL('image/png');
     link.click();
     toast('📸 บันทึกรูปบิลสำเร็จ ✅');
@@ -1936,6 +1939,7 @@ function generateDocument(oid){
   o._whtRate=whtRate;o._whtAmt=whtAmt;o._grandTotal=grandTotal;o._netPayable=netPayable;
   o._docCname=cname;o._docPhone=phone;o._docRemark=remark;
   // Display in bill modal
+  window._billFileName='Sakkanid_'+docNum+(cname?'_'+cname:'');
   $('moBillIn').innerHTML=
     '<div class="modal-head"><h3>📄 '+dt.name+' — '+docNum+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
@@ -2695,7 +2699,7 @@ function saveCRMSettings(){
   var s=getShopSettings();
   s.crm={ptsRate:parseInt($('crm-rate').value)||100,redeemRate:parseInt($('crm-redeem').value)||1,vipThreshold:parseInt($('crm-vip').value)||10000,welcomePts:parseInt($('crm-welcome').value)||50,silverMin:parseInt($('crm-silver').value)||3000,goldMin:parseInt($('crm-gold').value)||6000};
   s.ptsRate=s.crm.ptsRate;s.welcomePts=s.crm.welcomePts;
-  saveDB();logAction('CHANGE_SETTINGS','อัปเดต CRM');toast('บันทึกตั้งค่า CRM สำเร็จ ✅');
+  saveDB();pushSettingsNow();logAction('CHANGE_SETTINGS','อัปเดต CRM');toast('บันทึกตั้งค่า CRM สำเร็จ ✅ (☁️ sync แล้ว)');
 }
 function autoUpdateLevels(){
   var s=getShopSettings();var crm=s.crm||{silverMin:3000,goldMin:6000,vipThreshold:10000};
@@ -2910,14 +2914,16 @@ function printQuote(qid){
   if(bc.bankName||bc.bankAccNo){h+='<div style="margin-top:8px;padding:9px 12px;background:#EEF6FB;border:1px solid #B6DDF0;border-radius:8px;font-size:12px"><span style="font-weight:700;color:#006F98">🏦 ชำระโดยโอนเข้าบัญชี:</span> '+[bc.bankName?esc(bc.bankName):'',bc.bankAccName?esc(bc.bankAccName):'',bc.bankAccNo?esc(bc.bankAccNo):''].filter(Boolean).join(' · ')+'</div>'}
   if(q.note)h+='<div style="margin-top:8px;font-size:12px;color:#444"><strong>หมายเหตุ:</strong><div style="white-space:pre-line;margin-top:2px">'+esc(q.note)+'</div></div>';
   // Signatures
+  var signImg=bc.signImage?'<img src="'+bc.signImage+'" style="max-height:44px;max-width:150px;object-fit:contain">':'';
   h+='<div style="display:flex;justify-content:space-between;gap:48px;margin-top:44px;font-size:12px">';
-  h+='<div style="flex:1;text-align:center"><div style="border-bottom:1px dotted #888;height:32px"></div><div style="margin-top:6px;font-weight:600">ผู้เสนอราคา</div><div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
-  h+='<div style="flex:1;text-align:center"><div style="border-bottom:1px dotted #888;height:32px"></div><div style="margin-top:6px;font-weight:600">ผู้อนุมัติ / ผู้รับบริการ</div><div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
+  h+='<div style="flex:1;text-align:center"><div style="height:46px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px dotted #888">'+signImg+'</div><div style="margin-top:6px;font-weight:600">ผู้เสนอราคา</div>'+(bc.signName?'<div style="font-size:11px;color:#555">('+esc(bc.signName)+')</div>':'')+'<div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
+  h+='<div style="flex:1;text-align:center"><div style="height:46px;border-bottom:1px dotted #888"></div><div style="margin-top:6px;font-weight:600">ผู้อนุมัติ / ผู้รับบริการ</div><div style="color:#999;font-size:11px;margin-top:2px">วันที่ ......./......./.......</div></div>';
   h+='</div>';
   // Footer
   h+='<div style="margin-top:22px;padding-top:10px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#999"><div>'+(s.shopName||'')+(ph?' · '+ph:'')+'</div><div>ใบเสนอราคา '+q.id+'</div></div>';
   if(bc.footerImage)h+='<div style="text-align:center;margin-top:8px"><img src="'+bc.footerImage+'" style="max-height:40px"></div>';
   h+='</div></div>';
+  window._billFileName='Sakkanid_'+q.id+(q.custName?'_'+q.custName:'');
   $('moBillIn').innerHTML='<div class="modal-head"><h3>📄 ใบเสนอราคา — '+q.id+'</h3><button class="modal-close" onclick="closeMo(\'moBill\')">&times;</button></div>'+
     '<div class="modal-body" style="display:flex;justify-content:center;overflow-y:auto">'+h+'</div>'+
     '<div class="modal-foot" style="flex-wrap:wrap;gap:4px"><button class="btn btn-out" onclick="closeMo(\'moBill\')">ปิด</button><button class="btn btn-out" onclick="saveBillImage(\''+q.id+'\')">📸 บันทึกรูป</button><button class="btn btn-pr" onclick="doPrint(\''+q.id+'\',\'a4\')">🖨️ พิมพ์ A4</button><button class="btn btn-out" onclick="doPrint(\''+q.id+'\',\'a5\')">🖨️ A5</button></div>';
@@ -3609,6 +3615,9 @@ function renderSettingsShop(s){
     '<div class="grid g3"><div class="form-group"><label class="form-label">ธนาคาร</label><input id="bc-bank" value="'+attrEsc((s.billConfig||{}).bankName||'')+'" placeholder="เช่น กสิกรไทย"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อบัญชี</label><input id="bc-accname" value="'+attrEsc((s.billConfig||{}).bankAccName||'')+'" placeholder="ชื่อเจ้าของบัญชี"></div>'+
     '<div class="form-group"><label class="form-label">เลขที่บัญชี</label><input id="bc-accno" value="'+attrEsc((s.billConfig||{}).bankAccNo||'')+'" placeholder="xxx-x-xxxxx-x"></div></div>'+
+    '<div style="font-size:12px;font-weight:700;color:var(--pr);margin:6px 0 2px">✍️ ลายเซ็น / ตราประทับร้าน (ผู้เสนอราคา — แสดงในใบเสนอราคา)</div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">อัปโหลดลายเซ็น/ตราประทับ <span style="font-size:10px;color:var(--t3)">(PNG พื้นใส ≤500KB)</span></label><input type="file" accept="image/*" onchange="bcUploadSignImage(event)" style="font-size:12px">'+((s.billConfig||{}).signImage?'<div style="margin-top:6px"><img src="'+(s.billConfig).signImage+'" style="height:48px;border:1px solid var(--bd);border-radius:4px;background:#fff"> <button class="btn btn-rd btn-sm" onclick="bcRemoveSign()">ลบ</button></div>':'')+'</div>'+
+    '<div class="form-group"><label class="form-label">ชื่อผู้เสนอราคา / ตำแหน่ง <span style="font-size:10px;color:var(--t3)">(ใต้ลายเซ็น)</span></label><input id="bc-signname" value="'+attrEsc((s.billConfig||{}).signName||'')+'" placeholder="เช่น คุณรพัสรา (เจ้าของร้าน)"></div></div>'+
     '<div class="grid g3" style="margin:8px 0;font-size:12px">'+
     '<label><input type="checkbox" id="bc-logo" '+(((s.billConfig||{}).showLogo!==false)?'checked':'')+' style="width:auto"> แสดงโลโก้</label>'+
     '<label><input type="checkbox" id="bc-pts" '+(((s.billConfig||{}).showPoints!==false)?'checked':'')+' style="width:auto"> แสดงแต้ม</label>'+
@@ -3841,6 +3850,8 @@ function showDeviceSetupQR(){
 }
 // ── ดันตั้งค่า (settings) ขึ้น Cloud ทันที กัน autoPull เขียนทับค่าที่เพิ่งแก้ ──
 function pushSettingsNow(){
+  // POS เป็นตัวหลัก: ล็อกไม่ให้ Cloud เขียนทับ settings นาน 60 วิ หลังเพิ่งแก้ในเครื่อง
+  window._settingsDirtyUntil=new Date().getTime()+60000;
   var s=getShopSettings();if(!s.apiUrl)return;
   try{
     var rows=Object.keys(s).map(function(k){var v=s[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}});
@@ -4177,6 +4188,7 @@ function saveBillConfig(){
   s.billConfig.bankName=$('bc-bank')?$('bc-bank').value.trim():'';
   s.billConfig.bankAccName=$('bc-accname')?$('bc-accname').value.trim():'';
   s.billConfig.bankAccNo=$('bc-accno')?$('bc-accno').value.trim():'';
+  s.billConfig.signName=$('bc-signname')?$('bc-signname').value.trim():'';
   s.billConfig.fontSize=parseInt($('bc-fontsize')?$('bc-fontsize').value:12)||12;
   s.billConfig.fontWeight=$('bc-fontweight')?$('bc-fontweight').value:'600';
   s.billConfig.dpi=$('bc-dpi')?$('bc-dpi').value:'203';
@@ -4192,6 +4204,19 @@ function bcUploadFooterImg(e){
     var s=getShopSettings();if(!s.billConfig)s.billConfig={};
     s.billConfig.footerImage=ev.target.result;saveDB();toast('อัพโหลดรูปท้ายบิลสำเร็จ ✅');
   };r.readAsDataURL(file);
+}
+function bcUploadSignImage(e){
+  var file=e.target.files[0];if(!file){return}
+  if(file.size>512000){toast('ไฟล์ใหญ่เกิน 500KB','err');return}
+  var r=new FileReader();r.onload=function(ev){
+    var s=getShopSettings();if(!s.billConfig)s.billConfig={};
+    s.billConfig.signImage=ev.target.result;saveDB();pushSettingsNow();
+    toast('อัพโหลดลายเซ็น/ตราประทับสำเร็จ ✅');if(curPage==='settings')renderPage('settings');
+  };r.readAsDataURL(file);
+}
+function bcRemoveSign(){
+  var s=getShopSettings();if(s.billConfig){delete s.billConfig.signImage}
+  saveDB();pushSettingsNow();toast('ลบลายเซ็น/ตราประทับแล้ว');if(curPage==='settings')renderPage('settings');
 }
 function bcUploadPayQR(e){
   var file=e.target.files[0];if(!file){return}
@@ -4924,13 +4949,7 @@ function saveLineTemplates(){
     billCollect:$('lt-billCollect')?$('lt-billCollect').value:'',billCollectEn:$('lt-billCollect-en')?$('lt-billCollect-en').value:'',
     ready:$('lt-ready')?$('lt-ready').value:'',readyEn:$('lt-ready-en')?$('lt-ready-en').value:''
   };
-  saveDB();
-  // push settings ขึ้น Cloud ทันที เพื่อให้ Apps Script (webhook) อ่านข้อความตอบกลับใหม่ได้
-  var sset=getShopSettings();
-  if(sset.apiUrl){
-    var rows=Object.keys(sset).map(function(k){var v=sset[k];return{key:k,value:typeof v==='object'?JSON.stringify(v):String(v)}});
-    fetch(sset.apiUrl+'?action=replaceAll&sheet=settings',{method:'POST',mode:'no-cors',body:JSON.stringify({rows:rows})});
-  }
+  saveDB();pushSettingsNow(); // push settings ขึ้น Cloud ทันที + ล็อกกัน Cloud ทับ
   toast('บันทึก LINE Templates สำเร็จ ✅ (☁️ sync แล้ว)');
 }
 
@@ -6226,8 +6245,8 @@ async function syncPullAll(){
       PKGS.length=0;
       d.packages.forEach(function(p){PKGS.push({type:p.type,typeEn:p.typeEn||'',qty:Number(p.qty)||0,price:Number(p.price)||0,cost:Number(p.cost)||0,expDays:Number(p.expDays)||90})});
     }
-    // Restore settings
-    if(d.settings&&d.settings.length){
+    // Restore settings (ข้ามถ้าเพิ่งแก้ในเครื่อง <60วิ — POS เป็นตัวหลัก)
+    if(d.settings&&d.settings.length&&new Date().getTime()>(window._settingsDirtyUntil||0)){
       d.settings.forEach(function(s){
         if(s.key&&s.value!==undefined){
           try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}
@@ -6812,8 +6831,8 @@ async function syncPullSilent(){
           console.log('✅ syncPull: PKGS updated — '+PKGS.length+' items')}
       }
     }
-    // ═══ Settings — merge ไม่ลบ ═══
-    if(d.settings&&d.settings.length>0){
+    // ═══ Settings — merge ไม่ลบ (แต่ถ้าเพิ่งแก้ในเครื่อง <60วิ ให้ POS ชนะ ไม่ให้ Cloud ทับ) ═══
+    if(d.settings&&d.settings.length>0&&new Date().getTime()>(window._settingsDirtyUntil||0)){
       d.settings.forEach(function(s){
         if(s.key&&s.value!==undefined){try{DB.shopSettings[s.key]=JSON.parse(s.value)}catch(e){DB.shopSettings[s.key]=s.value}}
       });
