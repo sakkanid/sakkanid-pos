@@ -4567,10 +4567,24 @@ function saveEditMember(mid){
   m.room=$('em-room')?$('em-room').value.trim():'';
   m.pts=parseInt($('em-pts').value)||0;m.level=$('em-level').value;
   m.lang=$('em-lang')?$('em-lang').value:(m.lang||'th');
-  saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);
-  // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ ──
-  if(wasLead&&!isLead(m)){toast('🎉 อัปเกรด '+m.name+' เป็นสมาชิกเต็มตัวแล้ว!');logAction('PROMOTE_MEMBER',mid+' Lead→สมาชิกเต็มตัว');}
-  else toast('แก้ไขสำเร็จ ✅');
+  // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ → บวกแต้มต้อนรับ + ส่ง LINE ──
+  if(wasLead&&!isLead(m)){
+    var s=getShopSettings();
+    var wpts=parseInt(s.welcomePts||(s.crm&&s.crm.welcomePts)||50)||0;
+    m.pts=(parseInt(m.pts)||0)+wpts; // บวกแต้มต้อนรับตามที่ตั้งค่าใน CRM
+    saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);
+    logAction('PROMOTE_MEMBER',mid+' Lead→สมาชิกเต็มตัว (+'+wpts+' แต้ม)');
+    if(validUid(m.lineUserId)){
+      var txt=fillLineTpl(m,'welcome',{name:(m.lineName||m.name),shop:(s.shopName||''),id:m.id,level:m.level,pts:wpts});
+      sendLineMessage(m.lineUserId,[{type:'text',text:txt}],'ต้อนรับสมาชิกใหม่');
+      toast('🎉 อัปเกรดเป็นสมาชิกเต็มตัว! +'+wpts+' แต้ม · ส่งข้อความต้อนรับทาง LINE แล้ว');
+    }else{
+      toast('🎉 อัปเกรดเป็นสมาชิกเต็มตัว! +'+wpts+' แต้ม (ยังไม่มี LINE UID เลยไม่ได้ส่งข้อความ)','warn');
+    }
+  }else{
+    saveDB();logAction('EDIT_MEMBER',mid+' '+m.name);
+    toast('แก้ไขสำเร็จ ✅');
+  }
   const mo=$('moEditMem');if(mo) mo.remove();renderPage(curPage);
 }
 function deleteMember(mid){
