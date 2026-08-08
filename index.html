@@ -82,7 +82,7 @@ body{font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;l
 .kanban-scroll::-webkit-scrollbar-thumb:hover{background:#005579}
 .kanban-scroll::-webkit-scrollbar-track{background:var(--prl,#e5eef3);border-radius:6px}
 .kanban-row{display:flex;gap:10px;width:max-content;align-items:flex-start}
-.kanban-col{flex:0 0 250px;width:250px;background:var(--bg);border-radius:12px;padding:8px;max-height:calc(100vh - 230px);overflow-y:auto}
+.kanban-col{flex:0 0 250px;width:250px;background:var(--bg);border-radius:12px;padding:8px;align-self:stretch}
 /* ═══ COMPONENTS ═══ */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:none;font-family:var(--ff);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
 .btn:hover{opacity:.9;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
@@ -2129,6 +2129,7 @@ function renderOrdersPage(c){
     '<div id="ordersDefaultView">'+(window._orderView==='board'?renderOrderBoard(all):renderOrderList(all))+'</div>';
 }
 function setOrderView(v){window._orderView=v;renderPage('orders')}
+function kanbanScroll(dir){var el=document.getElementById('kanbanScroll');if(el)el.scrollBy({left:dir*320,behavior:'smooth'})}
 function renderOrderList(all){
   const allStatuses=[...new Set(all.map(o=>o.status))].sort(function(a,b){return statusRank(a)-statusRank(b)});
   var h='<div class="filter-bar">'+
@@ -2144,13 +2145,15 @@ function renderOrderList(all){
 function renderOrderBoard(all){
   if(!all.length) return '<div class="empty-state"><div class="es-icon">📋</div><div class="es-text">ไม่มีออเดอร์ที่กำลังดำเนินการ</div></div>';
   var statuses=[...new Set(all.map(function(o){return o.status}))].sort(function(a,b){return statusRank(a)-statusRank(b)});
-  var h='<div style="font-size:11px;color:var(--t3);margin-bottom:6px">↔️ เลื่อนซ้าย-ขวาเพื่อดูทุกสถานะ ('+statuses.length+' คอลัมน์)</div>';
-  h+='<div class="kanban-scroll"><div class="kanban-row">';
+  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:11px;color:var(--t3)">↔️ เลื่อนดูทุกสถานะ ('+statuses.length+' คอลัมน์)</span>'+
+    '<button class="btn btn-out btn-sm" style="padding:2px 10px" onclick="kanbanScroll(-1)">◀</button>'+
+    '<button class="btn btn-out btn-sm" style="padding:2px 10px" onclick="kanbanScroll(1)">▶</button></div>';
+  h+='<div class="kanban-scroll" id="kanbanScroll"><div class="kanban-row">';
   statuses.forEach(function(st){
     var col=statusColor(st);
     var items=all.filter(function(o){return o.status===st}).slice().reverse();
     h+='<div class="kanban-col">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;background:'+col+';color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;margin-bottom:8px;position:sticky;top:0"><span>'+st+'</span><span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 8px;font-size:12px">'+items.length+'</span></div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;background:'+col+';color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;margin-bottom:8px"><span>'+st+'</span><span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 8px;font-size:12px">'+items.length+'</span></div>'+
       items.map(function(o){return boardCardHTML(o)}).join('')+
       '</div>';
   });
