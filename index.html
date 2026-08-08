@@ -3834,7 +3834,7 @@ function renderSettingsConnect(s){
     '<div class="form-group"><label class="form-label">Channel Access Token</label><input id="cn-line-token" type="password" value="'+(s.lineChannelToken||'')+'" placeholder="ใส่ Channel Access Token จาก LINE Developers"></div>'+
     '<div class="form-group"><label class="form-label">Channel Secret</label><input id="cn-line-secret" type="password" value="'+(s.lineChannelSecret||'')+'" placeholder="ใส่ Channel Secret"></div>'+
     '<div class="form-group"><label class="form-label">LINE OA ID</label><input id="cn-line-oa" type="text" value="'+(s.lineOA||'')+'" placeholder="@sakkanid"></div>'+
-    '<div class="form-group"><label class="form-label">LINE OA Numeric ID <span style="font-size:10px;color:var(--t3)">(สำหรับปุ่มแชทตรง — ดูจาก URL ตอนเปิด chat.line.biz)</span></label><input id="cn-line-oanum" type="text" value="'+(s.lineOaNumId||'')+'" placeholder="เช่น 123456789"></div>'+
+    '<div class="form-group"><label class="form-label">LINE OA ID <span style="font-size:10px;color:var(--t3)">(สำหรับปุ่ม "แชท LINE" เปิดแชทลูกค้าตรง)</span></label><input id="cn-line-oanum" type="text" value="'+(s.lineOaNumId||'')+'" placeholder="เช่น 123456789 หรือ Uxxxxxx"><div style="font-size:10px;color:var(--t3);margin-top:3px">วิธีหา: เปิด <a href="https://chat.line.biz" target="_blank" style="color:var(--pr)">chat.line.biz</a> → เลือก OA ร้าน → ดู URL <code>chat.line.biz/<b>ตรงนี้</b>/chat/...</code> เอาส่วนตรงกลางมาใส่</div></div>'+
     '<div class="form-group"><label class="form-label">LIFF ID <span style="font-size:10px;color:var(--t3)">(สำหรับ LINE Login สมัครสมาชิก)</span></label><input id="cn-liff-id" type="text" value="'+(s.liffId||'')+'" placeholder="1234567890-abcdefgh"></div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">ตั้งค่าที่ <a href="https://developers.line.biz" target="_blank" style="color:var(--pr)">LINE Developers Console</a></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-pr btn-sm" onclick="saveConnectionSettings()">💾 บันทึก</button>'+
@@ -6375,21 +6375,21 @@ function chatWithCustomer(mid){
   var m=gM(mid);if(!m) return;
   var s=getShopSettings();
   var uid=String(m.lineUserId||'').trim();
-  var oaNumId=(s.lineOaNumId||'').replace(/[^0-9]/g,'');
-  // ถ้ามี OA numeric ID + userId → เปิดแชทลูกค้าตรงเลย
-  if(oaNumId&&uid.length>=30){
-    window.open('https://chat.line.biz/'+oaNumId+'/chat/'+uid,'_blank');
+  var oaId=String(s.lineOaNumId||'').trim(); // รับได้ทั้งเลขและตัวอักษร (ก๊อปจาก URL chat.line.biz)
+  // ถ้ามี OA ID + userId → เปิดแชทลูกค้าคนนี้ตรงเลย
+  if(oaId&&uid.length>=30){
+    window.open('https://chat.line.biz/'+oaId+'/chat/'+uid,'_blank');
     toast('💬 เปิดแชท '+(m.lineName||m.name),'info');
     return;
   }
-  // ไม่มี OA numeric ID → copy ชื่อ + เปิดหน้าแชทรวม
+  // ยังไม่มี OA ID → คัดลอกชื่อ + เปิดหน้าแชทรวม + แนะนำให้ตั้งค่า
   var searchName=m.lineName||m.name||'';
   if(navigator.clipboard&&searchName){
-    navigator.clipboard.writeText(searchName).then(function(){
-      toast('📋 คัดลอก "'+searchName+'" — วางค้นหาในแชท (ตั้งค่า OA ID ในตั้งค่าเพื่อเปิดแชทตรง)','info');
-    }).catch(function(){});
+    navigator.clipboard.writeText(searchName).then(function(){}).catch(function(){});
   }
-  window.open('https://chat.line.biz/','_blank');
+  if(!oaId){toast('⚠️ ยังไม่ได้ตั้ง "LINE OA ID" — ไปตั้งที่ ตั้งค่า → การเชื่อมต่อ แล้วจะเปิดแชทลูกค้าตรงได้','warn')}
+  else if(uid.length<30){toast('⚠️ สมาชิกนี้ยังไม่มี LINE UID เลยเปิดแชทตรงไม่ได้','warn')}
+  window.open('https://chat.line.biz/'+(oaId||''),'_blank');
 }
 async function sendQuotaInfoLine(mid){
   var m=gM(mid);if(!m){toast('ไม่พบสมาชิก','err');return}
