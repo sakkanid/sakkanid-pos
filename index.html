@@ -297,6 +297,7 @@ input[type="date"],input[type="time"],input[type="number"]{min-height:44px;font-
 <div class="modal-overlay" id="moUseQuota"><div class="modal modal-lg" id="moUseQuotaIn"></div></div>
 <div class="modal-overlay" id="moBedset"><div class="modal" id="moBedsetIn"></div></div>
 <div class="modal-overlay" id="moCleaning"><div class="modal" id="moCleaningIn"></div></div>
+<div class="modal-overlay" id="moWeight"><div class="modal" id="moWeightIn"></div></div>
 <div class="modal-overlay" id="moEditOrder"><div class="modal modal-lg" id="moEditOrderIn"></div></div>
 
 <script>
@@ -329,6 +330,16 @@ const CLN_SVCS=[
   {type:'1br',label:'1 ห้องนอน 1 ห้องน้ำ',minPrice:1800,cost:720},
   {type:'2br',label:'2 ห้องนอน 2 ห้องน้ำ',minPrice:2000,cost:800},
   {type:'3br',label:'3 ห้องนอน 3 ห้องน้ำ',minPrice:2500,cost:1000}
+];
+
+// ═══ บริการซักชั่งกิโล (Kg) — ลูกค้าบริษัท/โรงแรม ═══
+// tiers = ราคาขั้นบันไดตามน้ำหนัก (ยิ่งเยอะยิ่งถูก) คิดทั้งก้อนตามช่วงที่น้ำหนักตกอยู่
+// max = ขอบบนของช่วง (กก.); max:0 = ช่วงสุดท้าย (ไม่จำกัด) ; rate = บาท/กก.
+// minKg = น้ำหนักขั้นต่ำที่คิดเงิน (0 = ไม่มีขั้นต่ำ)
+const WEIGHT_SVCS_DEFAULT=[
+  {label:'ซักรีด',cost:15,minKg:0,tiers:[{max:10,rate:40},{max:30,rate:35},{max:0,rate:30}]},
+  {label:'ซักอบพับ',cost:12,minKg:0,tiers:[{max:10,rate:30},{max:30,rate:25},{max:0,rate:20}]},
+  {label:'ซักแห้ง',cost:25,minKg:0,tiers:[{max:0,rate:60}]}
 ];
 
 const PKGS=[
@@ -475,6 +486,7 @@ const PAGES=[
   {id:'package',icon:'📦',label:'บริการ Package',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
   {id:'bedset',icon:'🛏️',label:'Set เครื่องนอน',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
   {id:'cleaning',icon:'🧹',label:'ทำความสะอาด',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
+  {id:'weight',icon:'⚖️',label:'รับผ้าชั่ง Kg',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
   {id:'quote',icon:'💰',label:'ใบเสนอราคา',section:'สร้างออเดอร์',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
   {id:'orders',icon:'📋',label:'สถานะออเดอร์',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','พนักงาน','แคชเชียร์']},
   {id:'history',icon:'🕐',label:'ประวัติการขาย',section:'จัดการ',roles:['เจ้าของร้าน','ผู้จัดการ','แคชเชียร์']},
@@ -508,14 +520,15 @@ function canEditPrice(){
 let curUser=null,curPage='dashboard',pinStr='',selUserIdx=null;
 let orderItems=[],orderExtras=[],orderMemberId=null,currentOrderCtx='ldr';
 let editOid=null,editExtras=[];
-let pkgMemberId=null,uqMemberId=null,bedMemberId=null,clnMemberId=null;
+let pkgMemberId=null,uqMemberId=null,bedMemberId=null,clnMemberId=null,weightMemberId=null;
+let weightLines=[];
 let payOrderId=null,payMethod='QR พร้อมเพย์';
 let DB=null;
 
 // ═══ CORE UTILITIES ═══
 const $=id=>document.getElementById(id);
 function genId(prefix){
-  const key=prefix==='LDR'||prefix==='BED'||prefix==='CLN'||prefix==='PKB'?'orderSeq':prefix==='SKN'?'memberSeq':'quotaSeq';
+  const key=prefix==='LDR'||prefix==='BED'||prefix==='CLN'||prefix==='PKB'||prefix==='KG'?'orderSeq':prefix==='SKN'?'memberSeq':'quotaSeq';
   // กัน ID ซ้ำ: หาเลขสูงสุดที่มีอยู่จริง (เผื่อ counter ตามข้อมูลจาก Cloud/webhook ไม่ทัน)
   var maxExisting=0,id,n;
   if(key==='orderSeq'){
@@ -675,6 +688,31 @@ function getActivePromos(){
   return (DB.promos||[]).filter(p=>p.active && (!p.startDate||p.startDate<=today) && (!p.exp||p.exp>=today));
 }
 function pts4(net){const s=getShopSettings();const rate=s.ptsRate||100;return Math.floor(net/rate)}
+// ═══ บริการชั่งกิโล — config + คำนวณราคา ═══
+function getWeightSvcs(){var s=getShopSettings();if(!s.weightSvcs||!s.weightSvcs.length){s.weightSvcs=JSON.parse(JSON.stringify(WEIGHT_SVCS_DEFAULT))}return s.weightSvcs}
+// หา rate ต่อกิโล ตามน้ำหนัก (คิดทั้งก้อนตามช่วงที่น้ำหนักตกอยู่ — ยิ่งเยอะยิ่งถูก)
+function wRate(svc,kg){
+  var tiers=((svc&&svc.tiers)||[]).slice().sort(function(a,b){var am=(a.max>0?a.max:1e9),bm=(b.max>0?b.max:1e9);return am-bm});
+  if(!tiers.length) return 0;
+  for(var i=0;i<tiers.length;i++){var mx=(tiers[i].max>0?tiers[i].max:1e9);if(kg<=mx)return parseFloat(tiers[i].rate)||0}
+  return parseFloat(tiers[tiers.length-1].rate)||0;
+}
+// คำนวณ 1 บรรทัด → {kg, billKg, rate, amount, cost, minApplied}
+function wLineCalc(svc,kg){
+  kg=parseFloat(kg)||0;if(kg<0)kg=0;
+  var minKg=parseFloat(svc&&svc.minKg)||0;
+  var billKg=kg,minApplied=false;
+  if(minKg>0&&kg>0&&kg<minKg){billKg=minKg;minApplied=true}
+  var rate=wRate(svc,billKg);
+  var amount=Math.round(billKg*rate*100)/100;
+  var cost=Math.round(billKg*(parseFloat(svc&&svc.cost)||0)*100)/100;
+  return {kg:kg,billKg:billKg,rate:rate,amount:amount,cost:cost,minApplied:minApplied};
+}
+// สรุปช่วงราคาเป็นข้อความ เช่น "≤10กก. 40฿ · ≤30กก. 35฿ · >30กก. 30฿"
+function wTierSummary(svc){
+  var tiers=((svc&&svc.tiers)||[]).slice().sort(function(a,b){var am=(a.max>0?a.max:1e9),bm=(b.max>0?b.max:1e9);return am-bm});
+  return tiers.map(function(t){return (t.max>0?'≤'+t.max+'กก.':'>'+(tiers.length>1?tiers[tiers.length-2].max:0)+'กก.')+' '+(parseFloat(t.rate)||0)+'฿'}).join(' · ');
+}
 function fmtPhone(p){
   if(!p) return '';
   var s=String(p).replace(/[^0-9]/g,'');
@@ -773,6 +811,7 @@ function orderCat(o){
   if(t==='bedset'||id.indexOf('BED')===0) return {icon:'🛏️',label:'เครื่องนอน',color:'#C77D0A'};   // อำพัน
   if(t==='quota') return {icon:'🎫',label:'ใช้โควต้า',color:'#0E9384'};                              // เขียวเทอร์คอยซ์
   if(t==='pkg_buy'||id.indexOf('PKB')===0) return {icon:'📦',label:'ซื้อ Package',color:'#D6336C'};  // ชมพูมาเจนต้า
+  if(t==='weight'||id.indexOf('KG')===0) return {icon:'⚖️',label:'ชั่งกิโล',color:'#0B7285'};        // เขียวน้ำเงินเข้ม
   return {icon:'👕',label:'ซักรีด',color:'#006F98'};                                                 // ฟ้าแบรนด์
 }
 function catBadge(o){var c=orderCat(o);return '<span class="badge" style="background:'+c.color+'22;color:'+c.color+';font-weight:700">'+c.icon+' '+c.label+'</span>'}
@@ -938,6 +977,7 @@ function renderPage(page){
     case 'package':renderPackagePage(c);break;
     case 'bedset':renderBedsetPage(c);break;
     case 'cleaning':renderCleaningPage(c);break;
+    case 'weight':renderWeightPage(c);break;
     case 'quote':renderQuotePage(c);break;
     case 'orders':renderOrdersPage(c);break;
     case 'history':renderHistoryPage(c);break;
@@ -1166,7 +1206,7 @@ function renderDashboardCharts(){
   // ═══ Service type pie chart ═══
   var typeCount={};
   DB.orders.forEach(function(o){var t=o.type||'laundry';typeCount[t]=(typeCount[t]||0)+1});
-  var typeLabels={'laundry':'ซักรีด','bedset':'เครื่องนอน','cleaning':'ทำความสะอาด','pkg_buy':'ซื้อ Package','quota':'ใช้โควต้า'};
+  var typeLabels={'laundry':'ซักรีด','bedset':'เครื่องนอน','cleaning':'ทำความสะอาด','weight':'ชั่งกิโล','pkg_buy':'ซื้อ Package','quota':'ใช้โควต้า'};
   var ctx2=document.getElementById('chartPie');
   if(ctx2){new Chart(ctx2,{type:'doughnut',data:{labels:Object.keys(typeCount).map(function(k){return typeLabels[k]||k}),datasets:[{data:Object.values(typeCount),backgroundColor:['#3B82C4','#F59E0B','#10B981','#8B5CF6','#EC4899']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}})}
 }
@@ -1248,6 +1288,7 @@ function selectMember(mid){
   else if(currentOrderCtx==='uq'){uqMemberId=mid;openUseQuotaForm(m)}
   else if(currentOrderCtx==='bed'){bedMemberId=mid;openBedsetForm(m)}
   else if(currentOrderCtx==='cln'){clnMemberId=mid;openCleaningForm(m)}
+  else if(currentOrderCtx==='wgt'){weightMemberId=mid;openWeightForm(m)}
 }
 
 // ═══ NEW MEMBER MODAL ═══
@@ -2530,6 +2571,126 @@ function saveCleaning(){
   closeMo('moCleaning');navTo('orders');
 }
 
+// ═══ WEIGHT (Kg) PAGE — รับผ้าชั่งกิโล ═══
+function renderWeightPage(c){
+  c.innerHTML='<div class="card"><div class="card-title">⚖️ รับผ้าชั่งกิโล (Kg) — สร้างออเดอร์</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:8px">สำหรับลูกค้าบริษัท / โรงแรม / ร้านค้า ที่คิดราคาตามน้ำหนัก</div>'+
+    '<button class="btn btn-pr btn-lg" onclick="startNewOrder(\'wgt\')">➕ รับผ้าชั่งกิโล</button></div>'+
+    '<div class="card"><div class="card-title">📋 ออเดอร์ชั่งกิโลล่าสุด</div>'+renderOrdersByType('weight')+'</div>';
+}
+function openWeightForm(m){
+  var svcs=getWeightSvcs();
+  if(!svcs.length){toast('ยังไม่ได้ตั้งค่าบริการชั่งกิโล — ไปที่ ตารางราคา › ชั่ง Kg','err');return}
+  weightLines=[{svc:0,kg:''}];
+  var tiers=getShopSettings().deliveryTiers||DEL_TIERS_DEFAULT;
+  var now=new Date();
+  $('moWeightIn').innerHTML=
+    '<div class="modal-head"><h3>⚖️ รับผ้าชั่งกิโล</h3><button class="modal-close" onclick="closeMo(\'moWeight\')">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div class="card" style="background:var(--prl);box-shadow:none"><strong>👤 '+m.name+'</strong></div>'+
+    '<label class="form-label">1️⃣ รายการชั่งกิโล (เพิ่มได้หลายบริการ)</label>'+
+    '<div id="wg-lines"></div>'+
+    '<button class="btn btn-out btn-sm" onclick="wAddLine()" style="margin:2px 0 12px">➕ เพิ่มรายการ</button>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วิธีรับผ้า</label><select id="wg-delivery" onchange="wgDeliveryChange();wCalcNet()"><option value="pickup">🏪 รับที่ร้าน</option><option value="delivery">🚗 Delivery</option></select></div>'+
+    '<div class="form-group" id="wg-del-tier" style="display:none"><label class="form-label">ค่าจัดส่ง</label><select id="wg-del-sel" onchange="wgDelCostChange();wCalcNet()">'+tiers.map(function(t){return '<option value="'+t.price+'">'+t.label+' — '+thb(t.price)+'</option>'}).join('')+'<option value="custom">✏️ กำหนดเอง</option></select><input id="wg-del-custom" type="number" placeholder="฿" style="display:none;margin-top:6px" oninput="wCalcNet()"></div></div>'+
+    '<div class="form-group" id="wg-del-addr" style="display:none"><label class="form-label">📍 ที่อยู่จัดส่ง</label><div style="display:flex;gap:6px"><input id="wg-addr" value="'+attrEsc((m.proj||m.village||'')+(m.room||m.houseNo?((m.addrType==='condo'?' ห้อง ':' ')+(m.room||m.houseNo||'')):''))+'" style="flex:1"><button class="btn btn-pr btn-sm" onclick="calcOrderDelivery(\'wg\')" style="white-space:nowrap">📍 คำนวณ</button></div><div id="wg-map-result" style="font-size:12px;margin-top:4px"></div><label class="form-label" style="margin-top:8px">🗺️ ลิงก์ Google Maps</label><input id="wg-maplink" placeholder="วางลิงก์ Google Maps"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันนัดรับ</label><input id="wg-pickup" type="date" value="'+defaultPickupDate()+'"></div>'+
+    '<div class="form-group"><label class="form-label">สถานที่/สาขา</label><input id="wg-room" value="'+attrEsc((m.addrType==='condo'?(m.proj||'')+' '+(m.room||''):(m.village||'')+' '+(m.houseNo||'')).trim())+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">หมายเหตุ</label><input id="wg-note"></div>'+
+    '<div class="form-group"><label class="form-label">🎁 โปรโมชั่น</label><select id="wg-promo" onchange="wCalcNet()"><option value="">— ไม่ใช้โปร —</option>'+getActivePromos().map(function(p,i){return '<option value="'+i+'">'+p.name+(p.type==='percent'?' (ลด '+p.value+'%)':' (ลด '+thb(p.value)+')')+'</option>'}).join('')+'</select></div>'+
+    '<div class="form-group"><label class="form-label">สถานะชำระเงิน</label><select id="wg-paid" onchange="wgPaidChange()"><option value="0">❌ ยังไม่ชำระ — รอชำระภายหลัง</option><option value="1">✅ ชำระเงินทันที</option></select></div>'+
+    '<div id="wg-pay-detail" style="display:none"><div class="form-group"><label class="form-label">วิธีชำระ</label><select id="wg-method">'+getPayMethods().map(function(pm){return '<option>'+pm.name+'</option>'}).join('')+'</select></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">วันที่ชำระ</label><input id="wg-paydate" type="date" value="'+todayStr()+'"></div>'+
+    '<div class="form-group"><label class="form-label">เวลา</label><input id="wg-paytime" type="time" value="'+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">ยอดเงินที่ชำระ (฿)</label><input id="wg-payamt" type="number" placeholder="กรอกยอดเงิน"></div></div>'+
+    '<div id="wg-net-total" style="background:var(--gnl);padding:12px;border-radius:8px;text-align:center;font-weight:700;font-size:18px;color:var(--gn);margin:8px 0">ยอดสุทธิ: ฿0</div>'+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moWeight\')">ยกเลิก</button><button class="btn btn-gn" onclick="saveWeightOrder()">💾 บันทึก</button></div>';
+  openMo('moWeight');
+  wRenderLines();wCalcNet();
+}
+function wRenderLines(){
+  var box=$('wg-lines');if(!box)return;
+  var svcs=getWeightSvcs();
+  box.innerHTML=weightLines.map(function(ln,i){
+    var svc=svcs[ln.svc]||svcs[0];
+    var calc=wLineCalc(svc,ln.kg);
+    return '<div class="card" style="box-shadow:none;border:1px solid var(--b1);padding:10px;margin-bottom:8px">'+
+      '<div style="display:flex;gap:6px;align-items:flex-end">'+
+      '<div class="form-group" style="flex:1;margin:0"><label class="form-label" style="font-size:11px">บริการ</label><select onchange="wLineChange('+i+',\'svc\',this.value)">'+
+      svcs.map(function(s,si){return '<option value="'+si+'"'+(si===ln.svc?' selected':'')+'>'+s.label+'</option>'}).join('')+'</select></div>'+
+      '<div class="form-group" style="width:120px;margin:0"><label class="form-label" style="font-size:11px">น้ำหนัก (กก.)</label><input type="number" min="0" step="0.1" value="'+(ln.kg===''?'':ln.kg)+'" placeholder="0" oninput="wLineChange('+i+',\'kg\',this.value)"></div>'+
+      (weightLines.length>1?'<button class="btn btn-out btn-sm" style="color:var(--rd);margin-bottom:2px;white-space:nowrap" onclick="wRemoveLine('+i+')">🗑️</button>':'')+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-top:6px">'+wTierSummary(svc)+(svc.minKg>0?' · ขั้นต่ำ '+svc.minKg+'กก.':'')+'</div>'+
+      '<div id="wg-amt-'+i+'" style="font-size:13px;font-weight:700;color:var(--pr);margin-top:4px;text-align:right">'+wLineAmtText(calc)+'</div>'+
+      '</div>';
+  }).join('');
+}
+function wLineAmtText(calc){
+  return calc.kg>0?(calc.billKg+' กก. × '+calc.rate+'฿ = '+thb(calc.amount)+(calc.minApplied?' (คิดขั้นต่ำ)':'')):'—';
+}
+function wLineChange(i,field,val){
+  if(!weightLines[i])return;
+  if(field==='svc'){weightLines[i].svc=parseInt(val)||0;wRenderLines();wCalcNet()}
+  else{weightLines[i].kg=val;wUpdateLineAmt(i);wCalcNet()}
+}
+function wUpdateLineAmt(i){
+  var svcs=getWeightSvcs();var ln=weightLines[i];if(!ln)return;
+  var svc=svcs[ln.svc]||svcs[0];var el=$('wg-amt-'+i);
+  if(el)el.innerHTML=wLineAmtText(wLineCalc(svc,ln.kg));
+}
+function wAddLine(){weightLines.push({svc:0,kg:''});wRenderLines();wCalcNet()}
+function wRemoveLine(i){weightLines.splice(i,1);if(!weightLines.length)weightLines.push({svc:0,kg:''});wRenderLines();wCalcNet()}
+function wComputeTotals(){
+  var svcs=getWeightSvcs();var sub=0,cost=0,totKg=0;
+  weightLines.forEach(function(ln){var svc=svcs[ln.svc]||svcs[0];var c=wLineCalc(svc,ln.kg);sub+=c.amount;cost+=c.cost;totKg+=c.kg});
+  return {sub:Math.round(sub*100)/100,cost:Math.round(cost*100)/100,totKg:Math.round(totKg*100)/100};
+}
+function wCalcNet(){
+  var t=wComputeTotals();
+  var isDel=$('wg-delivery')&&$('wg-delivery').value==='delivery';
+  var selEl=$('wg-del-sel');var delCost=0;
+  if(isDel&&selEl){delCost=selEl.value==='custom'?(parseFloat($('wg-del-custom')?$('wg-del-custom').value:0)||0):(parseFloat(selEl.value)||0)}
+  var disc=0;var pi=$('wg-promo')?$('wg-promo').value:'';
+  if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){disc=pr.type==='percent'?Math.round(t.sub*pr.value/100):pr.value}}
+  var net=Math.max(0,t.sub+delCost-disc);
+  var el=$('wg-net-total');
+  if(el)el.innerHTML='ยอดสุทธิ: '+thb(net)+' <span style="font-size:12px;font-weight:500;color:var(--t3)">('+t.totKg+' กก.'+(delCost?' + ส่ง '+thb(delCost):'')+(disc?' − ลด '+thb(disc):'')+')</span>';
+  return {sub:t.sub,cost:t.cost,delCost:delCost,disc:disc,net:net,totKg:t.totKg};
+}
+function wgDeliveryChange(){var isDel=$('wg-delivery')&&$('wg-delivery').value==='delivery';if($('wg-del-tier'))$('wg-del-tier').style.display=isDel?'block':'none';if($('wg-del-addr'))$('wg-del-addr').style.display=isDel?'block':'none'}
+function wgDelCostChange(){var sel=$('wg-del-sel');var c=$('wg-del-custom');if(sel&&c)c.style.display=sel.value==='custom'?'block':'none'}
+function wgPaidChange(){if($('wg-pay-detail'))$('wg-pay-detail').style.display=$('wg-paid').value==='1'?'block':'none'}
+function saveWeightOrder(){
+  const m=gM(weightMemberId);if(!m)return;
+  var svcs=getWeightSvcs();
+  var items=[],validKg=0;
+  weightLines.forEach(function(ln){
+    var svc=svcs[ln.svc]||svcs[0];var c=wLineCalc(svc,ln.kg);
+    if(c.kg<=0)return;
+    validKg+=c.kg;
+    items.push({c:'ซักชั่งกิโล',t:svc.label,o:c.billKg+' กก. × '+c.rate+' ฿/กก.'+(c.minApplied?' (ขั้นต่ำ '+svc.minKg+' กก.)':''),qty:1,p:c.amount,k:c.cost,kg:c.kg,billKg:c.billKg,rate:c.rate});
+  });
+  if(!items.length){toast('กรุณากรอกน้ำหนักอย่างน้อย 1 รายการ','err');return}
+  var totals=wCalcNet();
+  var disc=totals.disc,promoName='';
+  var pi=$('wg-promo')?$('wg-promo').value:'';
+  if(pi!==''){var ps=getActivePromos();var pr=ps[parseInt(pi)];if(pr){promoName=pr.name;if(pr.type==='points'&&pr.ptsNeeded)m.pts=Math.max(0,(m.pts||0)-pr.ptsNeeded)}}
+  var net=totals.net,cost=totals.cost,delCost=totals.delCost;
+  var isDel=$('wg-delivery')&&$('wg-delivery').value==='delivery';
+  var paidNow=$('wg-paid')&&$('wg-paid').value==='1';
+  var payAmt=paidNow?(parseFloat($('wg-payamt')?$('wg-payamt').value:0)||net):0;
+  var payDt=paidNow?fmtDate(new Date($('wg-paydate')?$('wg-paydate').value:new Date())):'';
+  var payTm=paidNow?($('wg-paytime')?$('wg-paytime').value:''):'';
+  const method=paidNow&&$('wg-method')?$('wg-method').value:'เงินสด';
+  const order={id:genId('KG'),type:'weight',mid:m.id,mname:m.name,mphone:m.phone,status:'รับผ้ารอส่งซัก',delivery:isDel?'delivery':'pickup',delCost:delCost,deliveryAddr:isDel?($('wg-addr')?$('wg-addr').value.trim():''):($('wg-room')?$('wg-room').value.trim():''),mapLink:isDel?($('wg-maplink')?$('wg-maplink').value.trim():''):'',items:items,extras:[],disc:disc,net:net,cost:cost,totalKg:validKg,payHist:paidNow?[{round:1,method:method,amt:payAmt,date:payDt+(payTm?' '+payTm:''),by:curUser.nick}]:[],isPaid:paidNow&&payAmt>=net,pts:pts4(net),promo:promoName,note:$('wg-note')?$('wg-note').value:'',pickupDate:$('wg-pickup')?$('wg-pickup').value:defaultPickupDate(),createdAt:fmtDT(),by:curUser.nick};
+  DB.orders.push(order);deductShopQuota(0,'weight',order.items);
+  if(order.isPaid){m.spend=(m.spend||0)+net;m.pts=(m.pts||0)+order.pts}
+  saveDB();logAction('CREATE_ORDER',order.id+' Weight '+validKg+'kg');toast('รับผ้าชั่งกิโลสำเร็จ ✅ '+validKg+' กก.');
+  closeMo('moWeight');navTo('orders');
+}
+
 // ═══ HISTORY PAGE ═══
 function renderHistoryPage(c){
   const done=DB.orders.filter(o=>['เสร็จสิ้น','ปิดงาน','ยกเลิก'].includes(o.status)).reverse();
@@ -3321,7 +3482,7 @@ function exportReportCSV(type){
 }
 
 function renderPricelistPage(c){
-  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'wg\')">⚖️ ชั่ง Kg</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
   '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
 }
 function showPriceTab(el,tab){
@@ -3331,6 +3492,7 @@ function showPriceTab(el,tab){
   if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
   else if(tab==='bed') rc.innerHTML=eiBar+renderBedPriceTable();
   else if(tab==='cln') rc.innerHTML=eiBar+renderClnPriceTable();
+  else if(tab==='wg') rc.innerHTML=renderWeightPriceTable();
   else if(tab==='pkg') rc.innerHTML=eiBar+renderPkgPriceTable();
 }
 function renderPriceTable(list){
@@ -3340,6 +3502,93 @@ function renderPriceTable(list){
 function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong>'+enSmall(b.labelEn)+'</td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong>'+enSmall(s.labelEn)+'</td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong>'+enSmall(p.typeEn)+'</td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+// ═══ ตารางราคา — บริการชั่งกิโล ═══
+function renderWeightPriceTable(){
+  var svcs=getWeightSvcs();
+  var addBtn=canEditPrice()?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:12px;color:var(--t3)">คิดราคาแบบ "ทั้งก้อนตามช่วงน้ำหนัก" — ยิ่งเยอะยิ่งถูก</div><button class="btn btn-pr btn-sm" onclick="openWeightSvcEdit(-1)">➕ เพิ่มบริการใหม่</button></div>':'';
+  var rows=svcs.map(function(s,i){
+    return '<tr><td><strong>'+s.label+'</strong></td>'+
+      '<td style="font-size:12px">'+wTierSummary(s)+'</td>'+
+      '<td>'+(s.minKg>0?s.minKg+' กก.':'—')+'</td>'+
+      (canSeeCost()?'<td>'+thb(s.cost||0)+'/กก.</td>':'')+
+      (canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openWeightSvcEdit('+i+')">✏️</button></td>':'')+'</tr>';
+  }).join('');
+  return addBtn+'<table><tr><th>บริการ</th><th>เรทตามน้ำหนัก (บาท/กก.)</th><th>ขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+rows+'</table>';
+}
+function openWeightSvcEdit(i){
+  if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
+  var svcs=getWeightSvcs();
+  var isNew=(i<0);
+  var s=isNew?{label:'',cost:0,minKg:0,tiers:[{max:0,rate:0}]}:svcs[i];
+  window._wgEditTiers=JSON.parse(JSON.stringify(s.tiers&&s.tiers.length?s.tiers:[{max:0,rate:0}]));
+  var body='<div class="grid g2"><div class="form-group"><label class="form-label">ชื่อบริการ *</label><input id="wsp-label" value="'+attrEsc(s.label)+'" placeholder="เช่น ซักรีด"></div>'+
+    '<div class="form-group"><label class="form-label">ต้นทุน (บาท/กก.)</label><input id="wsp-cost" type="number" value="'+(s.cost||0)+'"></div></div>'+
+    '<div class="form-group"><label class="form-label">น้ำหนักขั้นต่ำ (กก.) — 0 = ไม่มีขั้นต่ำ</label><input id="wsp-minkg" type="number" min="0" step="0.1" value="'+(s.minKg||0)+'"></div>'+
+    '<div class="form-group"><label class="form-label">💰 ราคาขั้นบันไดตามน้ำหนัก (บาท/กก.)</label>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:6px">เรียงจากน้ำหนักน้อย→มาก · ช่วงสุดท้ายให้เว้น "ถึง (กก.)" ว่างไว้ = ขึ้นไปไม่จำกัด</div>'+
+    '<div id="wsp-tiers"></div>'+
+    '<button class="btn btn-out btn-sm" onclick="wspAddTier()" style="margin-top:6px">➕ เพิ่มช่วงราคา</button></div>';
+  var h='<div class="modal-overlay show" id="moWSP"><div class="modal" style="max-width:520px"><div class="modal-head"><h3>⚖️ '+(isNew?'เพิ่มบริการชั่งกิโล':'แก้ไขบริการชั่งกิโล')+'</h3><button class="modal-close" onclick="document.getElementById(\'moWSP\').remove()">&times;</button></div><div class="modal-body" style="overflow-y:auto">'+body+'</div><div class="modal-foot">'+(isNew?'':'<button class="btn btn-rd" onclick="deleteWeightSvc('+i+')">🗑️ ลบ</button>')+'<button class="btn btn-out" onclick="document.getElementById(\'moWSP\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveWeightSvc('+i+')">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  wspRenderTiers();
+}
+function wspRenderTiers(){
+  var box=$('wsp-tiers');if(!box)return;
+  var tiers=window._wgEditTiers||[];
+  box.innerHTML=tiers.map(function(t,i){
+    var last=(i===tiers.length-1);
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'+
+      '<span style="font-size:12px;color:var(--t3);white-space:nowrap">ถึง</span>'+
+      '<input type="number" min="0" step="0.1" placeholder="'+(last?'ขึ้นไป':'กก.')+'" value="'+(t.max>0?t.max:'')+'" oninput="wspTierChg('+i+',\'max\',this.value)" style="width:90px">'+
+      '<span style="font-size:12px;color:var(--t3);white-space:nowrap">กก. =</span>'+
+      '<input type="number" min="0" step="0.5" placeholder="บาท/กก." value="'+(t.rate||0)+'" oninput="wspTierChg('+i+',\'rate\',this.value)" style="flex:1">'+
+      '<span style="font-size:12px;color:var(--t3);white-space:nowrap">฿/กก.</span>'+
+      (tiers.length>1?'<button class="btn btn-out btn-sm" style="color:var(--rd)" onclick="wspRemoveTier('+i+')">✕</button>':'')+
+      '</div>';
+  }).join('');
+}
+function wspTierChg(i,field,val){
+  var tiers=window._wgEditTiers||[];if(!tiers[i])return;
+  tiers[i][field]=field==='max'?(parseFloat(val)||0):(parseFloat(val)||0);
+}
+function wspAddTier(){
+  window._wgEditTiers=window._wgEditTiers||[];
+  // แทรกช่วงใหม่ก่อนช่วงสุดท้าย (ช่วงสุดท้าย=ไม่จำกัด)
+  var t=window._wgEditTiers;
+  t.splice(Math.max(0,t.length-1),0,{max:0,rate:0});
+  wspRenderTiers();
+}
+function wspRemoveTier(i){
+  var t=window._wgEditTiers||[];t.splice(i,1);if(!t.length)t.push({max:0,rate:0});wspRenderTiers();
+}
+function saveWeightSvc(i){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  var label=$('wsp-label')?$('wsp-label').value.trim():'';
+  if(!label){toast('กรุณากรอกชื่อบริการ','err');return}
+  var cost=parseFloat($('wsp-cost')?$('wsp-cost').value:0)||0;
+  var minKg=parseFloat($('wsp-minkg')?$('wsp-minkg').value:0)||0;
+  var tiers=(window._wgEditTiers||[]).map(function(t){return {max:parseFloat(t.max)||0,rate:parseFloat(t.rate)||0}});
+  if(!tiers.length)tiers=[{max:0,rate:0}];
+  // ช่วงสุดท้ายบังคับเป็นไม่จำกัด (max:0)
+  tiers[tiers.length-1].max=0;
+  var s=getShopSettings();
+  if(!s.weightSvcs||!s.weightSvcs.length)s.weightSvcs=JSON.parse(JSON.stringify(WEIGHT_SVCS_DEFAULT));
+  var svc={label:label,cost:cost,minKg:minKg,tiers:tiers};
+  if(i<0)s.weightSvcs.push(svc);else s.weightSvcs[i]=svc;
+  saveDB();pushSettingsNow();
+  toast('บันทึกบริการชั่งกิโลสำเร็จ ✅');logAction('EDIT_PRICE','weight '+(i<0?'add':'idx:'+i)+' '+label);
+  var mo=$('moWSP');if(mo)mo.remove();renderPage('pricelist');setTimeout(function(){var t=document.querySelectorAll('#mainContent .tab');for(var k=0;k<t.length;k++){if(t[k].textContent.indexOf('ชั่ง Kg')>=0){showPriceTab(t[k],'wg');break}}},30);
+}
+function deleteWeightSvc(i){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  var s=getShopSettings();var svcs=s.weightSvcs||[];
+  if(!svcs[i])return;
+  if(!confirm('ลบบริการ "'+svcs[i].label+'" ?'))return;
+  svcs.splice(i,1);
+  saveDB();pushSettingsNow();
+  toast('🗑️ ลบแล้ว');logAction('DEL_PRICE','weight '+i);
+  var mo=$('moWSP');if(mo)mo.remove();renderPage('pricelist');setTimeout(function(){var t=document.querySelectorAll('#mainContent .tab');for(var k=0;k<t.length;k++){if(t[k].textContent.indexOf('ชั่ง Kg')>=0){showPriceTab(t[k],'wg');break}}},30);
+}
 function openSvcPriceEdit(type,i){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
   var body='',title='';
@@ -5307,7 +5556,7 @@ async function sendDailyReport(){
   else msg+='✅ ไม่มียอดค้างชำระ\n';
   msg+='───────────\n';
   msg+='📦 แยกตามบริการ:\n';
-  var typeLabels={laundry:'👕 ซักรีด',bedset:'🛏️ เครื่องนอน',cleaning:'🧹 ทำความสะอาด',pkg_buy:'📦 ซื้อ Package',quota:'📦 ใช้โควต้า'};
+  var typeLabels={laundry:'👕 ซักรีด',bedset:'🛏️ เครื่องนอน',cleaning:'🧹 ทำความสะอาด',weight:'⚖️ ชั่งกิโล',pkg_buy:'📦 ซื้อ Package',quota:'📦 ใช้โควต้า'};
   Object.keys(byType).forEach(function(t){msg+='  '+(typeLabels[t]||t)+': '+byType[t]+' รายการ\n'});
   msg+='───────────\n';
   msg+='📊 แยกตามสถานะ:\n';
