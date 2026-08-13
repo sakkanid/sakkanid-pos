@@ -635,12 +635,17 @@ var TH_EN_DICT={
   'ผ้าปูที่นอน':'Bed Sheet','ผ้าปู':'Bed Sheet','ปลอกหมอน':'Pillow Case','ปลอกหมอนข้าง':'Bolster Case','ผ้านวม':'Comforter','ผ้าห่ม':'Blanket','ผ้าคลุมเตียง':'Bed Cover','หมอน':'Pillow','หมอนข้าง':'Bolster',
   'ผ้าม่าน':'Curtain','พรม':'Carpet','ผ้าเช็ดตัว':'Towel','ผ้าขนหนู':'Towel','ผ้าปูโต๊ะ':'Table Cloth','ตุ๊กตา':'Doll','กระเป๋า':'Bag','รองเท้า':'Shoes','หมวก':'Hat','เนคไท':'Necktie','ผ้าพันคอ':'Scarf',
   // ตัวเลือก
-  'ตัวสั้น':'Short','ตัวยาว':'Long','ขาสั้น':'Short','ขายาว':'Long','เด็ก':'Kids','ผู้ใหญ่':'Adult','ผู้ชาย':'Men','ผู้หญิง':'Women','เล็ก':'Small','กลาง':'Medium','ใหญ่':'Large','หนา':'Thick','บาง':'Thin',
+  'ตัวสั้น':'Short','ตัวยาว':'Long','ขาสั้น':'Short','ขายาว':'Long','แขนสั้น':'Short Sleeve','แขนยาว':'Long Sleeve',
+  'สั้น':'Short','ยาว':'Long','เด็ก':'Kids','ผู้ใหญ่':'Adult','ผู้ชาย':'Men','ผู้หญิง':'Women','ชาย':'Men','หญิง':'Women',
+  'เล็ก':'Small','กลาง':'Medium','ใหญ่':'Large','หนา':'Thick','บาง':'Thin','ธรรมดา':'Regular','เดี่ยว':'Single','คู่':'Double',
+  'ดำ':'Black','ขาว':'White','สีเข้ม':'Dark','สีอ่อน':'Light','มีสี':'Colored','ลาย':'Patterned','สีขาว':'White','สีดำ':'Black',
   // ขนาดเตียง
-  '3.5 ฟุต':'3.5Ft','5 ฟุต':'5Ft','6 ฟุต':'6Ft','ซิงเกิล':'Single','ควีน':'Queen','คิง':'King',
+  '3.5 ฟุต':'3.5Ft','5 ฟุต':'5Ft','6 ฟุต':'6Ft','ฟุต':'Ft','ซิงเกิล':'Single','ควีน':'Queen','คิง':'King','สี่เหลี่ยม':'Square',
   // ห้อง (ทำความสะอาด)
-  'ห้องนอน':'Bedroom','ห้องน้ำ':'Bathroom','ห้องนั่งเล่น':'Living Room','คอนโด':'Condo','บ้าน':'House','ออฟฟิศ':'Office','สำนักงาน':'Office','โซฟา':'Sofa'
+  'ห้องนอน':'Bedroom','ห้องน้ำ':'Bathroom','ห้องนั่งเล่น':'Living Room','ห้องครัว':'Kitchen','ห้อง':'Room','คอนโด':'Condo','บ้าน':'House','ออฟฟิศ':'Office','สำนักงาน':'Office','โซฟา':'Sofa','สตูดิโอ':'Studio'
 };
+// เช็คว่ายังมีตัวอักษรไทยหลงเหลือไหม (แปลไม่สำเร็จ)
+function hasThaiChar(s){return /[฀-๿]/.test(String(s||''))}
 // แปลไทย→อังกฤษแบบ best-effort (จับคู่คำยาวสุดก่อน)
 function autoTranslateTh(th){
   th=String(th||'').trim();if(!th)return '';
@@ -651,21 +656,29 @@ function autoTranslateTh(th){
   out=out.replace(/\s+/g,' ').trim();
   return out;
 }
-// เติมช่อง EN จากช่องไทยอัตโนมัติ (แล้วผู้ใช้แก้เองได้)
-function autoFillEn(srcId,dstId){
-  var src=$(srcId),dst=$(dstId);if(!src||!dst)return;
-  var en=autoTranslateTh(src.value);
-  if(!en){toast('ยังไม่มีคำแปล — พิมพ์เองได้เลย','warn');return}
+// เติมช่อง EN จากข้อความไทย — ไม่ยอมใส่ภาษาไทยลงช่อง EN เด็ดขาด
+function applyEnTranslate(srcText,dst){
+  var th=String(srcText||'').trim();
+  if(!th){toast('กรอกข้อความภาษาไทยก่อน','warn');return}
+  var en=autoTranslateTh(th);
+  if(!en||hasThaiChar(en)){
+    // แปลไม่ได้ หรือแปลได้บางส่วน (ยังมีไทยเหลือ) → ไม่ใส่ไทยลงช่อง EN
+    toast('⚠️ ยังไม่มีคำแปลคำนี้ในระบบ — พิมพ์ภาษาอังกฤษเองได้เลย','warn');
+    if(dst)dst.focus();
+    return;
+  }
   dst.value=en;dst.focus();
   toast('🌐 แปลให้แล้ว — แก้คำได้ตามต้องการ');
+}
+function autoFillEn(srcId,dstId){
+  var src=$(srcId),dst=$(dstId);if(!src||!dst)return;
+  applyEnTranslate(src.value,dst);
 }
 // แปลหมวดในฟอร์มเพิ่มรายการ (หมวดมี 2 ช่อง: เลือก/พิมพ์ใหม่)
 function autoFillEnCat(){
   var c=($('ap-cat-new')&&$('ap-cat-new').value.trim())||($('ap-cat')?$('ap-cat').value:'');
   var dst=$('ap-ce');if(!dst)return;
-  var en=autoTranslateTh(c);
-  if(!en){toast('ยังไม่มีคำแปล — พิมพ์เองได้เลย','warn');return}
-  dst.value=en;toast('🌐 แปลให้แล้ว — แก้คำได้ตามต้องการ');
+  applyEnTranslate(c,dst);
 }
 function enFieldWithBtn(label,dstId,srcId,val,ph){
   return '<div class="form-group"><label class="form-label">'+label+' <button type="button" class="btn btn-out" style="padding:1px 8px;font-size:11px;min-height:0;height:auto;margin-left:4px" onclick="autoFillEn(\''+srcId+'\',\''+dstId+'\')">🌐 แปลอัตโนมัติ</button></label><input id="'+dstId+'" value="'+attrEsc(val||'')+'"'+(ph?' placeholder="'+ph+'"':'')+'></div>';
