@@ -1442,7 +1442,11 @@ function removeExtra(i){orderExtras.splice(i,1);renderExtras();calcOrderTotal()}
 
 // ═══ ADD ITEM MODAL — แบบการ์ด ═══
 var CAT_ICONS={'ซัก อบ รีด':'👔','ซัก อบ พับ':'👕','ซัก อบ พับ เร่งด่วน':'⚡','ซักแห้ง':'🧥','รีด':'♨️','ซักรองเท้า':'👟','ทำความสะอาด':'🧹','เครื่องนอน':'🛏️','ชุดเครื่องนอน':'🛏️','อื่นๆ(หมอน/ตุ๊กตา/ผ้าม่าน/กระเป๋า)':'🧸','อื่นๆ':'🧸'};
-function catIcon(c){return CAT_ICONS[c]||'🧺'}
+function catIcon(c){var ov=(DB&&DB.shopSettings&&DB.shopSettings.catIcons)||{};return ov[c]||CAT_ICONS[c]||'🧺'}
+function isImgIcon(v){return typeof v==='string'&&/^(https?:\/\/|data:image)/i.test(v)}
+function catIconHTML(c,size){size=size||34;var v=catIcon(c);return isImgIcon(v)?'<img src="'+v+'" style="width:'+size+'px;height:'+size+'px;object-fit:cover;border-radius:8px" alt="">':'<span>'+v+'</span>'}
+// emoji สำเร็จรูปสำหรับเลือกไอคอนหมวด
+const ICON_PRESETS=['👔','👕','🧥','👖','🧦','👗','👘','🥼','🧺','🧸','⚡','♨️','👟','🥿','👞','🛏️','🧹','🧼','🫧','🧴','🚿','🧽','👜','🎒','🧢','🧣','🧤','🩳','👚','🕴️','🦺','🎽','🧶','🪆','🐻','🐾'];
 function openAddItemModal(){
   window._aiSelCat='';window._aiSelType='';window._aiSelOpt='';
   $('moAddItemIn').innerHTML=
@@ -1450,7 +1454,7 @@ function openAddItemModal(){
     '<div class="modal-body" style="max-height:70vh;overflow-y:auto">'+
     '<div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">1️⃣ เลือกหมวดบริการ</div>'+
     '<div id="ai-cat-cards" class="svc-card-grid">'+
-    CATS_UNIQUE.map(function(c){return '<div class="svc-card" onclick="selectAICat(\''+c.replace(/'/g,"\\'")+'\',this)"><div class="svc-icon">'+catIcon(c)+'</div><div class="svc-name">'+c+'</div></div>'}).join('')+
+    CATS_UNIQUE.map(function(c){return '<div class="svc-card" onclick="selectAICat(\''+c.replace(/'/g,"\\'")+'\',this)"><div class="svc-icon">'+catIconHTML(c)+'</div><div class="svc-name">'+c+'</div></div>'}).join('')+
     '</div>'+
     '<div id="ai-type-area" style="display:none;margin-top:16px"><div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">2️⃣ เลือกประเภทผ้า</div><div id="ai-type-cards" class="svc-card-grid"></div></div>'+
     '<div id="ai-opt-area" style="display:none;margin-top:16px"><div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">3️⃣ เลือกตัวเลือก</div><div id="ai-opt-cards" class="svc-card-grid"></div></div>'+
@@ -3483,16 +3487,16 @@ function exportReportCSV(type){
 
 function renderPricelistPage(c){
   c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'wg\')">⚖️ ชั่ง Kg</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
-  '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
+  '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
 }
 function showPriceTab(el,tab){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
   var rc=$('priceContent');
   var eiBar='<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\''+tab+'\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\''+tab+'\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\''+tab+'\')">📥 Import CSV</button><input type="file" id="importFile_'+tab+'" accept=".csv" style="display:none" onchange="importPriceCSV(\''+tab+'\',this)"></div>';
-  if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
+  if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
   else if(tab==='bed') rc.innerHTML=eiBar+renderBedPriceTable();
   else if(tab==='cln') rc.innerHTML=eiBar+renderClnPriceTable();
-  else if(tab==='wg') rc.innerHTML=renderWeightPriceTable();
+  else if(tab==='wg') rc.innerHTML=eiBar+renderWeightPriceTable();
   else if(tab==='pkg') rc.innerHTML=eiBar+renderPkgPriceTable();
 }
 function renderPriceTable(list){
@@ -3502,6 +3506,66 @@ function renderPriceTable(list){
 function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong>'+enSmall(b.labelEn)+'</td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong>'+enSmall(s.labelEn)+'</td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong>'+enSmall(p.typeEn)+'</td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+// ═══ จัดการไอคอนหมวดบริการ (emoji + รูปจริง) ═══
+function openCatIconManager(){
+  if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
+  var rows=CATS_UNIQUE.map(function(c){
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px;border-bottom:1px solid var(--b1)">'+
+      '<div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--bg);border-radius:10px">'+catIconHTML(c,40)+'</div>'+
+      '<div style="flex:1;font-size:13px;font-weight:600">'+c+'</div>'+
+      '<button class="btn btn-out btn-sm" onclick="openCatIconEdit('+"'"+c.replace(/'/g,"\\'")+"'"+')">✏️ เปลี่ยน</button>'+
+      '</div>';
+  }).join('');
+  var h='<div class="modal-overlay show" id="moCatIcons"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>🎨 ไอคอนหมวดบริการ</h3><button class="modal-close" onclick="document.getElementById(\'moCatIcons\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="overflow-y:auto"><div style="font-size:12px;color:var(--t3);margin-bottom:8px">ไอคอนนี้จะแสดงบนการ์ดหมวดในหน้ารับผ้ารายชิ้น</div>'+(rows||'<div class="empty-state"><div class="es-text">ยังไม่มีหมวดบริการ</div></div>')+'</div>'+
+    '<div class="modal-foot"><button class="btn btn-pr" onclick="document.getElementById(\'moCatIcons\').remove()">เสร็จสิ้น</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function openCatIconEdit(c){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  window._iconEditCat=c;window._iconEditVal=catIcon(c);
+  var presets=ICON_PRESETS.map(function(em){return '<div onclick="iconPick(\''+em+'\')" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--b1);border-radius:8px;cursor:pointer;user-select:none" onmouseover="this.style.background=\'var(--prl)\'" onmouseout="this.style.background=\'\'">'+em+'</div>'}).join('');
+  var body='<div style="font-size:13px;font-weight:600;margin-bottom:6px">1) เลือก emoji สำเร็จรูป</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'+presets+'</div>'+
+    '<div class="form-group"><label class="form-label">หรือพิมพ์ emoji เอง</label><input id="icon-emoji" maxlength="4" placeholder="วาง emoji" oninput="iconPick(this.value)"></div>'+
+    '<hr style="margin:10px 0"><div style="font-size:13px;font-weight:600;margin-bottom:6px">2) หรือใช้รูปภาพจริง (โลโก้บริการ)</div>'+
+    '<div class="form-group"><label class="form-label">อัปโหลดรูป</label><input type="file" id="icon-file" accept="image/*" onchange="iconUpload(event)"></div>'+
+    '<div class="form-group"><label class="form-label">หรือวางลิงก์รูป (URL)</label><input id="icon-url" placeholder="https://..." oninput="iconPick(this.value)"></div>'+
+    '<div style="text-align:center;margin-top:10px"><div style="font-size:12px;color:var(--t3);margin-bottom:4px">ตัวอย่าง</div><div id="icon-preview" style="width:56px;height:56px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:34px;background:var(--bg);border-radius:12px">'+catIconHTML(c,50)+'</div></div>';
+  var h='<div class="modal-overlay show" id="moIconEdit"><div class="modal" style="max-width:460px"><div class="modal-head"><h3>✏️ ไอคอน: '+c+'</h3><button class="modal-close" onclick="document.getElementById(\'moIconEdit\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="overflow-y:auto">'+body+'</div>'+
+    '<div class="modal-foot"><button class="btn btn-rd" onclick="iconReset()">↩️ ค่าเริ่มต้น</button><button class="btn btn-out" onclick="document.getElementById(\'moIconEdit\').remove()">ยกเลิก</button><button class="btn btn-pr" onclick="saveCatIcon()">💾 บันทึก</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function iconPreviewRender(){
+  var v=window._iconEditVal;var box=$('icon-preview');if(!box)return;
+  box.innerHTML=isImgIcon(v)?'<img src="'+v+'" style="width:50px;height:50px;object-fit:cover;border-radius:10px">':'<span>'+(v||'🧺')+'</span>';
+}
+function iconPick(v){if(!v)return;window._iconEditVal=v;iconPreviewRender()}
+function iconUpload(ev){
+  var f=ev.target.files&&ev.target.files[0];if(!f)return;
+  if(f.size>500000){toast('รูปใหญ่เกิน 500KB — ใช้รูปเล็กลง','err');return}
+  var r=new FileReader();r.onload=function(e){window._iconEditVal=e.target.result;iconPreviewRender()};r.readAsDataURL(f);
+}
+function saveCatIcon(){
+  if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
+  var c=window._iconEditCat;var v=window._iconEditVal;
+  if(!c)return;
+  var s=getShopSettings();if(!s.catIcons)s.catIcons={};
+  s.catIcons[c]=v;saveDB();pushSettingsNow();
+  toast('บันทึกไอคอน "'+c+'" ✅');logAction('CHANGE_SETTINGS','ไอคอนหมวด '+c);
+  var mo=$('moIconEdit');if(mo)mo.remove();
+  var mm=$('moCatIcons');if(mm)mm.remove();openCatIconManager();
+}
+function iconReset(){
+  var c=window._iconEditCat;if(!c)return;
+  var s=getShopSettings();if(s.catIcons&&s.catIcons[c]!==undefined){delete s.catIcons[c]}
+  saveDB();pushSettingsNow();
+  toast('คืนค่าไอคอนเริ่มต้น "'+c+'"');
+  var mo=$('moIconEdit');if(mo)mo.remove();
+  var mm=$('moCatIcons');if(mm)mm.remove();openCatIconManager();
+}
+
 // ═══ ตารางราคา — บริการชั่งกิโล ═══
 function renderWeightPriceTable(){
   var svcs=getWeightSvcs();
@@ -3697,6 +3761,10 @@ function exportPriceCSV(tab){
     csv='ประเภท,ประเภท(EN),จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\n';
     PKGS.forEach(function(p){csv+=csvQ(p.type)+','+csvQ(p.typeEn||'')+','+p.qty+','+p.price+','+p.cost+','+(p.expDays||90)+'\n'});
     filename='SAKKANID_pricelist_packages.csv';
+  }else if(tab==='wg'){
+    csv='ชื่อบริการ,ต้นทุนต่อกก.,น้ำหนักขั้นต่ำ(กก.),ช่วงราคา(ถึงกก.:บาทต่อกก. คั่นด้วย | และช่วงสุดท้ายใช้ 0)\n';
+    getWeightSvcs().forEach(function(s){var t=(s.tiers||[]).map(function(x){return (x.max||0)+':'+(x.rate||0)}).join('|');csv+=csvQ(s.label)+','+(s.cost||0)+','+(s.minKg||0)+','+csvQ(t)+'\n'});
+    filename='SAKKANID_pricelist_weight.csv';
   }
   downloadCSV(csv,filename);
 }
@@ -3715,6 +3783,9 @@ function downloadPriceTemplate(tab){
   }else if(tab==='pkg'){
     csv='ประเภท,ประเภท(EN),จำนวนชิ้น,ราคา,ต้นทุน,อายุ(วัน)\nซัก/อบ/พับ,Wash/Dry/Fold,25,400,150,90\nซัก/อบ/พับ,Wash/Dry/Fold,60,900,350,120\n';
     filename='TEMPLATE_pricelist_packages.csv';
+  }else if(tab==='wg'){
+    csv='ชื่อบริการ,ต้นทุนต่อกก.,น้ำหนักขั้นต่ำ(กก.),ช่วงราคา(ถึงกก.:บาทต่อกก. คั่นด้วย | ช่วงสุดท้ายใช้ 0)\nซักรีด,15,0,10:40|30:35|0:30\nซักอบพับ,12,0,10:30|30:25|0:20\nซักแห้ง,25,0,0:60\n';
+    filename='TEMPLATE_pricelist_weight.csv';
   }else if(tab==='members'){
     csv='ชื่อ,ชื่อเล่น,เบอร์โทร,ประเภทที่อยู่,โครงการ/คอนโด,ห้อง,หมู่บ้าน,เลขบ้าน,LINE_ID\nสมชาย ใจดี,ชาย,081-234-5678,condo,Supalai Premier,A-101,,,@somchai\nสมหญิง รักงาน,หญิง,089-876-5432,house,,,พฤกษา,123/45,\n';
     filename='TEMPLATE_members.csv';
@@ -3753,57 +3824,105 @@ function pushPriceToCloud(){
     }
   }catch(e){console.error('pushPriceToCloud',e)}
 }
+// ═══ IMPORT CSV ตารางราคา — มาตรฐานเดียวกันทุกแท็บ ═══
+function priceTabInfo(tab){
+  var map={
+    cat:{name:'ซักรีด (รายชิ้น)',list:function(){return CAT}},
+    bed:{name:'เครื่องนอน',list:function(){return BED_SETS}},
+    cln:{name:'ทำความสะอาด',list:function(){return CLN_SVCS}},
+    wg:{name:'ชั่งกิโล (Kg)',list:function(){return getWeightSvcs()}},
+    pkg:{name:'Package',list:function(){return PKGS}}
+  };
+  return map[tab];
+}
+function parseTierStr(s){
+  s=String(s||'').trim();var tiers=[];
+  s.split('|').forEach(function(part){part=part.trim();if(!part)return;var kv=part.split(':');tiers.push({max:parseFloat(kv[0])||0,rate:parseFloat(kv[1])||0})});
+  if(!tiers.length)tiers=[{max:0,rate:0}];
+  return tiers;
+}
+function parseImportRows(tab,rows){
+  var tmp=[];
+  if(tab==='cat'){rows.forEach(function(r){if(r.length<7||!r[0]||!r[2])return;tmp.push({c:r[0],ce:r[1]||'',t:r[2],te:r[3]||'',o:r[4]||'',oe:r[5]||'',p:parseFloat(r[6])||0,k:parseFloat(r[7])||0,pt:r[8]||'fixed',sku:r[9]||''})})}
+  else if(tab==='bed'){rows.forEach(function(r){if(r.length<5||!r[0])return;tmp.push({size:r[0],label:r[1]||r[0],labelEn:r[2]||'',price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,items:[]})})}
+  else if(tab==='cln'){rows.forEach(function(r){if(r.length<5||!r[0])return;tmp.push({type:r[0],label:r[1]||r[0],labelEn:r[2]||'',minPrice:parseFloat(r[3])||0,cost:parseFloat(r[4])||0})})}
+  else if(tab==='pkg'){rows.forEach(function(r){if(r.length<4||!r[0])return;tmp.push({type:r[0],typeEn:r[1]||'',qty:parseInt(r[2])||0,price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,expDays:parseInt(r[5])||90})})}
+  else if(tab==='wg'){rows.forEach(function(r){if(r.length<4||!r[0])return;tmp.push({label:r[0],cost:parseFloat(r[1])||0,minKg:parseFloat(r[2])||0,tiers:parseTierStr(r[3])})})}
+  return tmp;
+}
 function importPriceCSV(tab,fileInput){
   if(!fileInput.files||!fileInput.files[0]) return;
   var reader=new FileReader();
   reader.onload=function(e){
     var rows=parseCSV(e.target.result);
-    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');fileInput.value='';return}
-    rows.shift(); // skip header
-    var count=0;
-    if(tab==='cat'){
-      // parse เข้า temp ก่อน — ถ้าไม่มีแถวที่ถูกต้อง จะไม่ลบของเดิม
-      var tmp=[];
-      rows.forEach(function(r){
-        if(r.length<7||!r[0]||!r[2]) return;
-        tmp.push({c:r[0],ce:r[1]||'',t:r[2],te:r[3]||'',o:r[4]||'',oe:r[5]||'',p:parseFloat(r[6])||0,k:parseFloat(r[7])||0,pt:r[8]||'fixed',sku:r[9]||''});
-      });
-      if(!tmp.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง — ตรวจว่าไฟล์มีครบ 10 คอลัมน์ (โหลด Template ไปแก้)','err');fileInput.value='';return}
-      var mode=confirm('พบ '+tmp.length+' รายการ\n\nกด OK = แทนที่ทั้งหมด (ลบรายการเดิม)\nกด Cancel = เพิ่มต่อท้าย (เก็บรายการเดิม)');
-      if(mode) CAT.length=0;
-      tmp.forEach(function(it){CAT.push(it);count++});
-      CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});
-    }else if(tab==='bed'){
-      var tmpB=[];
-      rows.forEach(function(r){if(r.length<5||!r[0]) return;tmpB.push({size:r[0],label:r[1]||r[0],labelEn:r[2]||'',price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,items:[]})});
-      if(!tmpB.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 5 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
-      BED_SETS.length=0;tmpB.forEach(function(b){BED_SETS.push(b);count++});
-    }else if(tab==='cln'){
-      var tmpC=[];
-      rows.forEach(function(r){if(r.length<5||!r[0]) return;tmpC.push({type:r[0],label:r[1]||r[0],labelEn:r[2]||'',minPrice:parseFloat(r[3])||0,cost:parseFloat(r[4])||0})});
-      if(!tmpC.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 5 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
-      CLN_SVCS.length=0;tmpC.forEach(function(s){CLN_SVCS.push(s);count++});
-    }else if(tab==='pkg'){
-      var tmpP=[];
-      rows.forEach(function(r){if(r.length<4||!r[0]) return;tmpP.push({type:r[0],typeEn:r[1]||'',qty:parseInt(r[2])||0,price:parseFloat(r[3])||0,cost:parseFloat(r[4])||0,expDays:parseInt(r[5])||90})});
-      if(!tmpP.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง (ต้องมีครบ 6 คอลัมน์ — โหลด Template ไปแก้)','err');fileInput.value='';return}
-      PKGS.length=0;tmpP.forEach(function(p){PKGS.push(p);count++});
-    }
-    saveDB();logAction('IMPORT_PRICE',tab+' '+count+' rows');
-    fileInput.value=''; // reset
-    // re-render แล้วเปิด tab ที่เพิ่ง import (renderPage จะ default เป็น cat)
-    renderPage('pricelist');
-    if(tab!=='cat'){
-      setTimeout(function(){
-        var tabs=document.querySelectorAll('.tabs .tab');var map={bed:1,cln:2,pkg:3};
-        var el=tabs[map[tab]];if(el)showPriceTab(el,tab);
-      },60);
-    }
-    pushPriceToCloud(); // ดันขึ้น Cloud ทันที กัน auto-pull ทับ
-    var hasApi=(typeof getApiUrl==='function'&&getApiUrl());
-    toast('📥 Import สำเร็จ — '+count+' รายการ '+(hasApi?'✅ (กำลัง sync ขึ้น Cloud)':'✅'));
+    fileInput.value=''; // reset ทันที เผื่อเลือกไฟล์เดิมซ้ำ
+    if(rows.length<2){toast('ไฟล์ว่างหรือไม่มีข้อมูล','err');return}
+    rows.shift(); // ตัด header
+    var tmp=parseImportRows(tab,rows);
+    if(!tmp.length){toast('❌ ไม่พบข้อมูลที่ถูกต้อง — โหลด Template ไปแก้แล้วนำเข้าใหม่','err');return}
+    showImportConfirm(tab,tmp);
   };
   reader.readAsText(fileInput.files[0]);
+}
+function showImportConfirm(tab,tmp){
+  var info=priceTabInfo(tab);if(!info){toast('ไม่รองรับการนำเข้าแท็บนี้','err');return}
+  var cur=info.list().length;
+  window._pendingImport={tab:tab,tmp:tmp};
+  var h='<div class="modal-overlay show" id="moImport"><div class="modal" style="max-width:460px">'+
+    '<div class="modal-head"><h3>📥 นำเข้าข้อมูล — '+info.name+'</h3><button class="modal-close" onclick="cancelImport()">&times;</button></div>'+
+    '<div class="modal-body">'+
+    '<div style="background:var(--prl);border-radius:8px;padding:12px;margin-bottom:14px;font-size:14px;line-height:1.7">'+
+    '📄 พบ <strong>'+tmp.length+' รายการ</strong> ในไฟล์<br>'+
+    '📋 ตาราง "'+info.name+'" ปัจจุบันมี <strong>'+cur+' รายการ</strong></div>'+
+    '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;font-weight:600">เลือกวิธีนำเข้า:</div>'+
+    '<button class="btn btn-rd" style="width:100%;margin-bottom:10px;text-align:left;display:block" onclick="applyImport(\'replace\')">🔄 แทนที่ทั้งหมด<br><span style="font-size:11px;opacity:.9;font-weight:400">ลบรายการเดิม '+cur+' รายการ → เหลือ '+tmp.length+' รายการ</span></button>'+
+    '<button class="btn btn-gn" style="width:100%;text-align:left;display:block" onclick="applyImport(\'append\')">➕ เพิ่มต่อท้าย<br><span style="font-size:11px;opacity:.9;font-weight:400">เก็บของเดิม '+cur+' + เพิ่มใหม่ '+tmp.length+' = '+(cur+tmp.length)+' รายการ</span></button>'+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="cancelImport()">ยกเลิก</button></div>'+
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function cancelImport(){window._pendingImport=null;var mo=$('moImport');if(mo)mo.remove()}
+function applyImport(mode){
+  var pi=window._pendingImport;if(!pi)return;
+  var tab=pi.tab,tmp=pi.tmp;var info=priceTabInfo(tab);var count=0;
+  function apply(arr){if(mode==='replace')arr.length=0;tmp.forEach(function(it){arr.push(it);count++})}
+  if(tab==='cat'){apply(CAT);CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)})}
+  else if(tab==='bed')apply(BED_SETS);
+  else if(tab==='cln')apply(CLN_SVCS);
+  else if(tab==='pkg')apply(PKGS);
+  else if(tab==='wg'){var s=getShopSettings();if(!s.weightSvcs||!s.weightSvcs.length)s.weightSvcs=JSON.parse(JSON.stringify(WEIGHT_SVCS_DEFAULT));apply(s.weightSvcs)}
+  saveDB();logAction('IMPORT_PRICE',tab+' '+mode+' '+count+' rows');
+  if(tab==='wg')pushSettingsNow();else pushPriceToCloud();
+  var totalNow=info.list().length;
+  window._pendingImport=null;var mo=$('moImport');if(mo)mo.remove();
+  renderPage('pricelist');reopenPriceTab(tab);
+  showImportSummary(info.name,mode,count,totalNow);
+}
+function reopenPriceTab(tab){
+  if(tab==='cat')return; // เป็นแท็บ default อยู่แล้ว
+  setTimeout(function(){
+    var tabs=document.querySelectorAll('#mainContent .tabs .tab');var map={bed:1,cln:2,wg:3,pkg:4};
+    var el=tabs[map[tab]];if(el)showPriceTab(el,tab);
+  },50);
+}
+function showImportSummary(name,mode,count,total){
+  var modeTxt=mode==='replace'?'แทนที่ทั้งหมด':'เพิ่มต่อท้าย';
+  var hasApi=(typeof getApiUrl==='function'&&getApiUrl());
+  var h='<div class="modal-overlay show" id="moImportDone"><div class="modal" style="max-width:420px">'+
+    '<div class="modal-head"><h3>✅ นำเข้าสำเร็จ</h3><button class="modal-close" onclick="document.getElementById(\'moImportDone\').remove()">&times;</button></div>'+
+    '<div class="modal-body" style="text-align:center">'+
+    '<div style="font-size:40px;margin:4px 0">📥</div>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:10px">'+name+'</div>'+
+    '<div style="background:var(--gnl);border-radius:8px;padding:14px;font-size:14px;line-height:1.8">'+
+    'วิธีนำเข้า: <strong>'+modeTxt+'</strong><br>'+
+    'นำเข้าแล้ว: <strong style="color:var(--gn)">'+count+' รายการ</strong><br>'+
+    'รวมในตารางตอนนี้: <strong>'+total+' รายการ</strong></div>'+
+    (hasApi?'<div style="font-size:12px;color:var(--t3);margin-top:8px">☁️ กำลังซิงค์ขึ้น Cloud อัตโนมัติ</div>':'<div style="font-size:12px;color:var(--am);margin-top:8px">⚠️ ยังไม่ได้เชื่อม Cloud — บันทึกในเครื่องนี้เท่านั้น</div>')+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-pr" onclick="document.getElementById(\'moImportDone\').remove()">ตกลง</button></div>'+
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
 }
 
 function importMembersCSV(fileInput){
