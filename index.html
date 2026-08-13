@@ -522,6 +522,7 @@ let orderItems=[],orderExtras=[],orderMemberId=null,currentOrderCtx='ldr';
 let editOid=null,editExtras=[];
 let pkgMemberId=null,uqMemberId=null,bedMemberId=null,clnMemberId=null,weightMemberId=null;
 let weightLines=[];
+let curPriceTab='cat';
 let payOrderId=null,payMethod='QR พร้อมเพย์';
 let DB=null;
 
@@ -619,6 +620,56 @@ function fillLineTpl(m,key,vars){
 function attrEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}
 // ── แสดงชื่อภาษาอังกฤษตัวเล็กใต้ชื่อไทย (ในตารางราคา) ──
 function enSmall(s){s=String(s||'').trim();return s?'<div style="font-size:10px;color:var(--t3)">'+s+'</div>':''}
+// ═══ พจนานุกรมไทย→อังกฤษ ศัพท์ซักรีด (แปลอัตโนมัติ แล้วแก้เองได้) ═══
+var TH_EN_DICT={
+  // หมวดบริการ
+  'ซัก อบ รีด':'Wash Dry Iron','ซัก อบ พับ':'Wash Dry Fold','ซัก อบ พับ เร่งด่วน':'Wash Dry Fold Express','ซักอบรีด':'Wash Dry Iron','ซักอบพับ':'Wash Dry Fold',
+  'ซักแห้ง':'Dry Clean','ซักน้ำ':'Wet Wash','ซักรีด':'Laundry & Iron','รีด':'Iron','รีดด่วน':'Express Iron','ซัก':'Wash','อบ':'Dry','พับ':'Fold',
+  'ซักรองเท้า':'Shoe Washing','ซักพรม':'Carpet Cleaning','ซักผ้าม่าน':'Curtain Cleaning','ทำความสะอาด':'Cleaning','ซักปลอก':'Cover Wash',
+  'เร่งด่วน':'Express','ด่วน':'Express','ปกติ':'Standard','พิเศษ':'Special','อื่นๆ':'Others','เครื่องนอน':'Bedding','ชุดเครื่องนอน':'Bedding Set',
+  // ประเภทผ้า/เสื้อผ้า
+  'เสื้อเชิ้ต':'Shirt','เสื้อยืด':'T-Shirt','เสื้อโปโล':'Polo Shirt','เสื้อ':'Shirt','เสื้อกันหนาว':'Sweater','เสื้อสูท':'Suit Jacket','เสื้อคลุม':'Coat','เสื้อแจ็คเก็ต':'Jacket',
+  'กางเกง':'Pants','กางเกงขายาว':'Long Pants','กางเกงขาสั้น':'Shorts','กางเกงเด็ก':'Kids Pants','กางเกงยีนส์':'Jeans','กางเกงใน':'Underwear',
+  'กระโปรง':'Skirt','ชุดกระโปรงราตรี':'Evening Gown','ชุดราตรี':'Evening Gown','ชุดเดรส':'Dress','เดรส':'Dress','ชุดสูท':'Suit','สูท':'Suit',
+  'ชุดข้าราชการ':'Government Uniform','ชุดครุย':'Graduation Gown','ชุดจั๊มสูท':'Jumpsuit','ชุดซาฟารี':'Safari Suit','ชุดตำรวจ':'Police Uniform','ชุดนักเรียน':'School Uniform','ชุดทหาร':'Military Uniform','ชุดพนักงาน':'Staff Uniform','ชุดไทย':'Thai Traditional Dress','ชุด':'Set',
+  'ผ้าปูที่นอน':'Bed Sheet','ผ้าปู':'Bed Sheet','ปลอกหมอน':'Pillow Case','ปลอกหมอนข้าง':'Bolster Case','ผ้านวม':'Comforter','ผ้าห่ม':'Blanket','ผ้าคลุมเตียง':'Bed Cover','หมอน':'Pillow','หมอนข้าง':'Bolster',
+  'ผ้าม่าน':'Curtain','พรม':'Carpet','ผ้าเช็ดตัว':'Towel','ผ้าขนหนู':'Towel','ผ้าปูโต๊ะ':'Table Cloth','ตุ๊กตา':'Doll','กระเป๋า':'Bag','รองเท้า':'Shoes','หมวก':'Hat','เนคไท':'Necktie','ผ้าพันคอ':'Scarf',
+  // ตัวเลือก
+  'ตัวสั้น':'Short','ตัวยาว':'Long','ขาสั้น':'Short','ขายาว':'Long','เด็ก':'Kids','ผู้ใหญ่':'Adult','ผู้ชาย':'Men','ผู้หญิง':'Women','เล็ก':'Small','กลาง':'Medium','ใหญ่':'Large','หนา':'Thick','บาง':'Thin',
+  // ขนาดเตียง
+  '3.5 ฟุต':'3.5Ft','5 ฟุต':'5Ft','6 ฟุต':'6Ft','ซิงเกิล':'Single','ควีน':'Queen','คิง':'King',
+  // ห้อง (ทำความสะอาด)
+  'ห้องนอน':'Bedroom','ห้องน้ำ':'Bathroom','ห้องนั่งเล่น':'Living Room','คอนโด':'Condo','บ้าน':'House','ออฟฟิศ':'Office','สำนักงาน':'Office','โซฟา':'Sofa'
+};
+// แปลไทย→อังกฤษแบบ best-effort (จับคู่คำยาวสุดก่อน)
+function autoTranslateTh(th){
+  th=String(th||'').trim();if(!th)return '';
+  if(TH_EN_DICT[th])return TH_EN_DICT[th];
+  var keys=Object.keys(TH_EN_DICT).sort(function(a,b){return b.length-a.length});
+  var out=th;
+  keys.forEach(function(k){if(out.indexOf(k)>=0)out=out.split(k).join(' '+TH_EN_DICT[k]+' ')});
+  out=out.replace(/\s+/g,' ').trim();
+  return out;
+}
+// เติมช่อง EN จากช่องไทยอัตโนมัติ (แล้วผู้ใช้แก้เองได้)
+function autoFillEn(srcId,dstId){
+  var src=$(srcId),dst=$(dstId);if(!src||!dst)return;
+  var en=autoTranslateTh(src.value);
+  if(!en){toast('ยังไม่มีคำแปล — พิมพ์เองได้เลย','warn');return}
+  dst.value=en;dst.focus();
+  toast('🌐 แปลให้แล้ว — แก้คำได้ตามต้องการ');
+}
+// แปลหมวดในฟอร์มเพิ่มรายการ (หมวดมี 2 ช่อง: เลือก/พิมพ์ใหม่)
+function autoFillEnCat(){
+  var c=($('ap-cat-new')&&$('ap-cat-new').value.trim())||($('ap-cat')?$('ap-cat').value:'');
+  var dst=$('ap-ce');if(!dst)return;
+  var en=autoTranslateTh(c);
+  if(!en){toast('ยังไม่มีคำแปล — พิมพ์เองได้เลย','warn');return}
+  dst.value=en;toast('🌐 แปลให้แล้ว — แก้คำได้ตามต้องการ');
+}
+function enFieldWithBtn(label,dstId,srcId,val,ph){
+  return '<div class="form-group"><label class="form-label">'+label+' <button type="button" class="btn btn-out" style="padding:1px 8px;font-size:11px;min-height:0;height:auto;margin-left:4px" onclick="autoFillEn(\''+srcId+'\',\''+dstId+'\')">🌐 แปลอัตโนมัติ</button></label><input id="'+dstId+'" value="'+attrEsc(val||'')+'"'+(ph?' placeholder="'+ph+'"':'')+'></div>';
+}
 function thb(n){return '฿'+Number(n||0).toLocaleString('th-TH')}
 function fmtDate(d){const dt=d?new Date(d):new Date();const D=String(dt.getDate()).padStart(2,'0'),M=String(dt.getMonth()+1).padStart(2,'0'),Y=dt.getFullYear()+543;return D+'/'+M+'/'+Y}
 function fmtDT(d){const dt=d?new Date(d):new Date();return fmtDate(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+' น.'}
@@ -3486,10 +3537,12 @@ function exportReportCSV(type){
 }
 
 function renderPricelistPage(c){
+  curPriceTab='cat';
   c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'wg\')">⚖️ ชั่ง Kg</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
   '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
 }
 function showPriceTab(el,tab){
+  curPriceTab=tab;
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
   var rc=$('priceContent');
   var eiBar='<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\''+tab+'\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\''+tab+'\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\''+tab+'\')">📥 Import CSV</button><input type="file" id="importFile_'+tab+'" accept=".csv" style="display:none" onchange="importPriceCSV(\''+tab+'\',this)"></div>';
@@ -3641,7 +3694,7 @@ function saveWeightSvc(i){
   if(i<0)s.weightSvcs.push(svc);else s.weightSvcs[i]=svc;
   saveDB();pushSettingsNow();
   toast('บันทึกบริการชั่งกิโลสำเร็จ ✅');logAction('EDIT_PRICE','weight '+(i<0?'add':'idx:'+i)+' '+label);
-  var mo=$('moWSP');if(mo)mo.remove();renderPage('pricelist');setTimeout(function(){var t=document.querySelectorAll('#mainContent .tab');for(var k=0;k<t.length;k++){if(t[k].textContent.indexOf('ชั่ง Kg')>=0){showPriceTab(t[k],'wg');break}}},30);
+  var mo=$('moWSP');if(mo)mo.remove();refreshPriceTab();
 }
 function deleteWeightSvc(i){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
@@ -3651,7 +3704,7 @@ function deleteWeightSvc(i){
   svcs.splice(i,1);
   saveDB();pushSettingsNow();
   toast('🗑️ ลบแล้ว');logAction('DEL_PRICE','weight '+i);
-  var mo=$('moWSP');if(mo)mo.remove();renderPage('pricelist');setTimeout(function(){var t=document.querySelectorAll('#mainContent .tab');for(var k=0;k<t.length;k++){if(t[k].textContent.indexOf('ชั่ง Kg')>=0){showPriceTab(t[k],'wg');break}}},30);
+  var mo=$('moWSP');if(mo)mo.remove();refreshPriceTab();
 }
 function openSvcPriceEdit(type,i){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
@@ -3659,19 +3712,19 @@ function openSvcPriceEdit(type,i){
   if(type==='bed'){var b=BED_SETS[i];title='แก้ไข Set เครื่องนอน';
     body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสขนาด *</label><input id="sp-size" value="'+attrEsc(b.size)+'" placeholder="single/queen/king"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อแสดง (ไทย) *</label><input id="sp-label" value="'+attrEsc(b.label)+'"></div></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อแสดง (EN)</label><input id="sp-labelEn" value="'+attrEsc(b.labelEn||'')+'" placeholder="เช่น Queen 5Ft Set"></div>'+
+    enFieldWithBtn('ชื่อแสดง (EN)','sp-labelEn','sp-label',b.labelEn,'เช่น Queen 5Ft Set')+
     '<div class="form-group"><label class="form-label">รายการในเซ็ต (คั่นด้วยจุลภาค ,)</label><input id="sp-items" value="'+attrEsc((b.items||[]).join(', '))+'" placeholder="ผ้าปูที่นอน, ปลอกหมอน, ผ้านวม"></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+b.price+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+b.cost+'"></div></div>';
   }else if(type==='cln'){var s=CLN_SVCS[i];title='แก้ไขบริการทำความสะอาด';
     body='<div class="grid g2"><div class="form-group"><label class="form-label">รหัสประเภท *</label><input id="sp-type" value="'+attrEsc(s.type)+'" placeholder="studio/1br/2br"></div>'+
     '<div class="form-group"><label class="form-label">ชื่อแสดง (ไทย) *</label><input id="sp-label" value="'+attrEsc(s.label)+'"></div></div>'+
-    '<div class="form-group"><label class="form-label">ชื่อแสดง (EN)</label><input id="sp-labelEn" value="'+attrEsc(s.labelEn||'')+'" placeholder="เช่น 1 Bedroom 1 Bath"></div>'+
+    enFieldWithBtn('ชื่อแสดง (EN)','sp-labelEn','sp-label',s.labelEn,'เช่น 1 Bedroom 1 Bath')+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขั้นต่ำ (฿)</label><input id="sp-p" type="number" value="'+s.minPrice+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="sp-k" type="number" value="'+s.cost+'"></div></div>';
   }else if(type==='pkg'){var pk=PKGS[i];title='แก้ไข Package';
     body='<div class="grid g2"><div class="form-group"><label class="form-label">ประเภท Package (ไทย) *</label><input id="sp-type" value="'+attrEsc(pk.type)+'"></div>'+
-    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="sp-typeEn" value="'+attrEsc(pk.typeEn||'')+'" placeholder="เช่น Wash/Dry/Fold"></div></div>'+
+    enFieldWithBtn('ประเภท (EN)','sp-typeEn','sp-type',pk.typeEn,'เช่น Wash/Dry/Fold')+'</div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">จำนวนชิ้น *</label><input id="sp-qty" type="number" value="'+pk.qty+'"></div>'+
     '<div class="form-group"><label class="form-label" style="opacity:0">.</label><div></div></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคา (฿)</label><input id="sp-p" type="number" value="'+pk.price+'"></div>'+
@@ -3689,7 +3742,7 @@ function saveSvcPrice(type,i){
   else if(type==='pkg'){var pk=PKGS[i];pk.type=($('sp-type')?$('sp-type').value.trim():'')||pk.type;pk.typeEn=$('sp-typeEn')?$('sp-typeEn').value.trim():(pk.typeEn||'');pk.qty=parseInt($('sp-qty').value)||pk.qty;pk.price=p;pk.cost=k;pk.expDays=parseInt($('sp-d').value)||0}
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('บันทึกสำเร็จ ✅');logAction('EDIT_PRICE',type+' idx:'+i);
-  var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
+  var mo=$('moPE2');if(mo)mo.remove();refreshPriceTab();
 }
 function deleteSvcItem(type,i){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
@@ -3698,7 +3751,7 @@ function deleteSvcItem(type,i){
   if(type==='bed')BED_SETS.splice(i,1);else if(type==='cln')CLN_SVCS.splice(i,1);else PKGS.splice(i,1);
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('🗑️ ลบแล้ว');logAction('DEL_PRICE',type+' '+name);
-  var mo=$('moPE2');if(mo)mo.remove();renderPage('pricelist');
+  var mo=$('moPE2');if(mo)mo.remove();refreshPriceTab();
 }
 function filterPricelist(){
   var q=($('priceSearch')?$('priceSearch').value:'').toLowerCase();
@@ -3710,11 +3763,11 @@ function openAddPriceItem(){
     '<div class="modal-body">'+
     '<div class="form-group"><label class="form-label">หมวดบริการ</label><select id="ap-cat"><option value="">— เลือกหรือพิมพ์ใหม่ —</option>'+CATS_UNIQUE.map(function(c){return '<option>'+c+'</option>'}).join('')+'</select></div>'+
     '<div class="form-group"><label class="form-label">หรือพิมพ์หมวดใหม่</label><input id="ap-cat-new" placeholder="เช่น ซักพรม"></div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">หมวด (EN)</label><input id="ap-ce" placeholder="เช่น Dry Clean"></div>'+
-    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="ap-te" placeholder="เช่น Shirt"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทผ้า/สินค้า *</label><input id="ap-type" placeholder="เช่น เสื้อยืด"></div>'+
     '<div class="form-group"><label class="form-label">ตัวเลือก</label><input id="ap-opt" placeholder="เช่น ตัวสั้น (ไม่บังคับ)"></div></div>'+
-    '<div class="form-group"><label class="form-label">ตัวเลือก (EN)</label><input id="ap-oe" placeholder="เช่น Short"></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">หมวด (EN) <button type="button" class="btn btn-out" style="padding:1px 8px;font-size:11px;min-height:0;height:auto;margin-left:4px" onclick="autoFillEnCat()">🌐 แปลอัตโนมัติ</button></label><input id="ap-ce" placeholder="เช่น Dry Clean"></div>'+
+    enFieldWithBtn('ประเภท (EN)','ap-te','ap-type','','เช่น Shirt')+'</div>'+
+    enFieldWithBtn('ตัวเลือก (EN)','ap-oe','ap-opt','','เช่น Short')+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ราคาขาย (฿) *</label><input id="ap-price" type="number"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="ap-cost" type="number" value="0"></div></div>'+
     '<div class="grid g2"><div class="form-group"><label class="form-label">ประเภทราคา</label><select id="ap-pt"><option value="fixed">ราคาคงที่ (fixed)</option><option value="min">ขั้นต่ำ +เพิ่มได้ (min++)</option></select></div>'+
@@ -3735,7 +3788,7 @@ function saveAddPriceItem(){
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   logAction('ADD_PRICE',cat+' '+type+' '+thb(price));
   toast('เพิ่มรายการสำเร็จ ✅ '+type+' '+thb(price));
-  var mo=$('moAddPrice');if(mo)mo.remove();renderPage('pricelist');
+  var mo=$('moAddPrice');if(mo)mo.remove();refreshPriceTab();
 }
 
 // ═══ SETTINGS PAGE — COMPREHENSIVE ═══
@@ -3906,6 +3959,8 @@ function reopenPriceTab(tab){
     var el=tabs[map[tab]];if(el)showPriceTab(el,tab);
   },50);
 }
+// re-render หน้าตารางราคาแล้วกลับมาอยู่แท็บเดิม (ไม่เด้งไปซักรีด)
+function refreshPriceTab(){var t=curPriceTab;renderPage('pricelist');reopenPriceTab(t);}
 function showImportSummary(name,mode,count,total){
   var modeTxt=mode==='replace'?'แทนที่ทั้งหมด':'เพิ่มต่อท้าย';
   var hasApi=(typeof getApiUrl==='function'&&getApiUrl());
@@ -4734,13 +4789,13 @@ function openPriceEdit(idx){
     '<div class="modal-body" style="overflow-y:auto">'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">หมวดบริการ *</label><input id="pe-c" value="'+attrEsc(it.c)+'"></div>'+
-    '<div class="form-group"><label class="form-label">หมวด (EN)</label><input id="pe-ce" value="'+attrEsc(it.ce||'')+'"></div></div>'+
+    enFieldWithBtn('หมวด (EN)','pe-ce','pe-c',it.ce)+'</div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">ประเภทผ้า *</label><input id="pe-t" value="'+attrEsc(it.t)+'"></div>'+
-    '<div class="form-group"><label class="form-label">ประเภท (EN)</label><input id="pe-te" value="'+attrEsc(it.te||'')+'"></div></div>'+
+    enFieldWithBtn('ประเภท (EN)','pe-te','pe-t',it.te)+'</div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">ตัวเลือก</label><input id="pe-o" value="'+attrEsc(it.o||'')+'" placeholder="เช่น ตัวสั้น"></div>'+
-    '<div class="form-group"><label class="form-label">ตัวเลือก (EN)</label><input id="pe-oe" value="'+attrEsc(it.oe||'')+'"></div></div>'+
+    enFieldWithBtn('ตัวเลือก (EN)','pe-oe','pe-o',it.oe)+'</div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">ราคาขาย (฿) *</label><input id="pe-price" type="number" value="'+it.p+'"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input id="pe-cost" type="number" value="'+it.k+'"></div></div>'+
@@ -4765,7 +4820,7 @@ function savePriceEdit(idx){
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('บันทึกสำเร็จ ✅');
   const mo=$('moPriceEdit');if(mo) mo.remove();
-  renderPage('pricelist');
+  refreshPriceTab();
 }
 function deletePriceItem(idx){
   if(!canEditPrice()){toast("⛔ ไม่มีสิทธิ์","err");return}
@@ -4777,7 +4832,7 @@ function deletePriceItem(idx){
   saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
   toast('🗑️ ลบรายการแล้ว');
   var mo=$('moPriceEdit');if(mo) mo.remove();
-  renderPage('pricelist');
+  refreshPriceTab();
 }
 
 // ═══ CANCEL ORDER WITH REASON ═══
@@ -5332,21 +5387,28 @@ function renderLineTemplates(){
   var g=function(k){return tpl[k]||LINE_TPL_DEF[k].th};
   var ge=function(k){return tpl[k+'En']||LINE_TPL_DEF[k].en};
   var row=function(icon,label,key){
-    return '<div class="card" style="box-shadow:none;background:var(--bg);margin-bottom:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+icon+' '+label+'</div>'+
+    return '<div class="card" style="box-shadow:none;background:var(--bg);margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:13px">'+icon+' '+label+'</div><button class="btn btn-out" style="padding:2px 10px;font-size:11px;min-height:0;height:auto" onclick="resetLineTpl(\''+key+'\')">↩️ คืนค่าเริ่มต้น</button></div>'+
       '<div class="grid g2">'+
-      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇹🇭 ไทย</label><textarea id="lt-'+key+'" rows="4" style="font-size:12px">'+g(key)+'</textarea></div>'+
-      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇬🇧 English</label><textarea id="lt-'+key+'-en" rows="4" style="font-size:12px">'+ge(key)+'</textarea></div>'+
+      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇹🇭 ไทย</label><textarea id="lt-'+key+'" rows="5" style="font-size:12px">'+g(key)+'</textarea></div>'+
+      '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇬🇧 English</label><textarea id="lt-'+key+'-en" rows="5" style="font-size:12px">'+ge(key)+'</textarea></div>'+
       '</div></div>';
   };
-  return '<div class="card"><div class="card-title">📱 LINE Message Templates</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
-    '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">💬 <b>ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)</b> = ข้อความที่ลูกค้าใหม่ได้รับทันทีที่ทักแชทเข้ามา (ยังไม่ต้องเป็นสมาชิก/ยังไม่ได้แต้ม) — ต่างจาก "ต้อนรับสมาชิกใหม่" ที่ส่งตอนสมัครเป็นสมาชิกเต็มตัว<br><span style="color:var(--am)">⚠️ ข้อความนี้ส่งจากฝั่ง Apps Script — หลังแก้ไขต้อง "อัปเดต + Deploy Apps Script ใหม่" ถึงจะมีผล</span></div>'+
+  return '<div class="card"><div class="card-title">📱 เทมเพลตข้อความแจ้งเตือน LINE</div>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">แก้ไขข้อความทุกแบบที่ส่งหาลูกค้าได้ที่นี่ · ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
+    '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">💬 <b>ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)</b> = ข้อความที่ลูกค้าใหม่ได้รับทันทีที่ทักแชทเข้ามา (ยังไม่ต้องเป็นสมาชิก/ยังไม่ได้แต้ม) — ต่างจาก "ต้อนรับสมาชิกใหม่" ที่ส่งตอนสมัครเป็นสมาชิกเต็มตัว<br><span style="color:var(--gn)">✅ แก้ไขแล้วกด "บันทึก" มีผลทันที ไม่ต้อง Deploy Apps Script ใหม่ (ระบบอ่านข้อความจากตั้งค่าที่ซิงค์ขึ้น Cloud)</span></div>'+
     row('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก / ยังไม่เป็นสมาชิก)','leadGreet')+
     row('🎉','ต้อนรับสมาชิกใหม่ (ตอนสมัครเป็นสมาชิกเต็มตัว)','welcome')+
-    row('📋','แจ้งสถานะ','statusUpdate')+
+    row('📋','แจ้งสถานะออเดอร์','statusUpdate')+
     row('💰','เรียกเก็บเงิน','billCollect')+
     row('✅','ผ้าพร้อมส่ง','ready')+
     '<button class="btn btn-pr" onclick="saveLineTemplates()">💾 บันทึก Templates</button></div>';
+}
+// คืนค่าข้อความเริ่มต้น (เฉพาะช่องบนหน้าจอ — ยังไม่บันทึกจนกว่าจะกดบันทึก)
+function resetLineTpl(key){
+  var def=LINE_TPL_DEF[key];if(!def)return;
+  if($('lt-'+key))$('lt-'+key).value=def.th;
+  if($('lt-'+key+'-en'))$('lt-'+key+'-en').value=def.en;
+  toast('↩️ คืนค่าเริ่มต้นแล้ว — กด "บันทึก" เพื่อยืนยัน');
 }
 function saveLineTemplates(){
   var s=getShopSettings();
@@ -5452,7 +5514,7 @@ function openAddBedSet(){
 function saveAddBedSet(){
   var label=$('as-label')?$('as-label').value.trim():'';if(!label){toast('กรอกชื่อ Set','err');return}
   BED_SETS.push({size:$('as-size')?$('as-size').value.trim():'new',label:label,labelEn:$('as-labelEn')?$('as-labelEn').value.trim():'',price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,items:($('as-items').value||'').split(',').map(function(s){return s.trim()}).filter(Boolean)});
-  toast('เพิ่ม Set สำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
+  toast('เพิ่ม Set สำเร็จ ✅');document.getElementById('moAddSvc').remove();refreshPriceTab();
 }
 function openAddClnSvc(){
   var h='<div class="modal-overlay show" id="moAddSvc"><div class="modal"><div class="modal-head"><h3>➕ เพิ่มบริการ Cleaning ใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddSvc\').remove()">&times;</button></div><div class="modal-body">'+
@@ -5467,7 +5529,7 @@ function openAddClnSvc(){
 function saveAddClnSvc(){
   var label=$('as-label')?$('as-label').value.trim():'';if(!label){toast('กรอกชื่อ','err');return}
   CLN_SVCS.push({type:$('as-type')?$('as-type').value.trim():'new',label:label,labelEn:$('as-labelEn')?$('as-labelEn').value.trim():'',minPrice:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0});
-  toast('เพิ่มบริการสำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
+  toast('เพิ่มบริการสำเร็จ ✅');document.getElementById('moAddSvc').remove();refreshPriceTab();
 }
 function openAddPkg(){
   var h='<div class="modal-overlay show" id="moAddSvc"><div class="modal"><div class="modal-head"><h3>➕ เพิ่ม Package ใหม่</h3><button class="modal-close" onclick="document.getElementById(\'moAddSvc\').remove()">&times;</button></div><div class="modal-body">'+
@@ -5483,7 +5545,7 @@ function openAddPkg(){
 function saveAddPkg(){
   var type=$('as-type')?$('as-type').value.trim():'';if(!type){toast('กรอกประเภท','err');return}
   PKGS.push({type:type,typeEn:$('as-typeEn')?$('as-typeEn').value.trim():'',qty:parseInt($('as-qty').value)||0,price:parseFloat($('as-price').value)||0,cost:parseFloat($('as-cost').value)||0,expDays:parseInt($('as-exp').value)||90});
-  toast('เพิ่ม Package สำเร็จ ✅');document.getElementById('moAddSvc').remove();renderPage('pricelist');
+  toast('เพิ่ม Package สำเร็จ ✅');document.getElementById('moAddSvc').remove();refreshPriceTab();
 }
 function mcUpdateSize(key,val){var cfg=window._mcSettings||{};cfg[key]=val;window._mcSettings=cfg}
 function mcSavePreset(){
