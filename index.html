@@ -3884,6 +3884,9 @@ function parseCSV(text){
 
 // ── บันทึกตารางราคาขึ้น Cloud ทันที (กัน auto-pull ทับข้อมูลที่เพิ่ง import) ──
 function pushPriceToCloud(){
+  // POS เป็นตัวหลัก: ล็อกไม่ให้ auto-pull เขียนทับตารางราคา 60 วิ หลังเพิ่งแก้ในเครื่อง
+  // (กัน bug: แก้ราคาแล้วเด้งกลับค่าเดิม เพราะ pull ดึงค่าเก่าจาก Cloud มาทับก่อน push จะขึ้นทัน)
+  window._priceDirtyUntil=new Date().getTime()+60000;
   try{
     if(typeof getApiUrl==='function'&&getApiUrl()&&typeof syncPushAll==='function'&&curUser){
       syncPushAll(true); // fire-and-forget เงียบ — ดันทั้งชุดขึ้น Sheets ทันที
@@ -7261,8 +7264,10 @@ async function syncPullSilent(){
     if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
     if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
     if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
+    // ═══ PRICELIST — ถ้าเพิ่งแก้ราคาในเครื่อง <60วิ ให้ POS ชนะ ไม่ให้ Cloud ทับ ═══
+    var priceLocked=new Date().getTime()<(window._priceDirtyUntil||0);
     // ═══ PRICELIST (CAT) — 3 Guards ป้องกันข้อมูลราคาหาย ═══
-    if(d.pricelist&&d.pricelist.length>0){
+    if(!priceLocked&&d.pricelist&&d.pricelist.length>0){
       // Guard 1: ถ้า local มี >50 items แต่ Cloud มี <10 → SKIP (ป้องกัน wipe)
       if(CAT.length>50&&d.pricelist.length<10){
         console.warn('⚠️ syncPull: pricelist Cloud มี '+d.pricelist.length+' items แต่ local มี '+CAT.length+' — SKIP');
@@ -7280,7 +7285,7 @@ async function syncPullSilent(){
       }
     }
     // ═══ BED_SETS — Guard เหมือน CAT ═══
-    if(d.bed_sets&&d.bed_sets.length>0){
+    if(!priceLocked&&d.bed_sets&&d.bed_sets.length>0){
       var validBeds=d.bed_sets.filter(function(b){return b.label&&(b.price!==undefined&&b.price!=='')});
       if(validBeds.length>0){
         var bc=validBeds.some(function(b,i){var o=BED_SETS[i];return !o||Number(b.price)!==o.price||(b.labelEn||'')!==(o.labelEn||'')||b.label!==o.label});
@@ -7289,7 +7294,7 @@ async function syncPullSilent(){
       }
     }
     // ═══ CLN_SVCS — Guard เหมือน CAT ═══
-    if(d.cln_svcs&&d.cln_svcs.length>0){
+    if(!priceLocked&&d.cln_svcs&&d.cln_svcs.length>0){
       var validCln=d.cln_svcs.filter(function(s){return s.type&&(s.minPrice!==undefined&&s.minPrice!=='')});
       if(validCln.length>0){
         var cc=validCln.some(function(s,i){var o=CLN_SVCS[i];return !o||Number(s.minPrice)!==o.minPrice||(s.labelEn||'')!==(o.labelEn||'')||s.label!==o.label});
@@ -7298,7 +7303,7 @@ async function syncPullSilent(){
       }
     }
     // ═══ PKGS — Guard เหมือน CAT ═══
-    if(d.packages&&d.packages.length>0){
+    if(!priceLocked&&d.packages&&d.packages.length>0){
       var validPkg=d.packages.filter(function(p){return p.type&&(p.price!==undefined&&p.price!=='')});
       if(validPkg.length>0){
         var pc=validPkg.some(function(p,i){var o=PKGS[i];return !o||Number(p.price)!==o.price||(p.typeEn||'')!==(o.typeEn||'')});
