@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx-js-style/1.2.0/xlsx.bundle.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" defer></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap');
@@ -3083,7 +3083,10 @@ function printVender(){
   }).join('');
   var pa=$('printArea');pa.innerHTML=html;pa.className='';pa.style.display='block';
   var oldStyle=document.getElementById('dynPageStyle');if(oldStyle)oldStyle.remove();
-  var st=document.createElement('style');st.id='dynPageStyle';st.innerHTML='@media print{@page{size:A4 landscape;margin:10mm}}';document.head.appendChild(st);
+  var st=document.createElement('style');st.id='dynPageStyle';
+  // override CSS print เดิมที่บังคับ #printArea กว้าง 72mm (สลิป) → ให้เต็มหน้า A4 แนวนอน + แสดงสีพื้น
+  st.innerHTML='@media print{#printArea{width:100%!important;font-weight:400!important;left:0!important;top:0!important;position:absolute!important}#printArea *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}@page{size:A4 landscape;margin:8mm}}';
+  document.head.appendChild(st);
   var _t=document.title;document.title='ใบคุมVender_'+todayStr();
   window.print();
   setTimeout(function(){pa.style.display='none';if(st)st.remove();document.title=_t},700);
