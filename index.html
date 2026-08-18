@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx-js-style/1.2.0/xlsx.bundle.js" defer></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap');
@@ -2793,6 +2793,20 @@ function venderRows(){
   var out={};VENDER_LIST.forEach(function(v){out[v]=[]});
   (DB.orders||[]).forEach(function(o){
     if(o.status!=='รับผ้ารอส่งซัก') return;
+    var ret=o.pickupDate?fmtISO(o.pickupDate):'';
+    // ── เครื่องนอน: ยุบเป็น 1 แถว/ออเดอร์ แล้วลิสต์ชิ้นในเซ็ตในช่องรายการ ──
+    if(o.type==='bedset'){
+      var its=o.items||[];
+      var setItem=its.find(function(it){return String(it.c||'').indexOf('Set')>=0})||its[0]||{};
+      var pieces=its.filter(function(it){return it!==setItem&&String(it.c||'').indexOf('เครื่องนอน')>=0});
+      var totalPcs=pieces.reduce(function(s,it){return s+(parseInt(it.qty)||0)},0);
+      if(!totalPcs){var mm=String(setItem.o||'').match(/(\d+)/);totalPcs=mm?parseInt(mm[1]):1}
+      var pclist=pieces.map(function(p){return p.t+(p.qty>1?' x'+p.qty:'')}).join(', ');
+      var detail=(setItem.t?setItem.t:'ชุดเครื่องนอน')+(pclist_ok(pclist)?' — '+pclist:'');
+      var vB=vendorForItem(o,{c:'เครื่องนอน Set'});
+      if(vB&&out[vB]) out[vB].push({oid:o.id,cust:o.mname||'-',type:'ชุดเครื่องนอน',t:setItem.t||'',o:'',pcs:totalPcs,pcsNum:totalPcs,detail:detail,price:parseFloat(setItem.p)||0,ret:ret,note:''});
+      return;
+    }
     (o.items||[]).forEach(function(it){
       var v=vendorForItem(o,it);if(!v||!out[v]) return;
       var isW=(o.type==='weight');var isQuota=(o.type==='quota');
@@ -2804,13 +2818,32 @@ function venderRows(){
         pcsNum: isW?(parseFloat(it.billKg||it.kg||0)||0) : (parseInt(it.qty||1)||1),
         detail: isQuota?(it.o||it.t||'') : ((it.t||'')+(it.o?' '+it.o:'')),
         price:(parseFloat(it.p)||0)*(parseInt(it.qty)||1),
-        ret:o.pickupDate?fmtISO(o.pickupDate):'',
+        ret:ret,
         note: isQuota?'ใช้โควต้า':''                     // คำว่า "ใช้โควต้า" ไปอยู่คอลัมน์หมายเหตุ
       });
     });
   });
+  // จัดกลุ่มให้ลูกค้าคนเดียวกันอยู่ติดกัน (เรียงตามลำดับที่พบครั้งแรก)
+  VENDER_LIST.forEach(function(v){out[v]=venderSortByCust(out[v])});
   return out;
 }
+function pclist_ok(s){return String(s||'').trim()!==''}
+// เรียงแถวให้ลูกค้าคนเดียวกันติดกัน (คงลำดับการพบครั้งแรก)
+function venderSortByCust(rows){
+  var order=[],map={};
+  rows.forEach(function(r){var k=r.cust||'-';if(!map[k]){map[k]=[];order.push(k)}map[k].push(r)});
+  var out=[];order.forEach(function(k){map[k].forEach(function(r){out.push(r)})});
+  return out;
+}
+// จัดกลุ่มลูกค้า → [{cust, no, rows:[...]}]
+function venderGroups(rows){
+  var order=[],map={};
+  rows.forEach(function(r){var k=r.cust||'-';if(!map[k]){map[k]=[];order.push(k)}map[k].push(r)});
+  return order.map(function(k,i){return {cust:k,no:i+1,rows:map[k]}});
+}
+// วันส่งผ้าซัก (ค่ากลาง — พิมพ์ในฟอร์มได้เลย)
+function vdGetSendDate(){return window._vdSendDate||''}
+function vdSyncSendDate(val){window._vdSendDate=val;var els=document.querySelectorAll('.vd-senddate');for(var i=0;i<els.length;i++){if(els[i].value!==val)els[i].value=val}}
 function venderTotals(rows){
   var pcs=0,price=0,wt=0;
   rows.forEach(function(r){price+=r.price; if(String(r.pcs).indexOf('กก.')>=0) wt+=r.pcsNum; else pcs+=r.pcsNum});
@@ -2822,13 +2855,11 @@ function renderVenderPage(c){
   c.innerHTML='<div class="card"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">'+
     '<div class="card-title" style="margin:0">🏭 ใบคุม Vender — สรุปส่งผ้าประจำวัน</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
-    '<label style="font-size:12px;color:var(--t2)">วันส่งผ้าซัก</label>'+
-    '<input id="vd-senddate" type="text" placeholder="เว้นไว้กรอกเอง" style="max-width:140px">'+
     '<button class="btn btn-out btn-sm" onclick="openVenderPriceEditor()">💵 ตั้งราคา Vender</button>'+
     '<button class="btn btn-gn btn-sm" onclick="exportVenderExcel()">📥 Export Excel</button>'+
     '<button class="btn btn-out btn-sm" onclick="printVender()">🖨️ พิมพ์ A4</button>'+
     '</div></div>'+
-    '<div style="font-size:12px;color:var(--t3);margin-top:6px">แสดงผ้าที่ "รอส่งซัก" ทั้งหมด · JUSTPIN = ซักแห้ง + ชุดเครื่องนอน · Going Laundry = บริการอื่นๆ (ยกเว้น ซักแห้ง, ชุดเครื่องนอน, ทำความสะอาด) · ช่อง Price / Return Date / วันส่งผ้าซัก กรอกเองได้</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-top:6px">แสดงผ้าที่ "รอส่งซัก" ทั้งหมด · JUSTPIN = ซักแห้ง + ชุดเครื่องนอน · Going Laundry = บริการอื่นๆ (ยกเว้น ซักแห้ง, ชุดเครื่องนอน, ทำความสะอาด) · ช่อง Price / Return Date / หมายเหตุ / วันส่งผ้าซัก กรอกเองได้ · ลูกค้าคนเดียวกันจัดเป็นลำดับเดียว</div>'+
     '</div>'+
     '<div id="vd-body"></div>';
   renderVenderBody();
@@ -2840,12 +2871,12 @@ function renderVenderBody(){
 }
 // ── สไตล์ตารางฟอร์ม (ใช้ทั้งบนจอ + พิมพ์ ให้เหมือนฟอร์ม Excel) ──
 var VD_TBL='border-collapse:collapse;width:100%;table-layout:fixed;font-family:Tahoma,Arial,sans-serif';
-function vdColgroup(){return '<colgroup><col style="width:5%"><col style="width:17%"><col style="width:12%"><col style="width:5%"><col style="width:21%"><col style="width:11%"><col style="width:14%"><col style="width:15%"></colgroup>'}
+function vdColgroup(){return '<colgroup><col style="width:5%"><col style="width:16%"><col style="width:12%"><col style="width:8%"><col style="width:22%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>'}
 function vdFormHeader(vname){
-  var s=getShopSettings();var sd=($('vd-senddate')&&$('vd-senddate').value)||'';
+  var s=getShopSettings();var sd=vdGetSendDate();
   return '<div style="margin-bottom:4px">'+
     '<div style="text-align:center;font-weight:700;font-size:15px">สรุปข้อมูลประจำวัน — '+(s.shopName||'')+'</div>'+
-    '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:2px"><span>วันส่งผ้าซัก '+(sd?sd:'________________')+'</span><span>Vender: <b>'+vname+'</b></span></div></div>';
+    '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:4px"><span>วันส่งผ้าซัก <input class="vd-senddate" value="'+attrEsc(sd)+'" placeholder="พิมพ์วันที่ตรงนี้" oninput="vdSyncSendDate(this.value)" style="border:1px solid #E0A800;background:#FFFBEA;border-radius:4px;font-size:12px;height:26px;padding:0 6px;width:150px"></span><span>Vender: <b>'+vname+'</b></span></div></div>';
 }
 // ═══ ตารางราคาต่อ Vender (เก็บใน shopSettings ซิงค์ Cloud) ═══
 function getVenderPrices(){
@@ -2889,25 +2920,29 @@ function venderCard(vname,rows,vi){
     '<div class="card-title" style="margin:0">🏷️ Vender: '+vname+'</div>'+
     '<div style="font-size:12px;color:var(--t2)">'+rows.length+' รายการ · รวม '+(tot.pcs||0)+' ชิ้น'+(tot.wt?' + '+tot.wt+' กก.':'')+'</div></div>';
   if(!rows.length) return '<div class="card">'+head+'<div class="empty-state"><div class="es-text">ไม่มีผ้ารอส่ง '+vname+'</div></div></div>';
-  var th='border:1px solid #999;padding:4px 6px;background:#e8eef4;font-weight:700;text-align:center;font-size:11px';
-  var thEdit='border:1px solid #999;padding:4px 6px;background:#FFF4D6;font-weight:700;text-align:center;font-size:11px';
-  var td='border:1px solid #999;padding:3px 5px;font-size:12px;vertical-align:top;word-break:break-word';
-  // สไตล์ช่องกรอกเอง — ให้เห็นชัดว่าพิมพ์ได้ (กรอบเหลือง/เขียว)
-  var inFill='width:100%;border:1px solid #E0A800;background:#FFFBEA;border-radius:4px;font-size:12px;height:26px;padding:0 5px';
-  var inAuto='width:100%;border:1px solid #37B37E;background:#E9FBF1;border-radius:4px;font-size:12px;height:26px;padding:0 5px';
-  var rowsHtml=rows.map(function(r,i){var ap=venderAutoPrice(vname,r);
-    return '<tr>'+
-      '<td style="'+td+';text-align:center">'+(i+1)+'</td>'+
-      '<td style="'+td+'">'+r.cust+'</td>'+
-      '<td style="'+td+'">'+r.type+'</td>'+
-      '<td style="'+td+';text-align:center">'+r.pcs+'</td>'+
-      '<td style="'+td+'">'+r.detail+'</td>'+
-      '<td style="'+td+';padding:2px 3px"><input id="vd-price-'+vi+'-'+i+'" type="number" placeholder="กรอกราคา"'+(ap!=null?' value="'+ap+'"':'')+' title="'+(ap!=null?'ราคา '+vname+' อัตโนมัติ (แก้ได้)':'ยังไม่ตั้งราคา — พิมพ์เอง')+'" style="'+(ap!=null?inAuto:inFill)+';text-align:right" oninput="venderRecalc('+vi+')"></td>'+
-      '<td style="'+td+';padding:2px 3px"><input id="vd-ret-'+vi+'-'+i+'" type="text" placeholder="กรอกวันรับ" style="'+inFill+'"></td>'+
-      '<td style="'+td+';padding:2px 3px"><input id="vd-note-'+vi+'-'+i+'" type="text" value="'+attrEsc(r.note||'')+'" placeholder="หมายเหตุ" style="'+inFill+'"></td>'+
-    '</tr>';
+  var th='border:1px solid #999;padding:5px 6px;background:#e8eef4;font-weight:700;text-align:center;font-size:11px';
+  var thEdit='border:1px solid #999;padding:5px 6px;background:#FFF4D6;font-weight:700;text-align:center;font-size:11px';
+  var td='border:1px solid #999;padding:4px 6px;font-size:12px;vertical-align:middle;word-break:break-word';
+  var tdMid='border:1px solid #999;padding:3px;font-size:12px;vertical-align:middle';
+  // สไตล์ช่องกรอกเอง — เห็นชัดว่าพิมพ์ได้ (สูงเท่ากันทุกช่อง)
+  var inFill='width:100%;box-sizing:border-box;border:1px solid #E0A800;background:#FFFBEA;border-radius:4px;font-size:12px;height:30px;padding:0 6px';
+  var inAuto='width:100%;box-sizing:border-box;border:1px solid #37B37E;background:#E9FBF1;border-radius:4px;font-size:12px;height:30px;padding:0 6px';
+  var groups=venderGroups(rows);var gi=0;
+  var rowsHtml=groups.map(function(g){
+    return g.rows.map(function(r,ri){var ap=venderAutoPrice(vname,r);var i=gi++;
+      var lead=(ri===0)?('<td style="'+td+';text-align:center" rowspan="'+g.rows.length+'">'+g.no+'</td><td style="'+td+'" rowspan="'+g.rows.length+'">'+r.cust+'</td>'):'';
+      return '<tr>'+lead+
+        '<td style="'+td+'">'+r.type+'</td>'+
+        '<td style="'+td+';text-align:center;white-space:nowrap">'+r.pcs+'</td>'+
+        '<td style="'+td+'">'+r.detail+'</td>'+
+        '<td style="'+tdMid+'"><input id="vd-price-'+vi+'-'+i+'" type="number" placeholder="กรอกราคา"'+(ap!=null?' value="'+ap+'"':'')+' title="'+(ap!=null?'ราคา '+vname+' อัตโนมัติ (แก้ได้)':'ยังไม่ตั้งราคา — พิมพ์เอง')+'" style="'+(ap!=null?inAuto:inFill)+';text-align:right" oninput="venderRecalc('+vi+')"></td>'+
+        '<td style="'+tdMid+'"><input id="vd-ret-'+vi+'-'+i+'" type="text" placeholder="กรอกวันรับ" style="'+inFill+'"></td>'+
+        '<td style="'+tdMid+'"><input id="vd-note-'+vi+'-'+i+'" type="text" value="'+attrEsc(r.note||'')+'" placeholder="หมายเหตุ" style="'+inFill+'"></td>'+
+      '</tr>';
+    }).join('');
   }).join('');
-  var totRow='<tr style="font-weight:700;background:#f4f7fa"><td style="'+td+';text-align:right" colspan="3">รวม</td><td style="'+td+';text-align:center">'+(tot.pcs||0)+(tot.wt?'+'+tot.wt+'กก.':'')+'</td><td style="'+td+'"></td><td style="'+td+';text-align:right"><span id="vd-ptot-'+vi+'">฿0</span></td><td style="'+td+'"></td><td style="'+td+'"></td></tr>';
+  var totTxt=(tot.pcs||0)+' ชิ้น'+(tot.wt?' / '+tot.wt+' กก.':'');
+  var totRow='<tr style="font-weight:700;background:#f4f7fa"><td style="'+td+';text-align:right" colspan="3">รวม</td><td style="'+td+';text-align:center;white-space:nowrap">'+totTxt+'</td><td style="'+td+'"></td><td style="'+td+';text-align:right"><span id="vd-ptot-'+vi+'">฿0</span></td><td style="'+td+'"></td><td style="'+td+'"></td></tr>';
   var table='<div style="overflow-x:auto"><table style="'+VD_TBL+'">'+vdColgroup()+
     '<tr><th style="'+th+'">No.</th><th style="'+th+'">Customer Name</th><th style="'+th+'">Laundry Type</th><th style="'+th+'">Pcs.</th><th style="'+th+'">รายการ</th><th style="'+thEdit+'">✏️ Price</th><th style="'+thEdit+'">✏️ Return Date</th><th style="'+thEdit+'">✏️ หมายเหตุ</th></tr>'+
     rowsHtml+totRow+'</table></div>';
@@ -2969,29 +3004,49 @@ function saveVenderPrices(){
 }
 function exportVenderExcel(){
   if(typeof XLSX==='undefined'){toast('กำลังโหลดตัวสร้าง Excel... ลองกดอีกครั้ง','warn');return}
-  var data=venderRows();
-  var senddate=$('vd-senddate')?$('vd-senddate').value:'';
+  var data=venderRows();var senddate=vdGetSendDate();var shop=getShopSettings().shopName||'';
+  var bd={style:'thin',color:{rgb:'888888'}};var allB={top:bd,bottom:bd,left:bd,right:bd};
   var wb=XLSX.utils.book_new();
   VENDER_LIST.forEach(function(v,vi){
-    var rows=data[v];var tot=venderTotals(rows);var byType=venderPcsByType(rows);
-    var aoa=[];
-    aoa.push(['','สรุปข้อมูลประจำวัน','','','','','','']);
-    aoa.push(['','วันส่งผ้าซัก '+(senddate||''),'','','Vender',v,'','']);
+    var rows=data[v];var tot=venderTotals(rows);var byType=venderPcsByType(rows);var groups=venderGroups(rows);
+    var aoa=[],merges=[];
+    aoa.push(['สรุปข้อมูลประจำวัน — '+shop,'','','','','','','']);
+    aoa.push(['วันส่งผ้าซัก '+(senddate||'..................'),'','','','Vender:',v,'','']);
     aoa.push(['No.','Customer Name','Laundry Type','Pcs.','รายการ','Price','Return Date','หมายเหตุ']);
-    rows.forEach(function(r,i){
-      var pe=$('vd-price-'+vi+'-'+i);var re=$('vd-ret-'+vi+'-'+i);var ne=$('vd-note-'+vi+'-'+i);
-      var price=(pe&&pe.value!=='')?(parseFloat(pe.value)||pe.value):'';
-      var ret=re?re.value:'';
-      var note=(ne&&ne.value)?ne.value:(r.note||'');
-      aoa.push([i+1,r.cust,r.type,r.pcs,r.detail,price,ret,note]);
+    var dataStart=3,gi=0;
+    groups.forEach(function(g){
+      var top=dataStart+gi;
+      g.rows.forEach(function(r,ri){
+        var i=gi++;
+        var pe=$('vd-price-'+vi+'-'+i);var re=$('vd-ret-'+vi+'-'+i);var ne=$('vd-note-'+vi+'-'+i);
+        var price=(pe&&pe.value!=='')?(parseFloat(pe.value)||''):'';
+        var ret=re?re.value:'';var note=(ne&&ne.value)?ne.value:(r.note||'');
+        aoa.push([ri===0?g.no:'', ri===0?r.cust:'', r.type, r.pcs, r.detail, price, ret, note]);
+      });
+      if(g.rows.length>1){merges.push({s:{r:top,c:0},e:{r:top+g.rows.length-1,c:0}});merges.push({s:{r:top,c:1},e:{r:top+g.rows.length-1,c:1}})}
     });
-    aoa.push(['','','','','','','','']);
-    aoa.push(['สรุปจำนวนแยกประเภท','','','','','','','']);
-    aoa.push(['ประเภทบริการ','จำนวน (ชิ้น)','น้ำหนัก (กก.)','','','','','']);
+    var totRowIdx=aoa.length;
+    aoa.push(['','','รวม',(tot.pcs||0)+' ชิ้น'+(tot.wt?' / '+tot.wt+' กก.':''),'','','','']);
+    aoa.push(['']);
+    var sumTitleIdx=aoa.length;aoa.push(['สรุปจำนวนแยกประเภท','','','','','','','']);
+    var sumHeadIdx=aoa.length;aoa.push(['ประเภทบริการ','จำนวน (ชิ้น)','น้ำหนัก (กก.)','','','','','']);
     byType.forEach(function(t){aoa.push([t.type,t.pcs||'',t.wt||'','','','','',''])});
-    aoa.push(['รวม',tot.pcs||'',tot.wt||'','','','','','']);
+    var sumTotIdx=aoa.length;aoa.push(['รวม',tot.pcs||'',tot.wt||'','','','','','']);
     var ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:6},{wch:22},{wch:16},{wch:8},{wch:24},{wch:10},{wch:14},{wch:16}];
+    ws['!cols']=[{wch:6},{wch:24},{wch:16},{wch:9},{wch:32},{wch:10},{wch:14},{wch:18}];
+    ws['!merges']=merges.concat([{s:{r:0,c:0},e:{r:0,c:7}}]);
+    function setS(r,c,style,val){var ref=XLSX.utils.encode_cell({r:r,c:c});var cell=ws[ref];if(!cell){cell={t:'s',v:(val!=null?val:'')};ws[ref]=cell}cell.s=Object.assign({},cell.s,style)}
+    var R,C;
+    for(R=2;R<=totRowIdx;R++)for(C=0;C<=7;C++)setS(R,C,{border:allB,alignment:{vertical:'center',wrapText:true}});
+    for(C=0;C<=4;C++)setS(2,C,{fill:{fgColor:{rgb:'E8EEF4'}},font:{bold:true},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:allB});
+    for(C=5;C<=7;C++)setS(2,C,{fill:{fgColor:{rgb:'FFF4D6'}},font:{bold:true},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:allB});
+    setS(0,0,{font:{bold:true,sz:14},alignment:{horizontal:'center'}});
+    setS(1,4,{font:{bold:true}});setS(1,5,{font:{bold:true}});
+    for(C=0;C<=7;C++)setS(totRowIdx,C,{font:{bold:true},fill:{fgColor:{rgb:'F4F7FA'}},border:allB,alignment:{vertical:'center'}});
+    for(R=sumHeadIdx;R<=sumTotIdx;R++)for(C=0;C<=2;C++)setS(R,C,{border:allB,alignment:{vertical:'center'}});
+    for(C=0;C<=2;C++)setS(sumHeadIdx,C,{fill:{fgColor:{rgb:'E8EEF4'}},font:{bold:true},alignment:{horizontal:'center'},border:allB});
+    setS(sumTitleIdx,0,{font:{bold:true}});
+    for(C=0;C<=2;C++)setS(sumTotIdx,C,{font:{bold:true},border:allB});
     XLSX.utils.book_append_sheet(wb,ws,String(v).substring(0,31));
   });
   var fn='ใบคุมVender_ซักกะนิด_'+todayStr().replace(/-/g,'')+'.xlsx';
@@ -2999,34 +3054,36 @@ function exportVenderExcel(){
   toast('📥 Export Excel สำเร็จ — '+fn+' ✅');
 }
 function printVender(){
-  var data=venderRows();
-  var senddate=$('vd-senddate')?$('vd-senddate').value:'';
-  var sd=senddate||'..............................';var s=getShopSettings();
-  var th='border:1px solid #333;padding:5px 6px;background:#e8eef4;font-weight:700;text-align:center;font-size:11px';
-  var td='border:1px solid #333;padding:5px 6px;font-size:12px;vertical-align:top;word-break:break-word';
+  var data=venderRows();var sd=vdGetSendDate()||'..............................';var s=getShopSettings();
+  var th='border:1px solid #333;padding:6px;background:#e8eef4;font-weight:700;text-align:center;font-size:12px';
+  var thE='border:1px solid #333;padding:6px;background:#FFF4D6;font-weight:700;text-align:center;font-size:12px';
+  var td='border:1px solid #333;padding:6px;font-size:12px;vertical-align:middle;word-break:break-word';
   var html=VENDER_LIST.map(function(v,vi){
-    var rows=data[v];var tot=venderTotals(rows);var byType=venderPcsByType(rows);
-    var dataRows=rows.length?rows.map(function(r,i){
-      var pe=$('vd-price-'+vi+'-'+i);var re=$('vd-ret-'+vi+'-'+i);var ne=$('vd-note-'+vi+'-'+i);
-      var price=(pe&&pe.value!=='')?thb(parseFloat(pe.value)||0):'';
-      var ret=(re&&re.value)?re.value:'';
-      var note=(ne&&ne.value)?ne.value:(r.note||'');
-      return '<tr><td style="'+td+';text-align:center">'+(i+1)+'</td><td style="'+td+'">'+r.cust+'</td><td style="'+td+'">'+r.type+'</td><td style="'+td+';text-align:center">'+r.pcs+'</td><td style="'+td+'">'+r.detail+'</td><td style="'+td+';text-align:right">'+price+'</td><td style="'+td+'">'+ret+'</td><td style="'+td+'">'+note+'</td></tr>';
+    var rows=data[v];var tot=venderTotals(rows);var byType=venderPcsByType(rows);var groups=venderGroups(rows);var gi=0;
+    var dataRows=rows.length?groups.map(function(g){
+      return g.rows.map(function(r,ri){var i=gi++;
+        var pe=$('vd-price-'+vi+'-'+i);var re=$('vd-ret-'+vi+'-'+i);var ne=$('vd-note-'+vi+'-'+i);
+        var price=(pe&&pe.value!=='')?thb(parseFloat(pe.value)||0):'';
+        var ret=(re&&re.value)?re.value:'';var note=(ne&&ne.value)?ne.value:(r.note||'');
+        var lead=(ri===0)?('<td style="'+td+';text-align:center" rowspan="'+g.rows.length+'">'+g.no+'</td><td style="'+td+'" rowspan="'+g.rows.length+'">'+r.cust+'</td>'):'';
+        return '<tr>'+lead+'<td style="'+td+'">'+r.type+'</td><td style="'+td+';text-align:center;white-space:nowrap">'+r.pcs+'</td><td style="'+td+'">'+r.detail+'</td><td style="'+td+';text-align:right">'+price+'</td><td style="'+td+'">'+ret+'</td><td style="'+td+'">'+note+'</td></tr>';
+      }).join('');
     }).join(''):'<tr><td style="'+td+'" colspan="8" align="center">— ไม่มีรายการ —</td></tr>';
-    var totRow='<tr style="font-weight:700;background:#f4f7fa"><td style="'+td+';text-align:right" colspan="3">รวม</td><td style="'+td+';text-align:center">'+(tot.pcs||0)+(tot.wt?'+'+tot.wt+'กก.':'')+'</td><td style="'+td+'"></td><td style="'+td+'"></td><td style="'+td+'"></td><td style="'+td+'"></td></tr>';
+    var totTxt=(tot.pcs||0)+' ชิ้น'+(tot.wt?' / '+tot.wt+' กก.':'');
+    var totRow='<tr style="font-weight:700;background:#f4f7fa"><td style="'+td+';text-align:right" colspan="3">รวม</td><td style="'+td+';text-align:center;white-space:nowrap">'+totTxt+'</td><td style="'+td+'"></td><td style="'+td+'"></td><td style="'+td+'"></td><td style="'+td+'"></td></tr>';
     var sumRows=byType.map(function(t){return '<tr><td style="'+td+'">'+t.type+'</td><td style="'+td+';text-align:center">'+(t.pcs||'')+'</td><td style="'+td+';text-align:center">'+(t.wt||'')+'</td></tr>'}).join('');
     return '<div style="page-break-after:always;font-family:Tahoma,sans-serif">'+
-      '<div style="text-align:center;font-weight:700;font-size:16px">สรุปข้อมูลประจำวัน — '+(s.shopName||'')+'</div>'+
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 2px"><span>วันส่งผ้าซัก '+sd+'</span><span>Vender: <b>'+v+'</b></span></div>'+
+      '<div style="text-align:center;font-weight:700;font-size:17px">สรุปข้อมูลประจำวัน — '+(s.shopName||'')+'</div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin:8px 2px"><span>วันส่งผ้าซัก '+sd+'</span><span>Vender: <b>'+v+'</b></span></div>'+
       '<table style="border-collapse:collapse;width:100%;table-layout:fixed">'+vdColgroup()+
-      '<tr><th style="'+th+'">No.</th><th style="'+th+'">Customer Name</th><th style="'+th+'">Laundry Type</th><th style="'+th+'">Pcs.</th><th style="'+th+'">รายการ</th><th style="'+th+'">Price</th><th style="'+th+'">Return Date</th><th style="'+th+'">หมายเหตุ</th></tr>'+dataRows+totRow+'</table>'+
-      '<div style="margin-top:10px;font-size:12px;font-weight:700">📊 สรุปจำนวนแยกประเภท</div>'+
-      '<table style="border-collapse:collapse;margin-top:3px"><tr><th style="'+th+';width:200px">ประเภทบริการ</th><th style="'+th+';width:100px">จำนวน (ชิ้น)</th><th style="'+th+';width:100px">น้ำหนัก (กก.)</th></tr>'+sumRows+'<tr style="font-weight:700"><td style="'+td+';text-align:right">รวม</td><td style="'+td+';text-align:center">'+(tot.pcs||'')+'</td><td style="'+td+';text-align:center">'+(tot.wt||'')+'</td></tr></table>'+
+      '<tr><th style="'+th+'">No.</th><th style="'+th+'">Customer Name</th><th style="'+th+'">Laundry Type</th><th style="'+th+'">Pcs.</th><th style="'+th+'">รายการ</th><th style="'+thE+'">Price</th><th style="'+thE+'">Return Date</th><th style="'+thE+'">หมายเหตุ</th></tr>'+dataRows+totRow+'</table>'+
+      '<div style="margin-top:12px;font-size:13px;font-weight:700">📊 สรุปจำนวนแยกประเภท</div>'+
+      '<table style="border-collapse:collapse;margin-top:3px"><tr><th style="'+th+';width:220px">ประเภทบริการ</th><th style="'+th+';width:110px">จำนวน (ชิ้น)</th><th style="'+th+';width:110px">น้ำหนัก (กก.)</th></tr>'+sumRows+'<tr style="font-weight:700"><td style="'+td+';text-align:right">รวม</td><td style="'+td+';text-align:center">'+(tot.pcs||'')+'</td><td style="'+td+';text-align:center">'+(tot.wt||'')+'</td></tr></table>'+
       '</div>';
   }).join('');
   var pa=$('printArea');pa.innerHTML=html;pa.className='';pa.style.display='block';
   var oldStyle=document.getElementById('dynPageStyle');if(oldStyle)oldStyle.remove();
-  var st=document.createElement('style');st.id='dynPageStyle';st.innerHTML='@media print{@page{size:A4 portrait;margin:12mm}}';document.head.appendChild(st);
+  var st=document.createElement('style');st.id='dynPageStyle';st.innerHTML='@media print{@page{size:A4 landscape;margin:10mm}}';document.head.appendChild(st);
   var _t=document.title;document.title='ใบคุมVender_'+todayStr();
   window.print();
   setTimeout(function(){pa.style.display='none';if(st)st.remove();document.title=_t},700);
