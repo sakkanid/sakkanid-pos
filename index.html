@@ -3252,25 +3252,50 @@ function exportVenderDates(dates,label){
   syncVenderList();
   var wb=XLSX.utils.book_new();var made=0,multi=dates.length>1;
   dates.forEach(function(date){VENDER_LIST.forEach(function(v){if(venderAppendSheet(wb,v,date,multi))made++})});
-  if(!made){toast('ช่วงวันที่เลือกยังไม่มีออเดอร์ที่จ่ายให้ร้านไหน','warn');return}
+  if(!made){toast('❗ ช่วงวันที่เลือกยังไม่มีออเดอร์ที่จ่ายงานให้ร้านไหน — ไปจ่ายงานในแท็บ "ออเดอร์วันนี้" ก่อน','warn');return}
   var fn='ใบคุมVender_ซักกะนิด_'+label+'.xlsx';
-  XLSX.writeFile(wb,fn);
-  toast('📥 Export Excel สำเร็จ ('+made+' ชีท) — '+fn+' ✅');
+  // ดาวน์โหลดแบบ blob (เสถียรกว่า writeFile ในบางเบราว์เซอร์) — มี fallback
+  var okDl=false;
+  try{
+    var out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();
+    setTimeout(function(){if(a.parentNode)a.parentNode.removeChild(a);URL.revokeObjectURL(url)},1500);okDl=true;
+  }catch(e){try{XLSX.writeFile(wb,fn);okDl=true}catch(e2){toast('บันทึกไฟล์ไม่สำเร็จ: '+(e2.message||e.message),'err')}}
+  if(okDl)toast('📥 Export Excel สำเร็จ ('+made+' ชีท) — '+fn+' ✅');
 }
 function exportVenderExcel(){exportVenderDates([venderSelDate()],venderSelDate().replace(/-/g,''))}
+// นับออเดอร์ที่จ่ายงานแล้วในช่วงวัน (ไว้โชว์ก่อนโหลด)
+function venderAssignedCountRange(from,to){
+  var dates=dateRangeList(from,to),assign=getVenderAssign(),n=0,days=0;
+  dates.forEach(function(d){var c=ordersForDate(d).filter(function(o){return assign[o.id]}).length;if(c){days++;n+=c}});
+  return {orders:n,days:days,total:dates.length};
+}
 // เลือกช่วงวันเพื่อโหลดหลายวันในไฟล์เดียว (แต่ละร้าน/วัน = 1 ชีท)
 function openVenderExportRange(){
   var to=venderSelDate();var d=new Date(to+'T00:00:00');d.setDate(d.getDate()-6);var from=d.toISOString().slice(0,10);
   var h='<div class="modal-overlay show" id="moVX"><div class="modal" style="max-width:420px"><div class="modal-head"><h3>🗓️ โหลด Excel หลายวัน</h3><button class="modal-close" onclick="document.getElementById(\'moVX\').remove()">&times;</button></div>'+
     '<div class="modal-body"><div style="font-size:12px;color:var(--t2);margin-bottom:10px">เลือกช่วงวันที่ — ระบบจะรวมทุกวัน ทุกร้าน ไว้ในไฟล์เดียว (แต่ละร้าน/วัน = 1 ชีท)</div>'+
-    '<div class="grid g2"><div class="form-group"><label class="form-label">ตั้งแต่วันที่</label><input type="date" id="vx-from" value="'+from+'"></div>'+
-    '<div class="form-group"><label class="form-label">ถึงวันที่</label><input type="date" id="vx-to" value="'+to+'"></div></div>'+
+    '<div class="grid g2"><div class="form-group"><label class="form-label">ตั้งแต่วันที่</label><input type="date" id="vx-from" value="'+from+'" onchange="vxPreview()"></div>'+
+    '<div class="form-group"><label class="form-label">ถึงวันที่</label><input type="date" id="vx-to" value="'+to+'" onchange="vxPreview()"></div></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px"><button class="btn btn-out btn-sm" onclick="vxQuick(7)">7 วันล่าสุด</button><button class="btn btn-out btn-sm" onclick="vxQuick(30)">30 วันล่าสุด</button><button class="btn btn-out btn-sm" onclick="vxThisMonth()">เดือนนี้</button></div>'+
-    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moVX\').remove()">ยกเลิก</button><button class="btn btn-gn" onclick="exportVenderRangeDo()">📥 โหลด Excel</button></div></div></div>';
+    '<div id="vx-preview" style="margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px"></div>'+
+    '</div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moVX\').remove()">ยกเลิก</button><button class="btn btn-gn" id="vx-btn" onclick="exportVenderRangeDo()">📥 โหลด Excel</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend',h);
+  vxPreview();
 }
-function vxQuick(n){var to=venderSelDate();var d=new Date(to+'T00:00:00');d.setDate(d.getDate()-(n-1));$('vx-from').value=d.toISOString().slice(0,10);$('vx-to').value=to}
-function vxThisMonth(){var to=venderSelDate();$('vx-from').value=to.slice(0,8)+'01';$('vx-to').value=to}
+function vxPreview(){
+  var box=$('vx-preview');if(!box)return;
+  var from=$('vx-from')?$('vx-from').value:'',to=$('vx-to')?$('vx-to').value:'';
+  var btn=$('vx-btn');
+  if(!from||!to){box.style.background='#FEE2E2';box.style.color='#991B1B';box.innerHTML='⚠️ เลือกวันที่ให้ครบ';if(btn)btn.disabled=true;return}
+  if(from>to){var t=from;from=to;to=t}
+  var info=venderAssignedCountRange(from,to);
+  if(info.orders>0){box.style.background='#E0F5EF';box.style.color='#076B52';box.innerHTML='✅ ช่วงนี้มี <b>'+info.orders+'</b> ออเดอร์ที่จ่ายงานแล้ว ใน <b>'+info.days+'</b> วัน (จาก '+info.total+' วัน) — พร้อมโหลด';if(btn){btn.disabled=false;btn.style.opacity=''}}
+  else{box.style.background='#FEF3C7';box.style.color='#92400E';box.innerHTML='❗ ช่วงนี้ยังไม่มีออเดอร์ที่จ่ายงานให้ร้านเลย ('+info.total+' วัน) — ต้องจ่ายงานในแท็บ "ออเดอร์วันนี้" ก่อน';if(btn){btn.disabled=true;btn.style.opacity='.5'}}
+}
+function vxQuick(n){var to=venderSelDate();var d=new Date(to+'T00:00:00');d.setDate(d.getDate()-(n-1));$('vx-from').value=d.toISOString().slice(0,10);$('vx-to').value=to;vxPreview()}
+function vxThisMonth(){var to=venderSelDate();$('vx-from').value=to.slice(0,8)+'01';$('vx-to').value=to;vxPreview()}
 function exportVenderRangeDo(){
   var from=$('vx-from')?$('vx-from').value:'',to=$('vx-to')?$('vx-to').value:'';
   if(!from||!to){toast('เลือกวันที่ให้ครบ','err');return}
