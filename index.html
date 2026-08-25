@@ -2917,9 +2917,11 @@ function renderVenderBody(){
 function renderVdInbox(){
   var d=venderSelDate(),assign=getVenderAssign();
   var orders=ordersForDate(d);
+  var assignedCnt=orders.filter(function(o){return assign[o.id]}).length;
+  var sendable=orders.filter(function(o){return !venderNoSend(o)}).length;
   var head='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
     '<div class="card-title" style="margin:0">📋 ออเดอร์วันที่ '+venderDateLabelTH(d)+' ('+orders.length+' ออเดอร์)</div>'+
-    '<div style="font-size:12px;color:var(--t3)">เลือกร้านปลายทางในช่อง "จ่ายให้ร้าน"</div></div>';
+    '<div style="font-size:12px;color:var(--t3)">แตะที่รหัสออเดอร์เพื่อดูรายละเอียด · เลือกร้านในช่อง "จ่ายให้ร้าน" (แถวสีฟ้า = จ่ายแล้ว)</div></div>';
   if(!orders.length)return head+'<div class="empty-state"><div class="es-text">ยังไม่มีออเดอร์ในวันนี้</div></div></div>';
   var th='border:1px solid #999;padding:6px 8px;background:#e8eef4;font-weight:700;text-align:center;font-size:12px';
   var thA='border:1px solid #999;padding:6px 8px;background:#FFF4D6;font-weight:700;text-align:center;font-size:12px';
@@ -2931,16 +2933,42 @@ function renderVdInbox(){
     var qty=(pcs?pcs+' ชิ้น':'')+(kg?(pcs?' + ':'')+kg+' กก.':'')||'-';
     var tm=(String(o.createdAt).match(/(\d{1,2}:\d{2})/)||['',''])[1];
     var cur=assign[o.id]||'';
-    var opts='<option value="">— ยังไม่จ่าย —</option>'+VENDER_LIST.map(function(v){return '<option value="'+attrEsc(v)+'"'+(v===cur?' selected':'')+'>'+v+'</option>'}).join('');
-    var sel='<select onchange="assignOrderVendor(\''+o.id+'\',this.value)" style="height:30px;min-height:0;font-size:12px;width:100%;'+(cur?'border-color:#37B37E;background:#E9FBF1':'border-color:#E0A800;background:#FFFBEA')+'">'+opts+'</select>';
-    return '<tr'+(cur?'':' style="background:#FFFDF5"')+'><td style="'+td+';text-align:center">'+(i+1)+'</td><td style="'+td+';text-align:center;white-space:nowrap">'+tm+'</td>'+
-      '<td style="'+td+';white-space:nowrap"><b>'+o.id+'</b></td><td style="'+td+'">'+(o.mname||'-')+'</td>'+
-      '<td style="'+td+';text-align:center">'+venderTypeLabel(o)+'</td><td style="'+td+';text-align:center;white-space:nowrap">'+qty+'</td>'+
-      '<td style="'+td+';min-width:150px">'+sel+'</td></tr>';
+    var noSend=venderNoSend(o);
+    var items=venderItemSummary(o);
+    // ช่องจ่ายงาน — ออเดอร์ซื้อแพ็กเกจเฉยๆ ไม่ต้องส่งร้าน
+    var sel;
+    if(noSend){sel='<span style="font-size:11px;color:var(--t3);font-style:italic">— ไม่ต้องส่งร้าน —</span>';}
+    else{
+      var opts='<option value="">— ยังไม่จ่าย —</option>'+VENDER_LIST.map(function(v){return '<option value="'+attrEsc(v)+'"'+(v===cur?' selected':'')+'>'+v+'</option>'}).join('');
+      sel='<select onchange="assignOrderVendor(\''+o.id+'\',this.value)" style="height:34px;min-height:0;font-size:13px;font-weight:600;width:100%;color:#1A2A3A;background:#fff;border:1.5px solid '+(cur?'#2FA36B':'#E0A800')+';border-radius:6px;padding:0 8px">'+opts+'</select>';
+    }
+    // สีพื้นแถว: ซื้อแพ็กเกจ=เทาอ่อน · จ่ายแล้ว=ฟ้าอ่อน · ยังไม่จ่าย=เหลืองจาง
+    var bg=noSend?'#F4F6F8':(cur?'#E3F2FB':'#FFFDF5');
+    var oid='<span onclick="showOrderDetail(\''+o.id+'\')" style="cursor:pointer;color:var(--pr);font-weight:700;text-decoration:underline;text-underline-offset:2px" title="ดูรายละเอียดออเดอร์">'+o.id+'</span>';
+    return '<tr style="background:'+bg+'"><td style="'+td+';text-align:center">'+(i+1)+'</td><td style="'+td+';text-align:center;white-space:nowrap">'+tm+'</td>'+
+      '<td style="'+td+';white-space:nowrap">'+oid+'</td><td style="'+td+'">'+(o.mname||'-')+'</td>'+
+      '<td style="'+td+';text-align:center">'+venderTypeLabel(o)+'</td>'+
+      '<td style="'+td+';font-size:11px;color:var(--t2)">'+items+'</td>'+
+      '<td style="'+td+';text-align:center;white-space:nowrap">'+(noSend?'-':qty)+'</td>'+
+      '<td style="'+td+';min-width:160px">'+sel+'</td></tr>';
   }).join('');
-  var tbl='<div class="card" style="overflow-x:auto"><table style="'+VD_TBL+'">'+
-    '<tr><th style="'+th+';width:5%">#</th><th style="'+th+';width:9%">เวลา</th><th style="'+th+';width:14%">ออเดอร์</th><th style="'+th+';width:22%">ลูกค้า</th><th style="'+th+';width:14%">ประเภท</th><th style="'+th+';width:14%">จำนวน</th><th style="'+thA+';width:22%">จ่ายให้ร้าน</th></tr>'+rowsHtml+'</table></div>';
+  var tbl='<div class="card" style="overflow-x:auto"><div style="font-size:12px;color:var(--t2);margin-bottom:6px">จ่ายงานแล้ว '+assignedCnt+'/'+sendable+' ออเดอร์ที่ต้องส่งซัก</div><table style="'+VD_TBL+'">'+
+    '<tr><th style="'+th+';width:4%">#</th><th style="'+th+';width:7%">เวลา</th><th style="'+th+';width:11%">ออเดอร์</th><th style="'+th+';width:14%">ลูกค้า</th><th style="'+th+';width:10%">ประเภท</th><th style="'+th+';width:26%">รายการที่ส่งซัก</th><th style="'+th+';width:9%">จำนวน</th><th style="'+thA+';width:19%">จ่ายให้ร้าน</th></tr>'+rowsHtml+'</table></div>';
   return head+'</div>'+tbl;
+}
+// ออเดอร์ที่ไม่มีผ้าส่งซัก (ซื้อแพ็กเกจเฉยๆ) — แสดงแต่ไม่ต้องจ่ายร้าน
+function venderNoSend(o){return o.type==='pkg_buy'}
+// สรุปรายการที่ส่งซักในออเดอร์ (ไว้ดูว่าส่งอะไรมาบ้าง)
+function venderItemSummary(o){
+  if(o.type==='pkg_buy'){
+    var nm=((o.items||[])[0]||{});return '<span style="color:var(--t3)">ซื้อแพ็กเกจ '+(nm.t||nm.type||nm.c||'')+(nm.o?' '+nm.o:'')+' (ไม่มีผ้าส่งซัก)</span>';
+  }
+  var rows=venderOrderRows(o);
+  var parts=rows.map(function(r){
+    var q=r.defKg?(r.defKg+'กก.'):(r.defPcs>1?'x'+r.defPcs:'');
+    return (r.detail||r.type||'')+(q?' '+q:'');
+  }).filter(function(x){return x.trim()!==''});
+  return parts.join(', ')||'-';
 }
 function venderTypeLabel(o){
   var m={laundry:'ซักรีด',bedset:'เครื่องนอน',cleaning:'ทำความสะอาด',weight:'ชั่งกิโล',quota:'โควต้า',pkg_buy:'ซื้อแพ็กเกจ'};
