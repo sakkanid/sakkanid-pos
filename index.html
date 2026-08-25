@@ -3996,31 +3996,42 @@ function povCards(q,forPrint){
   q=(q||'').toLowerCase();
   function keep(txt){return !q||String(txt).toLowerCase().indexOf(q)>=0}
   function pr(kind,idx){return forPrint?'<span class="px-ro">'+thb(pxGet(kind,idx))+'</span>':pxPriceHTML(kind,idx)}
+  // ตอนพิมพ์: ตัดการ์ดที่ยาวเกินหน้า A4 เป็นหลายใบ (ป้องกันหน้าแรกว่าง) · บนจอ: การ์ดเดียว (masonry จัดการเอง)
+  var CHUNK=forPrint?20:100000;
+  function emitCard(headHTML,rowArr){
+    if(!rowArr.length)return '';
+    if(rowArr.length<=CHUNK)return '<div class="pov-card"><div class="ph">'+headHTML+'</div>'+rowArr.join('')+'</div>';
+    var out='';
+    for(var i=0;i<rowArr.length;i+=CHUNK){
+      var cont=i>0?' <span style="font-size:9px;opacity:.7;font-weight:400">(ต่อ)</span>':'';
+      out+='<div class="pov-card"><div class="ph">'+headHTML+cont+'</div>'+rowArr.slice(i,i+CHUNK).join('')+'</div>';
+    }
+    return out;
+  }
   var cards='';
   // 1) ซักรีด/ซักแห้ง — แยกตามหมวด
   povCatGroups().forEach(function(g){
-    var rows=g.items.filter(function(o){return keep(g.c)||keep(o.it.t)||keep(o.it.o)||keep(g.ce)||keep(o.it.te)}).map(function(o){
+    var rowArr=g.items.filter(function(o){return keep(g.c)||keep(o.it.t)||keep(o.it.o)||keep(g.ce)||keep(o.it.te)}).map(function(o){
       var it=o.it;
       var nm='<div class="pov-nm"><div>'+it.t+(it.o?' <span style="color:var(--t3)">· '+it.o+'</span>':'')+'</div>'+((it.te||it.oe)?'<div class="en">'+[it.te,it.oe].filter(Boolean).join(' · ')+'</div>':'')+'</div>';
       return '<div class="pov-row">'+nm+pr('cat',o.idx)+'</div>';
-    }).join('');
-    if(!rows)return;
-    cards+='<div class="pov-card"><div class="ph"><span class="ic">'+catIconHTML(g.c,20)+'</span><span>'+g.c+(g.ce?' <span class="en">'+g.ce+'</span>':'')+'</span></div>'+rows+'</div>';
+    });
+    cards+=emitCard('<span class="ic">'+catIconHTML(g.c,20)+'</span><span>'+g.c+(g.ce?' <span class="en">'+g.ce+'</span>':'')+'</span>',rowArr);
   });
   // 2) ชุดเครื่องนอน
   var bedRows=BED_SETS.map(function(b,i){return {b:b,i:i}}).filter(function(o){return keep(o.b.label)||keep(o.b.labelEn)||keep('เครื่องนอน')||keep((o.b.items||[]).join(' '))}).map(function(o){
     var b=o.b;
     var nm='<div class="pov-nm"><div>'+b.label+'</div>'+(b.labelEn?'<div class="en">'+b.labelEn+'</div>':'')+((b.items&&b.items.length)?'<div class="sub">'+b.items.join(', ')+'</div>':'')+'</div>';
     return '<div class="pov-row">'+nm+pr('bed',o.i)+'</div>';
-  }).join('');
-  if(bedRows)cards+='<div class="pov-card"><div class="ph"><span class="ic">🛏️</span><span>ชุดเครื่องนอน <span class="en">Bed & Bath</span></span></div>'+bedRows+'</div>';
+  });
+  cards+=emitCard('<span class="ic">🛏️</span><span>ชุดเครื่องนอน <span class="en">Bed & Bath</span></span>',bedRows);
   // 3) ทำความสะอาด
   var clnRows=CLN_SVCS.map(function(s,i){return {s:s,i:i}}).filter(function(o){return keep(o.s.label)||keep(o.s.labelEn)||keep('ทำความสะอาด')}).map(function(o){
     var s=o.s;
     var nm='<div class="pov-nm"><div>'+s.label+'</div>'+(s.labelEn?'<div class="en">'+s.labelEn+'</div>':'')+'<div class="sub">ราคาเริ่มต้น</div></div>';
     return '<div class="pov-row">'+nm+pr('cln',o.i)+'</div>';
-  }).join('');
-  if(clnRows)cards+='<div class="pov-card"><div class="ph"><span class="ic">🧹</span><span>ทำความสะอาด <span class="en">Cleaning</span></span></div>'+clnRows+'</div>';
+  });
+  cards+=emitCard('<span class="ic">🧹</span><span>ทำความสะอาด <span class="en">Cleaning</span></span>',clnRows);
   // 4) ชั่งกิโล (แสดงเรทตามน้ำหนัก + ปุ่มแก้ละเอียด)
   var svcs=(typeof getWeightSvcs==='function')?getWeightSvcs():[];
   var wgRows=svcs.map(function(s,i){return {s:s,i:i}}).filter(function(o){return keep(o.s.label)||keep('ชั่งกิโล')||keep('kg')}).map(function(o){
@@ -4064,23 +4075,41 @@ function povFilter(){
   var q=($('povSearch')?$('povSearch').value:'')||'';
   var g=$('povGrid');if(g)g.innerHTML=povCards(q,false);
 }
-function printPriceSheet(){
-  ensurePovStyle();
+function buildPriceSheetDoc(){
   var s=(typeof getShopSettings==='function')?getShopSettings():{};
   var name=(s&&s.shopName)||'ร้านซักกะนิด';
-  var logo=(s&&s.logo)?'<img src="'+s.logo+'" style="height:44px;margin-bottom:4px">':'';
-  var html='<div style="font-family:Tahoma,Arial,sans-serif">'+
-    '<div style="text-align:center;margin-bottom:10px">'+logo+'<div style="font-size:20px;font-weight:800">ค่าบริการซักผ้า '+name+'</div>'+
-    '<div style="font-size:12px;color:#555">เปิดทุกวัน 10:00–20:00'+(s&&s.phone?' · โทร. '+s.phone:'')+'</div></div>'+
-    '<div class="pov-grid">'+povCards('',true)+'</div></div>';
-  var pa=$('printArea');pa.innerHTML=html;pa.className='';pa.style.display='block';
-  var oldStyle=document.getElementById('dynPageStyle');if(oldStyle)oldStyle.remove();
-  var st=document.createElement('style');st.id='dynPageStyle';
-  st.innerHTML='@media print{#printArea{width:100%!important;font-weight:400!important;left:0!important;top:0!important;position:absolute!important}#printArea *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}@page{size:A4 portrait;margin:8mm}}';
-  document.head.appendChild(st);
-  var _t=document.title;document.title='ตารางราคา_'+name;
-  window.print();
-  setTimeout(function(){pa.style.display='none';pa.innerHTML='';if(st)st.remove();document.title=_t},700);
+  var logo=(s&&s.logo)?'<img src="'+s.logo+'" style="height:46px;margin-bottom:4px">':'';
+  var css=''+
+    '*{box-sizing:border-box}'+
+    'body{font-family:Tahoma,Arial,sans-serif;margin:0;padding:8mm;color:#1A2A3A;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.head{text-align:center;margin-bottom:10px}'+
+    '.head .t{font-size:20px;font-weight:800}'+
+    '.head .s{font-size:12px;color:#555}'+
+    '.grid::after{content:"";display:block;clear:both}'+  // clearfix สำหรับ float
+    '.pov-card{float:left;width:32.6%;margin:0 0.5% 8px 0;border:1px solid #C8CDD3;border-radius:8px;overflow:hidden;font-size:12px;page-break-inside:avoid;break-inside:avoid}'+
+    '.pov-card .ph{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#D9F0FB;color:#006F98;font-weight:700;font-size:12px;border-bottom:1px solid #C8CDD3}'+
+    '.pov-card .ph .ic{font-size:15px}'+
+    '.pov-card .ph .en{font-size:9px;color:#006F98;opacity:.75;font-weight:600}'+
+    '.pov-row{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;padding:3px 8px;border-bottom:1px dashed #DDE1E5;font-size:11.5px;line-height:1.25}'+
+    '.pov-row:last-child{border-bottom:none}'+
+    '.pov-nm{flex:1;min-width:0}'+
+    '.pov-nm .en,.pov-nm .sub{font-size:9px;color:#6B7A88}'+
+    '.px-ro{font-weight:700;white-space:nowrap}'+
+    '.pov-typehd{font-size:10.5px;font-weight:700;color:#344250;padding:5px 8px 2px;background:#F0F3F5}'+
+    '@page{size:A4 portrait;margin:7mm}';
+  var body='<div class="head">'+logo+'<div class="t">ค่าบริการซักผ้า '+name+'</div>'+
+    '<div class="s">เปิดทุกวัน 10:00–20:00'+(s&&s.phone?' · โทร. '+s.phone:'')+'</div></div>'+
+    '<div class="grid">'+povCards('',true)+'</div>';
+  return '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ตารางราคา '+name+'</title><style>'+css+'</style></head><body>'+body+'</body></html>';
+}
+function printPriceSheet(){
+  var doc=buildPriceSheetDoc();
+  var w=window.open('','_blank');
+  if(!w){toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — อนุญาต popup แล้วลองใหม่','err');return}
+  w.document.open();w.document.write(doc);w.document.close();
+  var go=function(){try{w.focus();w.print()}catch(e){}};
+  // รอให้ font/รูปโหลดก่อนพิมพ์
+  if(w.document.readyState==='complete')setTimeout(go,300);else w.onload=function(){setTimeout(go,300)};
 }
 
 // ═══ จัดการไอคอนหมวดบริการ (emoji + รูปจริง) ═══
