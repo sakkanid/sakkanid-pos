@@ -3883,16 +3883,17 @@ function exportReportCSV(type){
 }
 
 function renderPricelistPage(c){
-  curPriceTab='cat';
-  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'wg\')">⚖️ ชั่ง Kg</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
-  '<div class="card" id="priceContent"><div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\'cat\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\'cat\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\'cat\')">📥 Import CSV</button><input type="file" id="importFile_cat" accept=".csv" style="display:none" onchange="importPriceCSV(\'cat\',this)"></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div></div>';
+  curPriceTab='overview';
+  c.innerHTML='<div class="tabs"><div class="tab act" onclick="showPriceTab(this,\'overview\')">📊 ภาพรวมราคา</div><div class="tab" onclick="showPriceTab(this,\'cat\')">👕 ซักรีด ('+CAT.length+')</div><div class="tab" onclick="showPriceTab(this,\'bed\')">🛏️ เครื่องนอน</div><div class="tab" onclick="showPriceTab(this,\'cln\')">🧹 ทำความสะอาด</div><div class="tab" onclick="showPriceTab(this,\'wg\')">⚖️ ชั่ง Kg</div><div class="tab" onclick="showPriceTab(this,\'pkg\')">📦 Package</div></div>'+
+  '<div class="card" id="priceContent">'+renderPriceOverview()+'</div>';
 }
 function showPriceTab(el,tab){
   curPriceTab=tab;
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('act')});el.classList.add('act');
   var rc=$('priceContent');
   var eiBar='<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="exportPriceCSV(\''+tab+'\')">📤 Export CSV</button><button class="btn btn-out btn-sm" onclick="downloadPriceTemplate(\''+tab+'\')">📋 Template</button><button class="btn btn-am btn-sm" onclick="triggerImport(\''+tab+'\')">📥 Import CSV</button><input type="file" id="importFile_'+tab+'" accept=".csv" style="display:none" onchange="importPriceCSV(\''+tab+'\',this)"></div>';
-  if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
+  if(tab==='overview') rc.innerHTML=renderPriceOverview();
+  else if(tab==='cat') rc.innerHTML=eiBar+'<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search-box" style="flex:1"><input id="priceSearch" placeholder="ค้นหา..." oninput="filterPricelist()"></div><button class="btn btn-out btn-sm" onclick="openCatIconManager()">🎨 ไอคอนหมวด</button><button class="btn btn-pr btn-sm" onclick="openAddPriceItem()">➕ เพิ่มรายการใหม่</button></div><div id="priceList">'+renderPriceTable(CAT)+'</div>';
   else if(tab==='bed') rc.innerHTML=eiBar+renderBedPriceTable();
   else if(tab==='cln') rc.innerHTML=eiBar+renderClnPriceTable();
   else if(tab==='wg') rc.innerHTML=eiBar+renderWeightPriceTable();
@@ -3905,6 +3906,183 @@ function renderPriceTable(list){
 function renderBedPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddBedSet()">➕ เพิ่ม Set ใหม่</button></div>':'')+'<table><tr><th>ขนาด</th><th>รายการ</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+BED_SETS.map(function(b,i){return '<tr><td><strong>'+b.label+'</strong>'+enSmall(b.labelEn)+'</td><td>'+b.items.join(', ')+'</td><td><strong>'+thb(b.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(b.cost)+'</td><td style="color:var(--gn)">'+thb(b.price-b.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'bed\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderClnPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddClnSvc()">➕ เพิ่มบริการใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>ราคาขั้นต่ำ</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+(canEditPrice()?'<th></th>':'')+'</tr>'+CLN_SVCS.map(function(s,i){return '<tr><td><strong>'+s.label+'</strong>'+enSmall(s.labelEn)+'</td><td><strong>'+thb(s.minPrice)+'</strong></td>'+(canSeeCost()?'<td>'+thb(s.cost)+'</td><td style="color:var(--gn)">'+thb(s.minPrice-s.cost)+'</td>':'')+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'cln\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
 function renderPkgPriceTable(){return (canEditPrice()?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-pr btn-sm" onclick="openAddPkg()">➕ เพิ่ม Package ใหม่</button></div>':'')+'<table><tr><th>ประเภท</th><th>จำนวน</th><th>ราคา</th>'+(canSeeCost()?'<th>ต้นทุน</th><th>กำไร</th>':'')+'<th>อายุ</th>'+(canEditPrice()?'<th></th>':'')+'</tr>'+PKGS.map(function(p,i){return '<tr><td><strong>'+p.type+'</strong>'+enSmall(p.typeEn)+'</td><td>'+p.qty+' ชิ้น</td><td><strong>'+thb(p.price)+'</strong></td>'+(canSeeCost()?'<td>'+thb(p.cost)+'</td><td style="color:var(--gn)">'+thb(p.price-p.cost)+'</td>':'')+'<td>'+p.expDays+' วัน</td>'+(canEditPrice()?'<td><button class="btn btn-out btn-sm" onclick="openSvcPriceEdit(\'pkg\','+i+')">✏️</button></td>':'')+'</tr>'}).join('')+'</table>'}
+// ═══════════════════════════════════════════════════════════════
+// ═══ ภาพรวมราคา (Price Overview) — เห็นราคาทุกบริการในหน้าเดียว + แก้ตรงจุด ═══
+// ═══════════════════════════════════════════════════════════════
+function ensurePovStyle(){
+  if(document.getElementById('povStyle'))return;
+  var st=document.createElement('style');st.id='povStyle';
+  st.textContent=''+
+  '.pov-grid{column-width:280px;column-gap:14px}'+
+  '.pov-card{-webkit-column-break-inside:avoid;page-break-inside:avoid;break-inside:avoid;display:inline-block;width:100%;margin:0 0 14px;border:1px solid var(--b1);border-radius:12px;overflow:hidden;background:var(--wh);vertical-align:top;box-shadow:var(--sh,0 1px 6px rgba(0,0,0,.05))}'+
+  '.pov-card .ph{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--prl);color:var(--pr);font-weight:700;font-size:13px;border-bottom:1px solid var(--b1)}'+
+  '.pov-card .ph .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}'+
+  '.pov-card .ph .en{font-size:10px;color:var(--pr);opacity:.7;font-weight:600}'+
+  '.pov-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px dashed var(--b1);font-size:13px}'+
+  '.pov-row:last-child{border-bottom:none}'+
+  '.pov-nm{flex:1;min-width:0;line-height:1.25}'+
+  '.pov-nm .en{font-size:10px;color:var(--t3)}'+
+  '.pov-nm .sub{font-size:10px;color:var(--t3)}'+
+  '.pov-typehd{font-size:11px;font-weight:700;color:var(--t2);padding:7px 12px 3px;background:var(--bg)}'+
+  '.px-price{font-weight:700;color:var(--pr);cursor:pointer;white-space:nowrap;border-bottom:1px dashed transparent;padding:1px 2px;border-radius:4px}'+
+  '.px-price:hover{background:var(--prl);border-bottom-color:var(--pr)}'+
+  '.px-ro{font-weight:700;color:var(--t1);white-space:nowrap}'+
+  '.px-inp{width:78px;height:28px;text-align:right;font-weight:700;padding:2px 6px;border:2px solid var(--pr);border-radius:6px;font-size:13px}'+
+  '@media print{.pov-grid{column-width:auto;column-count:3;column-gap:10px}.pov-card{box-shadow:none}.px-price{color:#000!important}}';
+  document.head.appendChild(st);
+}
+// จัดกลุ่ม CAT ตามหมวด (คงลำดับเดิม) → [{c, ce, items:[{it,idx}]}]
+function povCatGroups(){
+  var order=[],map={};
+  CAT.forEach(function(it,idx){
+    if(!map[it.c]){map[it.c]={c:it.c,ce:it.ce||'',items:[]};order.push(it.c)}
+    if(!map[it.c].ce&&it.ce)map[it.c].ce=it.ce;
+    map[it.c].items.push({it:it,idx:idx});
+  });
+  return order.map(function(k){return map[k]});
+}
+// ราคาแบบแตะแก้ได้ (inline) — kind: cat|bed|cln|pkg
+function pxPriceHTML(kind,idx){
+  var v=pxGet(kind,idx);
+  if(!canEditPrice())return '<span class="px-ro">'+thb(v)+'</span>';
+  return '<span class="px-price" onclick="pxEdit(this,\''+kind+'\','+idx+')" title="แตะเพื่อแก้ราคา">'+thb(v)+'</span>';
+}
+function pxGet(kind,idx){
+  if(kind==='cat')return (CAT[idx]||{}).p||0;
+  if(kind==='bed')return (BED_SETS[idx]||{}).price||0;
+  if(kind==='cln')return (CLN_SVCS[idx]||{}).minPrice||0;
+  if(kind==='pkg')return (PKGS[idx]||{}).price||0;
+  return 0;
+}
+function pxSet(kind,idx,v){
+  if(kind==='cat'&&CAT[idx])CAT[idx].p=v;
+  else if(kind==='bed'&&BED_SETS[idx])BED_SETS[idx].price=v;
+  else if(kind==='cln'&&CLN_SVCS[idx])CLN_SVCS[idx].minPrice=v;
+  else if(kind==='pkg'&&PKGS[idx])PKGS[idx].price=v;
+}
+function pxEdit(el,kind,idx){
+  if(!canEditPrice()){toast('⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น','err');return}
+  var cur=pxGet(kind,idx);
+  var inp=document.createElement('input');
+  inp.type='number';inp.min='0';inp.step='1';inp.value=cur;inp.className='px-inp';
+  inp.dataset.kind=kind;inp.dataset.idx=idx;
+  el.replaceWith(inp);inp.focus();inp.select();
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();inp.blur()}
+    else if(e.key==='Escape'){e.preventDefault();inp._cancel=true;inp.blur()}
+  });
+  inp.addEventListener('blur',function(){pxCommit(inp)});
+}
+function pxCommit(inp){
+  if(inp._done)return;inp._done=true;
+  var kind=inp.dataset.kind,idx=parseInt(inp.dataset.idx,10);
+  if(!inp._cancel){
+    var v=parseFloat(inp.value);
+    if(!isNaN(v)&&v>=0){
+      var old=pxGet(kind,idx);
+      if(v!==old){
+        pxSet(kind,idx,v);
+        saveDB();if(typeof pushPriceToCloud==='function')pushPriceToCloud();
+        logAction('EDIT_PRICE','ภาพรวม '+kind+' idx:'+idx+' → '+thb(v));
+        toast('บันทึกราคา ✅ '+thb(v));
+      }
+    }
+  }
+  var tmp=document.createElement('span');tmp.innerHTML=pxPriceHTML(kind,idx);
+  var node=tmp.firstChild;inp.replaceWith(node);
+}
+// สร้างการ์ดทั้งหมด (forPrint = true → ราคาเป็นข้อความเฉยๆ ไม่มีปุ่มแก้)
+function povCards(q,forPrint){
+  q=(q||'').toLowerCase();
+  function keep(txt){return !q||String(txt).toLowerCase().indexOf(q)>=0}
+  function pr(kind,idx){return forPrint?'<span class="px-ro">'+thb(pxGet(kind,idx))+'</span>':pxPriceHTML(kind,idx)}
+  var cards='';
+  // 1) ซักรีด/ซักแห้ง — แยกตามหมวด
+  povCatGroups().forEach(function(g){
+    var rows=g.items.filter(function(o){return keep(g.c)||keep(o.it.t)||keep(o.it.o)||keep(g.ce)||keep(o.it.te)}).map(function(o){
+      var it=o.it;
+      var nm='<div class="pov-nm"><div>'+it.t+(it.o?' <span style="color:var(--t3)">· '+it.o+'</span>':'')+'</div>'+((it.te||it.oe)?'<div class="en">'+[it.te,it.oe].filter(Boolean).join(' · ')+'</div>':'')+'</div>';
+      return '<div class="pov-row">'+nm+pr('cat',o.idx)+'</div>';
+    }).join('');
+    if(!rows)return;
+    cards+='<div class="pov-card"><div class="ph"><span class="ic">'+catIconHTML(g.c,20)+'</span><span>'+g.c+(g.ce?' <span class="en">'+g.ce+'</span>':'')+'</span></div>'+rows+'</div>';
+  });
+  // 2) ชุดเครื่องนอน
+  var bedRows=BED_SETS.map(function(b,i){return {b:b,i:i}}).filter(function(o){return keep(o.b.label)||keep(o.b.labelEn)||keep('เครื่องนอน')||keep((o.b.items||[]).join(' '))}).map(function(o){
+    var b=o.b;
+    var nm='<div class="pov-nm"><div>'+b.label+'</div>'+(b.labelEn?'<div class="en">'+b.labelEn+'</div>':'')+((b.items&&b.items.length)?'<div class="sub">'+b.items.join(', ')+'</div>':'')+'</div>';
+    return '<div class="pov-row">'+nm+pr('bed',o.i)+'</div>';
+  }).join('');
+  if(bedRows)cards+='<div class="pov-card"><div class="ph"><span class="ic">🛏️</span><span>ชุดเครื่องนอน <span class="en">Bed & Bath</span></span></div>'+bedRows+'</div>';
+  // 3) ทำความสะอาด
+  var clnRows=CLN_SVCS.map(function(s,i){return {s:s,i:i}}).filter(function(o){return keep(o.s.label)||keep(o.s.labelEn)||keep('ทำความสะอาด')}).map(function(o){
+    var s=o.s;
+    var nm='<div class="pov-nm"><div>'+s.label+'</div>'+(s.labelEn?'<div class="en">'+s.labelEn+'</div>':'')+'<div class="sub">ราคาเริ่มต้น</div></div>';
+    return '<div class="pov-row">'+nm+pr('cln',o.i)+'</div>';
+  }).join('');
+  if(clnRows)cards+='<div class="pov-card"><div class="ph"><span class="ic">🧹</span><span>ทำความสะอาด <span class="en">Cleaning</span></span></div>'+clnRows+'</div>';
+  // 4) ชั่งกิโล (แสดงเรทตามน้ำหนัก + ปุ่มแก้ละเอียด)
+  var svcs=(typeof getWeightSvcs==='function')?getWeightSvcs():[];
+  var wgRows=svcs.map(function(s,i){return {s:s,i:i}}).filter(function(o){return keep(o.s.label)||keep('ชั่งกิโล')||keep('kg')}).map(function(o){
+    var s=o.s;
+    var edit=(!forPrint&&canEditPrice())?'<button class="btn btn-out btn-sm" style="padding:2px 8px;min-height:0;height:26px" onclick="openWeightSvcEdit('+o.i+')">✏️</button>':'';
+    var nm='<div class="pov-nm"><div>'+s.label+(s.minKg>0?' <span style="color:var(--t3);font-size:10px">(ขั้นต่ำ '+s.minKg+'กก.)</span>':'')+'</div><div class="sub">'+wTierSummary(s)+'</div></div>';
+    return '<div class="pov-row">'+nm+edit+'</div>';
+  }).join('');
+  if(wgRows)cards+='<div class="pov-card"><div class="ph"><span class="ic">⚖️</span><span>ชั่งกิโล (บาท/กก.) <span class="en">By Weight</span></span></div>'+wgRows+'</div>';
+  // 5) Package — จัดกลุ่มตามประเภท
+  var pkgOrder=[],pkgMap={};
+  PKGS.forEach(function(p,i){if(!pkgMap[p.type]){pkgMap[p.type]={type:p.type,typeEn:p.typeEn||'',items:[]};pkgOrder.push(p.type)}pkgMap[p.type].items.push({p:p,i:i})});
+  var pkgInner='';
+  pkgOrder.forEach(function(k){
+    var g=pkgMap[k];
+    var rows=g.items.filter(function(o){return keep(g.type)||keep(g.typeEn)||keep('package')||keep('แพ็ก')}).map(function(o){
+      var p=o.p;
+      var nm='<div class="pov-nm"><div>'+p.qty+' ชิ้น'+(p.expDays?' <span style="color:var(--t3);font-size:10px">· '+p.expDays+' วัน</span>':' <span style="color:var(--t3);font-size:10px">· ไม่หมดอายุ</span>')+'</div></div>';
+      return '<div class="pov-row">'+nm+pr('pkg',o.i)+'</div>';
+    }).join('');
+    if(rows)pkgInner+='<div class="pov-typehd">'+g.type+(g.typeEn?' <span style="font-weight:400;color:var(--t3)">'+g.typeEn+'</span>':'')+'</div>'+rows;
+  });
+  if(pkgInner)cards+='<div class="pov-card"><div class="ph"><span class="ic">📦</span><span>แพ็กเกจ <span class="en">Package</span></span></div>'+pkgInner+'</div>';
+  return cards||'<div class="empty-state"><div class="es-text">ไม่พบรายการที่ค้นหา</div></div>';
+}
+function renderPriceOverview(){
+  ensurePovStyle();
+  var s=(typeof getShopSettings==='function')?getShopSettings():{};
+  var name=(s&&s.shopName)||'ร้านซักกะนิด';
+  var canEd=canEditPrice();
+  var total=CAT.length+BED_SETS.length+CLN_SVCS.length+PKGS.length+((typeof getWeightSvcs==='function')?getWeightSvcs().length:0);
+  var head='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">'+
+    '<div><div style="font-size:16px;font-weight:800;color:var(--pr)">📊 ค่าบริการซักผ้า — '+name+'</div>'+
+    '<div style="font-size:12px;color:var(--t3)">เปิดทุกวัน 10:00–20:00 · รวม '+total+' รายการ'+(canEd?' · <span style="color:var(--pr)">แตะที่ราคาเพื่อแก้ไขได้ทันที</span>':'')+'</div></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-out btn-sm" onclick="printPriceSheet()">🖨️ พิมพ์ตารางราคา</button></div>'+
+    '</div>';
+  var search='<div class="search-box" style="margin-bottom:12px"><input id="povSearch" placeholder="🔎 ค้นหาบริการ / ประเภท / ราคา..." oninput="povFilter()"></div>';
+  return head+search+'<div id="povGrid" class="pov-grid">'+povCards('',false)+'</div>';
+}
+function povFilter(){
+  var q=($('povSearch')?$('povSearch').value:'')||'';
+  var g=$('povGrid');if(g)g.innerHTML=povCards(q,false);
+}
+function printPriceSheet(){
+  ensurePovStyle();
+  var s=(typeof getShopSettings==='function')?getShopSettings():{};
+  var name=(s&&s.shopName)||'ร้านซักกะนิด';
+  var logo=(s&&s.logo)?'<img src="'+s.logo+'" style="height:44px;margin-bottom:4px">':'';
+  var html='<div style="font-family:Tahoma,Arial,sans-serif">'+
+    '<div style="text-align:center;margin-bottom:10px">'+logo+'<div style="font-size:20px;font-weight:800">ค่าบริการซักผ้า '+name+'</div>'+
+    '<div style="font-size:12px;color:#555">เปิดทุกวัน 10:00–20:00'+(s&&s.phone?' · โทร. '+s.phone:'')+'</div></div>'+
+    '<div class="pov-grid">'+povCards('',true)+'</div></div>';
+  var pa=$('printArea');pa.innerHTML=html;pa.className='';pa.style.display='block';
+  var oldStyle=document.getElementById('dynPageStyle');if(oldStyle)oldStyle.remove();
+  var st=document.createElement('style');st.id='dynPageStyle';
+  st.innerHTML='@media print{#printArea{width:100%!important;font-weight:400!important;left:0!important;top:0!important;position:absolute!important}#printArea *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}@page{size:A4 portrait;margin:8mm}}';
+  document.head.appendChild(st);
+  var _t=document.title;document.title='ตารางราคา_'+name;
+  window.print();
+  setTimeout(function(){pa.style.display='none';pa.innerHTML='';if(st)st.remove();document.title=_t},700);
+}
+
 // ═══ จัดการไอคอนหมวดบริการ (emoji + รูปจริง) ═══
 function openCatIconManager(){
   if(!canEditPrice()){toast("⛔ เฉพาะเจ้าของร้าน/ผู้จัดการเท่านั้น","err");return}
@@ -4302,9 +4480,9 @@ function applyImport(mode){
   showImportSummary(info.name,mode,count,totalNow);
 }
 function reopenPriceTab(tab){
-  if(tab==='cat')return; // เป็นแท็บ default อยู่แล้ว
+  if(tab==='overview'||!tab)return; // ภาพรวมเป็นแท็บ default อยู่แล้ว
   setTimeout(function(){
-    var tabs=document.querySelectorAll('#mainContent .tabs .tab');var map={bed:1,cln:2,wg:3,pkg:4};
+    var tabs=document.querySelectorAll('#mainContent .tabs .tab');var map={cat:1,bed:2,cln:3,wg:4,pkg:5};
     var el=tabs[map[tab]];if(el)showPriceTab(el,tab);
   },50);
 }
