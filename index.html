@@ -572,20 +572,34 @@ function fixDuplicateMemberIds(silent){
   return fixed;
 }
 // ── ปรับรหัสสมาชิกที่ไม่ใช่ SKN- (เช่น MBR- จาก webhook เวอร์ชันเก่า) ให้เป็น SKN- + อัปเดต reference ──
+// รหัสสำหรับ LINE Friend (ยังไม่เป็นสมาชิกเต็มตัว) — แยก sequence ไม่กินเลข SKN
+function genLeadId(){
+  var maxN=0;(DB.members||[]).forEach(function(m){var id=String(m&&m.id||'');if(id.indexOf('LINE-')===0){var n=parseInt(id.slice(5),10)||0;if(n>maxN)maxN=n}});
+  var next=Math.max((DB.leadSeq||0),maxN)+1;DB.leadSeq=next;
+  return 'LINE-'+String(next).padStart(4,'0');
+}
+// เลขสมาชิก SKN รันต่อเนื่องเฉพาะ "สมาชิกเต็มตัว" (มีเบอร์) · LINE Friend ใช้รหัส LINE- แยก
 function normalizeMemberIds(silent){
   var renamed=0,detail=[];
   (DB.members||[]).forEach(function(m){
     if(!m||!m.id)return;
-    if(String(m.id).indexOf('SKN-')===0)return;
-    var oldId=m.id;var newId=genId('SKN');
-    (DB.orders||[]).forEach(function(o){if(o.mid===oldId)o.mid=newId});
-    (DB.quotas||[]).forEach(function(q){if(q.mid===oldId)q.mid=newId});
-    m.id=newId;renamed++;detail.push(oldId+'→'+newId+' ('+(m.name||'')+')');
+    var lead=isLead(m);
+    var isSkn=String(m.id).indexOf('SKN-')===0;
+    var isLine=String(m.id).indexOf('LINE-')===0;
+    var newId=null;
+    if(lead){ if(!isLine) newId=genLeadId(); }   // LINE Friend → LINE-#### (ไม่รันเลขสมาชิก)
+    else { if(!isSkn) newId=genId('SKN'); }       // สมาชิกเต็มตัว → SKN-####
+    if(newId){
+      var oldId=m.id;
+      (DB.orders||[]).forEach(function(o){if(o.mid===oldId)o.mid=newId});
+      (DB.quotas||[]).forEach(function(q){if(q.mid===oldId)q.mid=newId});
+      m.id=newId;renamed++;detail.push(oldId+'→'+newId+' ('+(m.name||'')+')');
+    }
   });
   if(renamed){
     saveDB();
-    logAction('NORMALIZE_ID','แปลงรหัสสมาชิกเป็น SKN '+renamed+' ราย: '+detail.join(', '));
-    if(!silent) toast('🔧 ปรับรหัสสมาชิกเป็น SKN '+renamed+' รายการ ✅');
+    logAction('NORMALIZE_ID','ปรับรหัสสมาชิก '+renamed+' ราย: '+detail.join(', '));
+    if(!silent) toast('🔧 ปรับรหัสสมาชิก '+renamed+' รายการ ✅');
   }
   return renamed;
 }
@@ -1318,6 +1332,7 @@ function orderCardHTML(o){
     '<div class="o-head" style="flex-wrap:wrap;gap:4px"><span class="o-id">'+o.id+'</span>'+catBadge(o)+'<span class="st-tag '+getStClass(o.status)+'">'+o.status+'</span><span class="o-date">'+o.createdAt+'</span></div>'+
     '<div class="o-cust">'+(o.mname||'Walk-in')+'</div>'+
     '<div class="o-info">'+((o.items||[]).length)+' รายการ · '+(o.delivery==='delivery'?'🚗 Delivery':'🏪 รับที่ร้าน')+'</div>'+
+    venderBadgeForOrder(o)+
     '<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span class="o-total">'+thb(o.net)+'</span>'+
     (paid?'<span class="badge bg-gn">✅ ชำระแล้ว</span>':'<span class="badge bg-rd">ค้าง '+thb(remaining(o))+'</span>')+'</div>'+
     (o.note?'<div style="font-size:11px;color:var(--am);margin-top:4px">📝 '+o.note+'</div>':'')+
@@ -2301,6 +2316,7 @@ function boardCardHTML(o){
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px"><span class="o-id" style="font-size:13px">'+o.id+'</span><span class="badge" style="background:'+cat.color+'1F;color:'+cat.color+';font-size:10px;font-weight:700;white-space:nowrap">'+cat.icon+' '+cat.label+'</span></div>'+
     '<div style="font-weight:600;font-size:13px;margin-top:3px">'+(o.mname||'Walk-in')+'</div>'+
     '<div style="font-size:11px;color:var(--t3)">'+((o.items||[]).length)+' รายการ · '+(o.delivery==='delivery'?'🚗 ส่ง':'🏪 รับที่ร้าน')+'</div>'+
+    venderBadgeForOrder(o)+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span style="font-weight:700;color:var(--pr)">'+thb(o.net)+'</span>'+(paid?'<span class="badge bg-gn" style="font-size:10px">✅ ชำระแล้ว</span>':'<span class="badge bg-rd" style="font-size:10px">ค้าง '+thb(remaining(o))+'</span>')+'</div>'+
     (acts?'<div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">'+acts+'</div>':'')+
     '</div>';
@@ -2888,6 +2904,7 @@ function renderVenderPage(c){
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
     '<span style="font-size:12px;color:var(--t2)">📅 วันที่</span>'+
     '<input type="date" id="vd-date" value="'+d+'" onchange="vdChangeDate(this.value)" style="height:32px;font-size:13px;min-height:0;width:auto">'+
+    '<span id="vd-datelbl" style="font-size:13px;font-weight:700;color:var(--pr)">'+venderDateLabelTH(d)+'</span>'+
     '<button class="btn btn-out btn-sm" onclick="vdChangeDate(\''+todayStr()+'\')">วันนี้</button>'+
     '<button class="btn btn-out btn-sm" onclick="openVenderManage()">🏷️ จัดการร้าน</button>'+
     '<button class="btn btn-out btn-sm" onclick="openVenderPriceEditor()">💵 ตั้งราคา</button>'+
@@ -2900,15 +2917,17 @@ function renderVenderPage(c){
     '</div><div id="vd-body"></div>';
   renderVdTabs();renderVenderBody();
 }
-function vdChangeDate(v){window._vdSelDate=v||todayStr();var el=$('vd-date');if(el&&el.value!==window._vdSelDate)el.value=window._vdSelDate;renderVdTabs();renderVenderBody()}
+function vdChangeDate(v){window._vdSelDate=v||todayStr();var el=$('vd-date');if(el&&el.value!==window._vdSelDate)el.value=window._vdSelDate;var lb=$('vd-datelbl');if(lb)lb.innerHTML=venderDateLabelTH(window._vdSelDate);renderVdTabs();renderVenderBody()}
 function vdSetTab(t){window._vdTab=t;renderVdTabs();renderVenderBody()}
 function renderVdTabs(){
   var box=$('vd-tabs');if(!box)return;syncVenderList();
   var d=venderSelDate(),assign=getVenderAssign();
   var orders=ordersForDate(d);
   var unassigned=orders.filter(function(o){return !(assign[o.id])}).length;
+  var sendableUnassigned=orders.filter(function(o){return !venderNoSend(o)&&!(assign[o.id])}).length;
   var tabs='<div class="tabs" style="flex-wrap:wrap">';
-  tabs+='<div class="tab'+(window._vdTab==='inbox'?' act':'')+'" onclick="vdSetTab(\'inbox\')">📋 ออเดอร์วันนี้ ('+orders.length+')'+(unassigned?' · ยังไม่จ่าย '+unassigned:'')+'</div>';
+  tabs+='<div class="tab'+(window._vdTab==='inbox'?' act':'')+'" onclick="vdSetTab(\'inbox\')">📋 ออเดอร์วันนี้ ('+orders.length+')</div>';
+  tabs+='<div class="tab'+(window._vdTab==='unassigned'?' act':'')+'" onclick="vdSetTab(\'unassigned\')" style="'+(sendableUnassigned?'color:#C92A2A;font-weight:700':'')+'">⚠️ ยังไม่เลือกร้าน ('+sendableUnassigned+')</div>';
   VENDER_LIST.forEach(function(v,vi){
     var cnt=orders.filter(function(o){return (assign[o.id]||'')===v}).length;
     var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+venderColorByIndex(vi)+';margin-right:5px;vertical-align:middle"></span>';
@@ -2919,22 +2938,29 @@ function renderVdTabs(){
 }
 function renderVenderBody(){
   var box=$('vd-body');if(!box)return;syncVenderList();
-  if(window._vdTab==='inbox'){box.innerHTML=renderVdInbox();return}
+  if(window._vdTab==='inbox'){box.innerHTML=renderVdInbox('all');return}
+  if(window._vdTab==='unassigned'){box.innerHTML=renderVdInbox('unassigned');return}
   var vi=parseInt(String(window._vdTab).replace('v',''),10);
   var vname=VENDER_LIST[vi];
-  if(vname==null){window._vdTab='inbox';box.innerHTML=renderVdInbox();return}
+  if(vname==null){window._vdTab='inbox';box.innerHTML=renderVdInbox('all');return}
   box.innerHTML=venderCardNew(vname,vi,venderSelDate());
 }
-// ── แท็บ inbox: ทุกออเดอร์ของวันนี้ + dropdown จ่ายงาน ──
-function renderVdInbox(){
+// ── แท็บ inbox: ทุกออเดอร์ของวันนี้ + dropdown จ่ายงาน (mode: 'all' | 'unassigned') ──
+function renderVdInbox(mode){
+  mode=mode||'all';
   var d=venderSelDate(),assign=getVenderAssign();
-  var orders=ordersForDate(d);
-  var assignedCnt=orders.filter(function(o){return assign[o.id]}).length;
-  var sendable=orders.filter(function(o){return !venderNoSend(o)}).length;
+  var allOrders=ordersForDate(d);
+  var orders=(mode==='unassigned')?allOrders.filter(function(o){return !venderNoSend(o)&&!(assign[o.id])}):allOrders;
+  var assignedCnt=allOrders.filter(function(o){return assign[o.id]}).length;
+  var sendable=allOrders.filter(function(o){return !venderNoSend(o)}).length;
+  var title=(mode==='unassigned')?'⚠️ ออเดอร์ที่ยังไม่เลือกร้าน — '+venderDateLabelTH(d)+' ('+orders.length+')':'📋 ออเดอร์วันที่ '+venderDateLabelTH(d)+' ('+allOrders.length+' ออเดอร์)';
   var head='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
-    '<div class="card-title" style="margin:0">📋 ออเดอร์วันที่ '+venderDateLabelTH(d)+' ('+orders.length+' ออเดอร์)</div>'+
+    '<div class="card-title" style="margin:0'+(mode==='unassigned'?';color:#C92A2A':'')+'">'+title+'</div>'+
     '<div style="font-size:12px;color:var(--t3)">แตะที่รหัสออเดอร์เพื่อดูรายละเอียด · เลือกร้านในช่อง "เลือกร้านที่ส่งซัก" (แถวสีฟ้า = จ่ายแล้ว)</div></div>';
-  if(!orders.length)return head+'<div class="empty-state"><div class="es-text">ยังไม่มีออเดอร์ในวันนี้</div></div></div>';
+  if(!orders.length){
+    if(mode==='unassigned')return head+'<div class="empty-state"><div class="es-icon">✅</div><div class="es-text">จ่ายงานครบทุกออเดอร์แล้ว — ไม่มีออเดอร์ค้าง</div></div></div>';
+    return head+'<div class="empty-state"><div class="es-text">ยังไม่มีออเดอร์ในวันนี้</div></div></div>';
+  }
   var th='border:1px solid #999;padding:6px 8px;background:#e8eef4;font-weight:700;text-align:center;font-size:12px';
   var thA='border:1px solid #999;padding:6px 8px;background:#FFF4D6;font-weight:700;text-align:center;font-size:12px';
   var td='border:1px solid #999;padding:5px 8px;font-size:12px;vertical-align:middle';
@@ -2951,10 +2977,10 @@ function renderVdInbox(){
     var sel;
     if(noSend){sel='<span style="font-size:11px;color:var(--t3);font-style:italic">— ไม่ต้องส่งร้าน —</span>';}
     else{
-      var opts='<option value="">— ยังไม่จ่าย —</option>'+VENDER_LIST.map(function(v){return '<option value="'+attrEsc(v)+'"'+(v===cur?' selected':'')+'>'+v+'</option>'}).join('');
-      var vcol=cur?venderColor(cur):'#E0A800';
+      var opts='<option value="">— กรุณาเลือก Vender —</option>'+VENDER_LIST.map(function(v){return '<option value="'+attrEsc(v)+'"'+(v===cur?' selected':'')+'>'+v+'</option>'}).join('');
+      var vcol=cur?venderColor(cur):'#C92A2A';
       var dot=cur?'<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+vcol+';flex:0 0 auto"></span>':'';
-      sel='<div style="display:flex;align-items:center;gap:6px">'+dot+'<select onchange="assignOrderVendor(\''+o.id+'\',this.value)" style="height:34px;min-height:0;font-size:13px;font-weight:700;width:100%;color:'+(cur?vcol:'#1A2A3A')+';background:#fff;border:2px solid '+vcol+';border-radius:6px;padding:0 8px">'+opts+'</select></div>';
+      sel='<div style="display:flex;align-items:center;gap:6px">'+dot+'<select onchange="assignOrderVendor(\''+o.id+'\',this.value)" style="height:34px;min-height:0;font-size:13px;font-weight:700;width:100%;color:'+vcol+';background:'+(cur?'#fff':'#FFF5F5')+';border:2px solid '+vcol+';border-radius:6px;padding:0 8px">'+opts+'</select></div>';
     }
     // สีพื้นแถว: ซื้อแพ็กเกจ=เทาอ่อน · จ่ายแล้ว=ฟ้าอ่อน · ยังไม่จ่าย=เหลืองจาง
     var bg=noSend?'#F4F6F8':(cur?'#E3F2FB':'#FFFDF5');
@@ -2969,6 +2995,13 @@ function renderVdInbox(){
   var tbl='<div class="card" style="overflow-x:auto"><div style="font-size:12px;color:var(--t2);margin-bottom:6px">จ่ายงานแล้ว '+assignedCnt+'/'+sendable+' ออเดอร์ที่ต้องส่งซัก</div><table style="'+VD_TBL+'">'+
     '<tr><th style="'+th+';width:4%">#</th><th style="'+th+';width:7%">เวลา</th><th style="'+th+';width:11%">ออเดอร์</th><th style="'+th+';width:14%">ลูกค้า</th><th style="'+th+';width:10%">ประเภท</th><th style="'+th+';width:26%">รายการที่ส่งซัก</th><th style="'+th+';width:9%">จำนวน</th><th style="'+thA+';width:19%">เลือกร้านที่ส่งซัก</th></tr>'+rowsHtml+'</table></div>';
   return head+'</div>'+tbl;
+}
+// ป้ายชื่อร้านที่ส่งซัก (โชว์บนการ์ดสถานะออเดอร์ เตือนแอดมินว่าทำรายการแล้ว)
+function venderBadgeForOrder(o){
+  if(!o||venderNoSend(o))return '';
+  var v=(getVenderAssign()||{})[o.id];if(!v)return '';
+  var c=venderColor(v);
+  return '<div style="margin-top:4px"><span style="display:inline-flex;align-items:center;gap:4px;background:'+c+'18;color:'+c+';border:1px solid '+c+';border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700">🏷️ ส่งซัก: '+v+'</span></div>';
 }
 // ออเดอร์ที่ไม่มีผ้าส่งซัก (ซื้อแพ็กเกจเฉยๆ) — แสดงแต่ไม่ต้องจ่ายร้าน
 function venderNoSend(o){return o.type==='pkg_buy'}
@@ -2995,9 +3028,9 @@ function assignOrderVendor(oid,v){
   saveDB();pushVenderCloud();
   logAction('CHANGE_SETTINGS','จ่ายงาน '+oid+' → '+(v||'(ไม่จ่าย)'));
   toast(v?('จ่ายงาน '+oid+' → '+v+' ✅'):'เอา '+oid+' ออกจากการจ่ายงานแล้ว');
-  renderVdTabs();renderVdInbox_refresh();
+  renderVdTabs();
+  if(window._vdTab==='inbox'||window._vdTab==='unassigned')renderVenderBody();
 }
-function renderVdInbox_refresh(){if(window._vdTab==='inbox'){var b=$('vd-body');if(b)b.innerHTML=renderVdInbox()}}
 
 // ── สไตล์ตาราง ──
 var VD_TBL='border-collapse:collapse;width:100%;table-layout:fixed;font-family:Tahoma,Arial,sans-serif';
@@ -3470,7 +3503,7 @@ function memListFiltered(){
 function renderMemberTable(list){
   if(!list.length) return '<div class="empty-state"><div class="es-text">ไม่มีสมาชิก</div></div>';
   return '<table><tr><th>ID</th><th>ชื่อ</th><th>ชื่อ LINE</th><th>เบอร์</th><th>แต้ม</th><th>ยอดซื้อ</th><th>ระดับ</th></tr>'+
-    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+m.id+'</td><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-gn" style="font-size:10px">🟢 LINE Friend</span>':'')+'</td><td style="font-size:12px;color:var(--t2)">'+(m.lineName?'💬 '+m.lineName:'<span style="color:var(--t3)">-</span>')+'</td><td>'+(fmtPhone(m.phone)||'<span style="color:var(--am);font-size:12px">— ยังไม่มีเบอร์</span>')+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
+    list.map(m=>'<tr style="cursor:pointer" onclick="viewMemberDetail(\''+m.id+'\')"><td>'+(isLead(m)?'<span style="color:var(--t3);font-size:11px">🟢 ยังไม่เป็นสมาชิก</span>':m.id)+'</td><td><strong>'+m.name+'</strong>'+(isLead(m)?' <span class="badge bg-gn" style="font-size:10px">🟢 LINE Friend</span>':'')+'</td><td style="font-size:12px;color:var(--t2)">'+(m.lineName?'💬 '+m.lineName:'<span style="color:var(--t3)">-</span>')+'</td><td>'+(fmtPhone(m.phone)||'<span style="color:var(--am);font-size:12px">— ยังไม่มีเบอร์</span>')+'</td><td>'+m.pts+'</td><td>'+thb(m.spend)+'</td><td><span class="badge bg-'+(m.level==='VIP'?'pp':m.level==='Gold'?'am':m.level==='Silver'?'pr':'gr')+'">'+m.level+'</span></td></tr>').join('')+'</table>';
 }
 function filterMembersPage(){
   $('memPageList').innerHTML=renderMemberTable(memListFiltered());
@@ -5361,9 +5394,13 @@ function renderSettingsBackup(){
     ' · โควต้ากลาง: '+(DB.shopQuotas||[]).length+
     '<br>localStorage: '+Math.round(JSON.stringify(DB).length/1024)+' KB'+
     '<br>Offline queue: '+offlineQueue.length+' รายการค้าง</div>'+
-    '<hr style="margin:14px 0"><div class="card-title" style="font-size:13px;color:var(--am)">🗑️ ล้างประวัติออเดอร์</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:8px">ลบออเดอร์ทั้งหมดออกจากระบบ (เก็บสมาชิก/ตารางราคา/ตั้งค่าไว้)</p>'+
-    '<button class="btn btn-am btn-sm" onclick="clearOrdersOnly()">ล้างออเดอร์ทั้งหมด</button>'+
+    '<hr style="margin:14px 0"><div class="card-title" style="font-size:13px;color:var(--am)">🗑️ ล้างข้อมูล / เริ่มใหม่ <span style="font-weight:normal;color:var(--t3);font-size:11px">(เก็บตารางราคา + ตั้งค่าไว้)</span></div>'+
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:8px">เลือกล้างเฉพาะส่วนที่ต้องการ — ตารางราคา, ราคา Vender และการตั้งค่าจะยังอยู่เสมอ</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn btn-am btn-sm" onclick="clearOrdersOnly()">🧾 ล้างออเดอร์ทั้งหมด</button>'+
+    '<button class="btn btn-am btn-sm" onclick="clearMembersOnly()">👥 ล้างสมาชิกทั้งหมด</button>'+
+    '<button class="btn btn-rd btn-sm" onclick="clearOrdersAndMembers()">🧹 เริ่มใหม่ (ลบออเดอร์ + สมาชิก)</button>'+
+    '</div>'+
     '<hr style="margin:14px 0"><div class="card-title" style="font-size:13px;color:var(--rd)">🗑️ ล้างข้อมูลทั้งหมด</div>'+
     '<button class="btn btn-rd btn-sm" onclick="clearAllData()">ล้างข้อมูลทั้งหมด (ไม่สามารถย้อนกลับ)</button></div>';
 }
@@ -5388,6 +5425,38 @@ async function clearOrdersOnly(){
     toast('🗑️ ล้างประวัติออเดอร์แล้ว ✅');
   }
   logAction('CLEAR_ORDERS','all orders cleared');
+  renderPage(curPage);
+}
+async function clearMembersOnly(){
+  if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
+  if(!confirm('⚠️ ล้างสมาชิกทั้งหมด?\n\nสมาชิก '+(DB.members||[]).length+' ราย และโควต้าลูกค้าจะถูกลบ (ทั้งในเครื่องและ Cloud)\n(ออเดอร์ ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
+  if(!confirm('❗ ยืนยันอีกครั้ง — ลบสมาชิกทั้งหมดจริงหรือ? ย้อนกลับไม่ได้')) return;
+  DB.members=[];DB.quotas=[];DB.memberSeq=0;DB.leadSeq=0;saveDB();
+  if(getApiUrl()){
+    toast('🔄 กำลังล้างสมาชิกใน Cloud...','info');
+    var sheets=['members','quotas','line_users'];var cleared=0;
+    for(var i=0;i<sheets.length;i++){try{var r=await jsonpCall('clearSheet',sheets[i]);if(r&&r.ok)cleared++}catch(e){}}
+    toast('🗑️ ล้างสมาชิกแล้ว ('+cleared+' sheets) ✅');
+  }else toast('🗑️ ล้างสมาชิกแล้ว ✅');
+  logAction('CLEAR_MEMBERS','all members cleared');
+  renderPage(curPage);
+}
+async function clearOrdersAndMembers(){
+  if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
+  if(!confirm('⚠️ เริ่มใหม่ — ลบออเดอร์ '+(DB.orders||[]).length+' + สมาชิก '+(DB.members||[]).length+' ราย?\n\n(ตารางราคา, ราคา Vender และตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
+  if(prompt('พิมพ์ "เริ่มใหม่" เพื่อยืนยันการลบออเดอร์+สมาชิกทั้งหมด:')!=='เริ่มใหม่'){toast('ยกเลิก','info');return}
+  DB.orders=[];DB.docs=[];DB.members=[];DB.quotas=[];
+  DB.orderSeq=0;DB.memberSeq=0;DB.leadSeq=0;
+  // ล้างการจ่ายงาน Vender + ค่าที่กรอกในใบคุม (แต่เก็บราคา Vender ไว้)
+  var s=getShopSettings();s.venderAssign={};s.venderEdit={};
+  saveDB();pushVenderCloud();
+  if(getApiUrl()){
+    toast('🔄 กำลังล้างข้อมูลใน Cloud...','info');
+    var sheets=['orders','orders_laundry','orders_package','orders_bedset','orders_cleaning','docs','members','quotas','line_users'];var cleared=0;
+    for(var i=0;i<sheets.length;i++){try{var r=await jsonpCall('clearSheet',sheets[i]);if(r&&r.ok)cleared++}catch(e){}}
+    toast('🧹 เริ่มใหม่แล้ว ('+cleared+' sheets) — เก็บราคา/ตั้งค่าไว้ ✅');
+  }else toast('🧹 เริ่มใหม่แล้ว — เก็บราคา/ตั้งค่าไว้ ✅');
+  logAction('RESET_ORDERS_MEMBERS','orders + members cleared (kept prices/settings)');
   renderPage(curPage);
 }
 function clearAllData(){
@@ -5811,8 +5880,15 @@ function saveEditMember(mid){
   m.room=$('em-room')?$('em-room').value.trim():'';
   m.pts=parseInt($('em-pts').value)||0;m.level=$('em-level').value;
   m.lang=$('em-lang')?$('em-lang').value:(m.lang||'th');
-  // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ → บวกแต้มต้อนรับ + ส่ง LINE ──
+  // ── อัปเกรด Lead → สมาชิกเต็มตัว เมื่อเพิ่งเติมเบอร์ → ออกเลขสมาชิก SKN + บวกแต้มต้อนรับ + ส่ง LINE ──
   if(wasLead&&!isLead(m)){
+    // เพิ่งเป็นสมาชิกเต็มตัว → ออกเลข SKN รันต่อเนื่อง (ถ้ายังไม่ใช่ SKN)
+    if(String(m.id).indexOf('SKN-')!==0){
+      var oldId=m.id;var newId=genId('SKN');
+      (DB.orders||[]).forEach(function(o){if(o.mid===oldId)o.mid=newId});
+      (DB.quotas||[]).forEach(function(q){if(q.mid===oldId)q.mid=newId});
+      m.id=newId;mid=newId;logAction('ASSIGN_SKN',oldId+'→'+newId+' ('+m.name+')');
+    }
     var s=getShopSettings();
     var wpts=parseInt(s.welcomePts||(s.crm&&s.crm.welcomePts)||50)||0;
     m.pts=(parseInt(m.pts)||0)+wpts; // บวกแต้มต้อนรับตามที่ตั้งค่าใน CRM
@@ -6658,10 +6734,9 @@ function openAddShopQuota(){
   var h='<div class="modal-overlay show" id="moSQ"><div class="modal" style="max-width:480px"><div class="modal-head"><h3>➕ เพิ่มโควต้าส่วนกลาง</h3><button class="modal-close" onclick="document.getElementById(\'moSQ\').remove()">&times;</button></div>'+
     '<div class="modal-body">'+
     '<div class="form-group"><label class="form-label">ชื่อโควต้า</label><input id="sq-name" placeholder="เช่น โควต้าซักทั่วไป"></div>'+
-    '<div class="form-group"><label class="form-label">ประเภทบริการ <span style="color:var(--t3);font-weight:normal">(ตามหมวดในตารางราคา)</span></label><select id="sq-type"><option value="ซักทั่วไป">⭐ ซักทั่วไป (ตัดจากทุกบริการ)</option>'+
-    '<optgroup label="── หมวดบริการเฉพาะ ──">'+
+    '<div class="form-group"><label class="form-label">ประเภทบริการ <span style="color:var(--t3);font-weight:normal">(ตามหมวดในตารางราคา — ต้องเลือก)</span></label><select id="sq-type"><option value="">— เลือกหมวดบริการที่จะตัดโควต้า —</option>'+
     validCats.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('')+
-    '</optgroup></select></div>'+
+    '</select><div style="font-size:11px;color:var(--t3);margin-top:4px">โควต้าจะตัดเฉพาะออเดอร์ในหมวดบริการนี้เท่านั้น (ดึงข้อมูลถูกต้อง)</div></div>'+
     '<div class="grid g2">'+
     '<div class="form-group"><label class="form-label">จำนวน (ชิ้น)</label><input id="sq-qty" type="number" min="1" value="100"></div>'+
     '<div class="form-group"><label class="form-label">ต้นทุนรวม (฿)</label><input id="sq-cost" type="number" min="0" value="0"></div></div>'+
@@ -6672,6 +6747,7 @@ function openAddShopQuota(){
 function saveAddShopQuota(){
   var qty=parseInt($('sq-qty').value)||0;var cost=parseFloat($('sq-cost').value)||0;
   if(!qty){toast('กรุณาระบุจำนวน','warn');return}
+  if(!$('sq-type')||!$('sq-type').value){toast('กรุณาเลือกหมวดบริการที่จะตัดโควต้า','warn');return}
   var q={
     id:genId('SQT'),name:$('sq-name').value||'โควต้าซัก',type:$('sq-type').value,
     total:qty,used:0,remain:qty,
