@@ -3485,9 +3485,37 @@ function renderMembersPage(c){
       memFilterChip('full','✅ สมาชิกเต็มตัว ('+fullCnt+')')+
       memFilterChip('lead','🟢 LINE Friend — ยังไม่เป็นสมาชิก ('+leadCnt+')')+'</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="syncLineFriends(false)">🔄 ดึง LINE Friend</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
     (window._memFilter==='lead'?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">💡 LINE Friend = ทักแชทเข้ามาแล้ว แต่ยังไม่มีเบอร์ (ยังไม่เป็นสมาชิกเต็มตัว) — กดที่รายชื่อ → ✏️ แก้ไข → ใส่เบอร์ แล้วเซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
     '<div id="memPageList">'+renderMemberTable(memListFiltered())+'</div></div>';
+  // ดึง LINE Friend จากชีต line_users อัตโนมัติ (เงียบ) — คนที่ทักไลน์มาแต่ยังไม่เป็นสมาชิก
+  if(typeof getApiUrl==='function'&&getApiUrl()){syncLineFriends(true).then(function(n){if(n>0&&curPage==='members')renderPage('members')})}
+}
+// ── ดึงรายชื่อ LINE Friend (คนที่ทักไลน์มา) จากชีต line_users → สร้างเป็น lead (ไม่ให้เลขสมาชิก ไม่ส่งข้อความ) ──
+async function syncLineFriends(silent){
+  var apiUrl=(typeof getApiUrl==='function')?getApiUrl():'';
+  if(!apiUrl){if(!silent)toast('⚠️ ยังไม่ได้เชื่อม Cloud','err');return 0}
+  try{
+    if(!silent)toast('🔄 กำลังดึง LINE Friend...','info');
+    var data=await jsonpCall('getLineUsers','');
+    if(!data||!data.ok||!data.data){if(!silent)toast('❌ ดึงข้อมูลไม่ได้ (ตรวจว่า deploy Apps Script แล้ว)','err');return 0}
+    var lus=data.data;var added=0,updated=0;
+    DB.members=DB.members||[];
+    DB.dismissedLine=DB.dismissedLine||{};
+    lus.forEach(function(lu){
+      var uid=lu.userId||lu.uid||'';var name=lu.displayName||lu.name||'';
+      if(!validUid(uid))return;
+      if(DB.dismissedLine[uid])return; // แอดมินลบทิ้งแล้ว ไม่ต้องดึงกลับ
+      var exist=(DB.members||[]).find(function(m){return m.lineUserId===uid});
+      if(exist){ if(name&&exist.lineName!==name){exist.lineName=name;updated++} return; }
+      DB.members.push({id:genLeadId(),name:(name||'(LINE Friend)'),nick:'',phone:'',
+        lineUserId:uid,lineName:name,lineId:'',lang:'th',pts:0,spend:0,level:'ทั่วไป',joinDate:fmtDate()});
+      added++;
+    });
+    if(added||updated){saveDB();if(getApiUrl()&&typeof syncPushAll==='function'&&curUser){try{syncPushAll(true)}catch(e){}}}
+    if(!silent)toast(added?('✅ พบ LINE Friend ใหม่ '+added+' คน'):(updated?'อัปเดตชื่อ LINE '+updated+' คน':'ไม่มี LINE Friend ใหม่'));
+    return added;
+  }catch(e){if(!silent)toast('❌ '+e.message,'err');return 0}
 }
 function memFilterChip(f,label){return '<div class="filter-chip'+(window._memFilter===f?' act':'')+'" onclick="setMemFilter(\''+f+'\')">'+label+'</div>'}
 function setMemFilter(f){window._memFilter=f;renderPage('members')}
@@ -5923,6 +5951,7 @@ function deleteMember(mid){
   // ── tombstone: กันไม่ให้ autoPull ดึงสมาชิกที่เพิ่งลบกลับมา ──
   DB.deletedMembers=DB.deletedMembers||{};
   DB.deletedMembers[mid]=new Date().getTime();
+  if(m.lineUserId){DB.dismissedLine=DB.dismissedLine||{};DB.dismissedLine[m.lineUserId]=new Date().getTime()}
   DB.members=DB.members.filter(function(x){return x.id!==mid});
   saveDB();
   // ── push ขึ้น Cloud ทันที (ไม่รอ debounce) เพื่อให้ Sheets ลบตามจริง ──
