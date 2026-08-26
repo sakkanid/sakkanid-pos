@@ -5408,7 +5408,9 @@ async function clearOrdersOnly(){
   if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
   if(!confirm('⚠️ ล้างประวัติออเดอร์ทั้งหมด?\n\nออเดอร์ '+(DB.orders||[]).length+' รายการจะถูกลบ (ทั้งในเครื่องและ Cloud)\n(สมาชิก ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
   if(!confirm('❗ ยืนยันอีกครั้ง — ลบออเดอร์ทั้งหมดจริงหรือ? ไม่สามารถย้อนกลับได้')) return;
+  window._wipeUntil=new Date().getTime()+180000; // กัน auto-sync ดึงข้อมูลกลับระหว่าง/หลังล้าง (3 นาที)
   DB.orders=[];DB.docs=[];DB.orderSeq=0;saveDB();
+  renderPage(curPage);
   // ล้างใน Google Sheets ด้วย (ทุก sheet ที่เก็บออเดอร์)
   if(getApiUrl()){
     toast('🔄 กำลังล้างข้อมูลใน Cloud...','info');
@@ -5420,6 +5422,7 @@ async function clearOrdersOnly(){
         if(r&&r.ok) cleared++;
       }catch(e){}
     }
+    window._wipeUntil=new Date().getTime()+120000; // ล้าง Cloud เสร็จแล้ว ต่ออีก 2 นาทีเผื่อ sync รอบถัดไป
     toast('🗑️ ล้างประวัติออเดอร์แล้ว ('+cleared+' sheets) ✅');
   }else{
     toast('🗑️ ล้างประวัติออเดอร์แล้ว ✅');
@@ -5431,11 +5434,14 @@ async function clearMembersOnly(){
   if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
   if(!confirm('⚠️ ล้างสมาชิกทั้งหมด?\n\nสมาชิก '+(DB.members||[]).length+' ราย และโควต้าลูกค้าจะถูกลบ (ทั้งในเครื่องและ Cloud)\n(ออเดอร์ ตารางราคา ตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
   if(!confirm('❗ ยืนยันอีกครั้ง — ลบสมาชิกทั้งหมดจริงหรือ? ย้อนกลับไม่ได้')) return;
+  window._wipeUntil=new Date().getTime()+180000;
   DB.members=[];DB.quotas=[];DB.memberSeq=0;DB.leadSeq=0;saveDB();
+  renderPage(curPage);
   if(getApiUrl()){
     toast('🔄 กำลังล้างสมาชิกใน Cloud...','info');
     var sheets=['members','quotas','line_users'];var cleared=0;
     for(var i=0;i<sheets.length;i++){try{var r=await jsonpCall('clearSheet',sheets[i]);if(r&&r.ok)cleared++}catch(e){}}
+    window._wipeUntil=new Date().getTime()+120000;
     toast('🗑️ ล้างสมาชิกแล้ว ('+cleared+' sheets) ✅');
   }else toast('🗑️ ล้างสมาชิกแล้ว ✅');
   logAction('CLEAR_MEMBERS','all members cleared');
@@ -5445,15 +5451,17 @@ async function clearOrdersAndMembers(){
   if(!curUser||curUser.role!=='เจ้าของร้าน'){toast('⛔ เฉพาะเจ้าของร้าน','err');return}
   if(!confirm('⚠️ เริ่มใหม่ — ลบออเดอร์ '+(DB.orders||[]).length+' + สมาชิก '+(DB.members||[]).length+' ราย?\n\n(ตารางราคา, ราคา Vender และตั้งค่า จะยังอยู่)\n\nยืนยัน?')) return;
   if(prompt('พิมพ์ "เริ่มใหม่" เพื่อยืนยันการลบออเดอร์+สมาชิกทั้งหมด:')!=='เริ่มใหม่'){toast('ยกเลิก','info');return}
+  window._wipeUntil=new Date().getTime()+180000;
   DB.orders=[];DB.docs=[];DB.members=[];DB.quotas=[];
   DB.orderSeq=0;DB.memberSeq=0;DB.leadSeq=0;
   // ล้างการจ่ายงาน Vender + ค่าที่กรอกในใบคุม (แต่เก็บราคา Vender ไว้)
   var s=getShopSettings();s.venderAssign={};s.venderEdit={};
-  saveDB();pushVenderCloud();
+  saveDB();pushVenderCloud();renderPage(curPage);
   if(getApiUrl()){
     toast('🔄 กำลังล้างข้อมูลใน Cloud...','info');
     var sheets=['orders','orders_laundry','orders_package','orders_bedset','orders_cleaning','docs','members','quotas','line_users'];var cleared=0;
     for(var i=0;i<sheets.length;i++){try{var r=await jsonpCall('clearSheet',sheets[i]);if(r&&r.ok)cleared++}catch(e){}}
+    window._wipeUntil=new Date().getTime()+120000;
     toast('🧹 เริ่มใหม่แล้ว ('+cleared+' sheets) — เก็บราคา/ตั้งค่าไว้ ✅');
   }else toast('🧹 เริ่มใหม่แล้ว — เก็บราคา/ตั้งค่าไว้ ✅');
   logAction('RESET_ORDERS_MEMBERS','orders + members cleared (kept prices/settings)');
@@ -7571,11 +7579,11 @@ async function syncPullAll(){
   try{
     var result=await jsonpCall('getFullDB','');
     if(result.ok&&result.data){
-    var d=result.data;
-    // Merge data
-    if(d.orders&&d.orders.length){DB.orders=d.orders.map(fixOrder)}
-    if(d.members&&d.members.length){DB.members=d.members.filter(function(m){return !isDeletedMember(m.id)})}
-    if(d.quotas&&d.quotas.length){DB.quotas=d.quotas}
+    var d=result.data;var wipeLocked=new Date().getTime()<(window._wipeUntil||0);
+    // Merge data (ข้าม orders/members/quotas ถ้าเพิ่งกดล้าง — กันข้อมูลกลับมา)
+    if(!wipeLocked&&d.orders&&d.orders.length){DB.orders=d.orders.map(fixOrder)}
+    if(!wipeLocked&&d.members&&d.members.length){DB.members=d.members.filter(function(m){return !isDeletedMember(m.id)})}
+    if(!wipeLocked&&d.quotas&&d.quotas.length){DB.quotas=d.quotas}
     if(d.promos&&d.promos.length){DB.promos=d.promos}
     if(d.expenses&&d.expenses.length){DB.expenses=d.expenses}
     if(d.shifts&&d.shifts.length){DB.shifts=d.shifts}
@@ -8120,9 +8128,11 @@ async function syncPullSilent(){
     var data=await jsonpCall('getFullDB','');
     if(!data.ok||!data.data) return;
     var d=data.data;var changed=false;
+    // ── กันข้อมูลกลับมาหลังกด "ล้าง/เริ่มใหม่" (ระหว่างล้าง Cloud ยังลบไม่เสร็จ auto-pull จะดึงกลับ) ──
+    var wipeLocked=new Date().getTime()<(window._wipeUntil||0);
     // CRITICAL: only update if cloud has data (never overwrite with empty!)
-    if(d.orders&&d.orders.length>0){var newOrders=d.orders.map(fixOrder);if(JSON.stringify(newOrders.map(function(o){return o.id}))!==JSON.stringify((DB.orders||[]).map(function(o){return o.id}))){DB.orders=newOrders;changed=true}}
-    if(d.members&&d.members.length>0){
+    if(!wipeLocked&&d.orders&&d.orders.length>0){var newOrders=d.orders.map(fixOrder);if(JSON.stringify(newOrders.map(function(o){return o.id}))!==JSON.stringify((DB.orders||[]).map(function(o){return o.id}))){DB.orders=newOrders;changed=true}}
+    if(!wipeLocked&&d.members&&d.members.length>0){
       var newMem=d.members.filter(function(m){return !isDeletedMember(m.id)}).map(function(m){
         var p=String(m.phone||'').replace(/^'+/,'').replace(/[^0-9]/g,'');if(p&&p.charAt(0)!=='0')p='0'+p;m.phone=p;
         if(m.joinDate&&String(m.joinDate).includes('T')){var dt=new Date(m.joinDate);if(!isNaN(dt.getTime())){var yr=dt.getFullYear();if(yr>2500)yr-=543;m.joinDate=String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+yr}}
@@ -8130,7 +8140,7 @@ async function syncPullSilent(){
       if(newMem.length!==(DB.members||[]).length||JSON.stringify(newMem.map(function(m){return m.id}))!==JSON.stringify((DB.members||[]).map(function(m){return m.id}))){DB.members=newMem;changed=true}}
     // ── merge ชื่อ LINE / UID / ภาษา จาก Cloud แม้รายชื่อ id ไม่เปลี่ยน (ให้ค่าที่ webhook เขียนไหลเข้ามา ไม่ถูกเขียนทับด้วยค่าว่างตอน push) ──
     if(d.members&&d.members.length){var _mById={};(DB.members||[]).forEach(function(mm){_mById[mm.id]=mm});d.members.forEach(function(sm){var lm=_mById[sm.id];if(!lm)return;['lineName','lineUserId','lang','lineId'].forEach(function(f){if(sm[f]!==undefined&&sm[f]!==''&&sm[f]!==lm[f]){lm[f]=sm[f];changed=true}})})}
-    if(d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
+    if(!wipeLocked&&d.quotas&&d.quotas.length>0&&d.quotas.length!==(DB.quotas||[]).length){DB.quotas=d.quotas;changed=true}
     if(d.promos&&d.promos.length>0&&d.promos.length!==(DB.promos||[]).length){DB.promos=d.promos;changed=true}
     if(d.expenses&&d.expenses.length>0&&d.expenses.length!==(DB.expenses||[]).length){DB.expenses=d.expenses;changed=true}
     // ═══ PRICELIST — ถ้าเพิ่งแก้ราคาในเครื่อง <60วิ ให้ POS ชนะ ไม่ให้ Cloud ทับ ═══
