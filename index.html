@@ -2924,7 +2924,7 @@ function renderVdTabs(){
   var d=venderSelDate(),assign=getVenderAssign();
   var orders=ordersForDate(d);
   var unassigned=orders.filter(function(o){return !(assign[o.id])}).length;
-  var sendableUnassigned=orders.filter(function(o){return !venderNoSend(o)&&!(assign[o.id])}).length;
+  var sendableUnassigned=venderAllUnassigned().length; // ยังไม่เลือกร้าน = นับทุกวัน
   var tabs='<div class="tabs" style="flex-wrap:wrap">';
   tabs+='<div class="tab'+(window._vdTab==='inbox'?' act':'')+'" onclick="vdSetTab(\'inbox\')">📋 ออเดอร์วันนี้ ('+orders.length+')</div>';
   tabs+='<div class="tab'+(window._vdTab==='unassigned'?' act':'')+'" onclick="vdSetTab(\'unassigned\')" style="'+(sendableUnassigned?'color:#C92A2A;font-weight:700':'')+'">⚠️ ยังไม่เลือกร้าน ('+sendableUnassigned+')</div>';
@@ -2945,20 +2945,32 @@ function renderVenderBody(){
   if(vname==null){window._vdTab='inbox';box.innerHTML=renderVdInbox('all');return}
   box.innerHTML=venderCardNew(vname,vi,venderSelDate());
 }
+// ออเดอร์ที่ยังไม่เลือกร้าน "ทุกวัน" (ไว้ตามเก็บของที่ลืมจ่าย) — เฉพาะออเดอร์ที่ยังทำงานอยู่
+function venderAllUnassigned(){
+  var assign=getVenderAssign();
+  return (DB.orders||[]).filter(function(o){
+    if(venderNoSend(o))return false;
+    if(assign[o.id])return false;
+    if(['ยกเลิก','เสร็จสิ้น','ปิดงาน'].indexOf(o.status)>=0)return false;
+    return true;
+  }).slice().sort(function(a,b){return String(orderDateISO(a)+' '+a.createdAt).localeCompare(String(orderDateISO(b)+' '+b.createdAt))});
+}
 // ── แท็บ inbox: ทุกออเดอร์ของวันนี้ + dropdown จ่ายงาน (mode: 'all' | 'unassigned') ──
 function renderVdInbox(mode){
   mode=mode||'all';
+  var isUn=(mode==='unassigned');
   var d=venderSelDate(),assign=getVenderAssign();
   var allOrders=ordersForDate(d);
-  var orders=(mode==='unassigned')?allOrders.filter(function(o){return !venderNoSend(o)&&!(assign[o.id])}):allOrders;
+  var orders=isUn?venderAllUnassigned():allOrders;   // ยังไม่เลือกร้าน = ข้ามวัน (ทุกวัน)
   var assignedCnt=allOrders.filter(function(o){return assign[o.id]}).length;
   var sendable=allOrders.filter(function(o){return !venderNoSend(o)}).length;
-  var title=(mode==='unassigned')?'⚠️ ออเดอร์ที่ยังไม่เลือกร้าน — '+venderDateLabelTH(d)+' ('+orders.length+')':'📋 ออเดอร์วันที่ '+venderDateLabelTH(d)+' ('+allOrders.length+' ออเดอร์)';
+  var title=isUn?'⚠️ ออเดอร์ที่ยังไม่เลือกร้าน (ทุกวัน) — '+orders.length+' รายการ':'📋 ออเดอร์วันที่ '+venderDateLabelTH(d)+' ('+allOrders.length+' ออเดอร์)';
+  var hint=isUn?'ออเดอร์ที่ยังทำงานอยู่แต่ลืมเลือกร้านส่งซัก (รวมทุกวัน) — เลือกร้านให้ครบ แล้วจะหายจากลิสต์นี้':'แตะที่รหัสออเดอร์เพื่อดูรายละเอียด · เลือกร้านในช่อง "เลือกร้านที่ส่งซัก" (แถวสีฟ้า = จ่ายแล้ว)';
   var head='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
-    '<div class="card-title" style="margin:0'+(mode==='unassigned'?';color:#C92A2A':'')+'">'+title+'</div>'+
-    '<div style="font-size:12px;color:var(--t3)">แตะที่รหัสออเดอร์เพื่อดูรายละเอียด · เลือกร้านในช่อง "เลือกร้านที่ส่งซัก" (แถวสีฟ้า = จ่ายแล้ว)</div></div>';
+    '<div class="card-title" style="margin:0'+(isUn?';color:#C92A2A':'')+'">'+title+'</div>'+
+    '<div style="font-size:12px;color:var(--t3)">'+hint+'</div></div>';
   if(!orders.length){
-    if(mode==='unassigned')return head+'<div class="empty-state"><div class="es-icon">✅</div><div class="es-text">จ่ายงานครบทุกออเดอร์แล้ว — ไม่มีออเดอร์ค้าง</div></div></div>';
+    if(isUn)return head+'<div class="empty-state"><div class="es-icon">✅</div><div class="es-text">เยี่ยม! ทุกออเดอร์เลือกร้านครบแล้ว — ไม่มีออเดอร์ตกค้าง</div></div></div>';
     return head+'<div class="empty-state"><div class="es-text">ยังไม่มีออเดอร์ในวันนี้</div></div></div>';
   }
   var th='border:1px solid #999;padding:6px 8px;background:#e8eef4;font-weight:700;text-align:center;font-size:12px';
@@ -2969,7 +2981,7 @@ function renderVdInbox(mode){
     var pcs=rows.reduce(function(s,r){return s+(r.defPcs||0)},0);
     var kg=rows.reduce(function(s,r){return s+(r.defKg||0)},0);
     var qty=(pcs?pcs+' ชิ้น':'')+(kg?(pcs?' + ':'')+kg+' กก.':'')||'-';
-    var tm=(String(o.createdAt).match(/(\d{1,2}:\d{2})/)||['',''])[1];
+    var tm=isUn?('<b>'+venderDateLabelTH(orderDateISO(o))+'</b><div style="font-size:10px;color:var(--t3)">'+((String(o.createdAt).match(/(\d{1,2}:\d{2})/)||['',''])[1])+' น.</div>'):((String(o.createdAt).match(/(\d{1,2}:\d{2})/)||['',''])[1]);
     var cur=assign[o.id]||'';
     var noSend=venderNoSend(o);
     var items=venderItemSummary(o);
@@ -2992,8 +3004,9 @@ function renderVdInbox(mode){
       '<td style="'+td+';text-align:center;white-space:nowrap">'+(noSend?'-':qty)+'</td>'+
       '<td style="'+td+';min-width:160px">'+sel+'</td></tr>';
   }).join('');
-  var tbl='<div class="card" style="overflow-x:auto"><div style="font-size:12px;color:var(--t2);margin-bottom:6px">จ่ายงานแล้ว '+assignedCnt+'/'+sendable+' ออเดอร์ที่ต้องส่งซัก</div><table style="'+VD_TBL+'">'+
-    '<tr><th style="'+th+';width:4%">#</th><th style="'+th+';width:7%">เวลา</th><th style="'+th+';width:11%">ออเดอร์</th><th style="'+th+';width:14%">ลูกค้า</th><th style="'+th+';width:10%">ประเภท</th><th style="'+th+';width:26%">รายการที่ส่งซัก</th><th style="'+th+';width:9%">จำนวน</th><th style="'+thA+';width:19%">เลือกร้านที่ส่งซัก</th></tr>'+rowsHtml+'</table></div>';
+  var summaryLine=isUn?'<div style="font-size:12px;color:#C92A2A;margin-bottom:6px;font-weight:600">⚠️ มี '+orders.length+' ออเดอร์ที่ยังไม่ได้เลือกร้านส่งซัก (รวมทุกวัน)</div>':'<div style="font-size:12px;color:var(--t2);margin-bottom:6px">จ่ายงานแล้ว '+assignedCnt+'/'+sendable+' ออเดอร์ที่ต้องส่งซัก</div>';
+  var tbl='<div class="card" style="overflow-x:auto">'+summaryLine+'<table style="'+VD_TBL+'">'+
+    '<tr><th style="'+th+';width:4%">#</th><th style="'+th+';width:8%">'+(isUn?'วันที่':'เวลา')+'</th><th style="'+th+';width:11%">ออเดอร์</th><th style="'+th+';width:13%">ลูกค้า</th><th style="'+th+';width:10%">ประเภท</th><th style="'+th+';width:26%">รายการที่ส่งซัก</th><th style="'+th+';width:9%">จำนวน</th><th style="'+thA+';width:19%">เลือกร้านที่ส่งซัก</th></tr>'+rowsHtml+'</table></div>';
   return head+'</div>'+tbl;
 }
 // ป้ายชื่อร้านที่ส่งซัก (โชว์บนการ์ดสถานะออเดอร์ เตือนแอดมินว่าทำรายการแล้ว)
@@ -3499,13 +3512,13 @@ async function syncLineFriends(silent){
     if(!silent)toast('🔄 กำลังดึง LINE Friend...','info');
     var data=await jsonpCall('getLineUsers','');
     if(!data||!data.ok||!data.data){if(!silent)toast('❌ ดึงข้อมูลไม่ได้ (ตรวจว่า deploy Apps Script แล้ว)','err');return 0}
-    var lus=data.data;var added=0,updated=0;
+    var lus=data.data;var added=0,updated=0,total=0;
     DB.members=DB.members||[];
-    DB.dismissedLine=DB.dismissedLine||{};
     lus.forEach(function(lu){
       var uid=lu.userId||lu.uid||'';var name=lu.displayName||lu.name||'';
       if(!validUid(uid))return;
-      if(DB.dismissedLine[uid])return; // แอดมินลบทิ้งแล้ว ไม่ต้องดึงกลับ
+      total++;
+      // ลูกค้าที่เคยลบไปแล้วกลับมาทักใหม่ → ถือว่าไม่เป็นสมาชิก โผล่เป็น LINE Friend ให้แอดมินสร้างใหม่ (ไม่บล็อกถาวร)
       var exist=(DB.members||[]).find(function(m){return m.lineUserId===uid});
       if(exist){ if(name&&exist.lineName!==name){exist.lineName=name;updated++} return; }
       DB.members.push({id:genLeadId(),name:(name||'(LINE Friend)'),nick:'',phone:'',
@@ -3513,7 +3526,11 @@ async function syncLineFriends(silent){
       added++;
     });
     if(added||updated){saveDB();if(getApiUrl()&&typeof syncPushAll==='function'&&curUser){try{syncPushAll(true)}catch(e){}}}
-    if(!silent)toast(added?('✅ พบ LINE Friend ใหม่ '+added+' คน'):(updated?'อัปเดตชื่อ LINE '+updated+' คน':'ไม่มี LINE Friend ใหม่'));
+    if(!silent){
+      if(added)toast('✅ พบ LINE Friend ใหม่ '+added+' คน (ทั้งหมด '+total+' คนในไลน์)');
+      else if(total===0)toast('⚠️ ยังไม่มีใครทักไลน์เข้ามา (ชีต line_users ว่าง) — เช็ค Webhook LINE','warn');
+      else toast('ไม่มี LINE Friend ใหม่ — ในไลน์มี '+total+' คน (จับคู่/เป็นสมาชิกครบแล้ว)');
+    }
     return added;
   }catch(e){if(!silent)toast('❌ '+e.message,'err');return 0}
 }
@@ -5951,7 +5968,6 @@ function deleteMember(mid){
   // ── tombstone: กันไม่ให้ autoPull ดึงสมาชิกที่เพิ่งลบกลับมา ──
   DB.deletedMembers=DB.deletedMembers||{};
   DB.deletedMembers[mid]=new Date().getTime();
-  if(m.lineUserId){DB.dismissedLine=DB.dismissedLine||{};DB.dismissedLine[m.lineUserId]=new Date().getTime()}
   DB.members=DB.members.filter(function(x){return x.id!==mid});
   saveDB();
   // ── push ขึ้น Cloud ทันที (ไม่รอ debounce) เพื่อให้ Sheets ลบตามจริง ──
