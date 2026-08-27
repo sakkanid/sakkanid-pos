@@ -6240,7 +6240,9 @@ function buildBillHTML(o){
       h+='<div style="display:flex;font-size:12px;font-weight:700;padding:1px 0"><span style="width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span><span style="width:15%;text-align:center">'+it.qty+'</span><span style="width:30%;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
       var en='';
       if(isQuota){
-        en='';   // โควต้าไม่ต้องมีบรรทัดอังกฤษซ้ำ
+        // โควต้า: บรรทัด 2 แสดงชื่อประเภทภาษาอังกฤษ (ดึงจากตารางราคาแพ็กเกจ)
+        var pkq=(typeof PKGS!=='undefined')?PKGS.find(function(p){return p.type===it.t}):null;
+        en=(pkq&&pkq.typeEn)?pkq.typeEn:((it.te&&it.te!==it.t)?it.te:'');
       }else if(o.type==='pkg_buy'||it.c==='Package'){
         // ซื้อแพ็กเกจ: หาชื่ออังกฤษจากตารางราคา (typeEn) ถ้ามี
         var pk=(typeof PKGS!=='undefined')?PKGS.find(function(p){return p.type===it.t}):null;
@@ -6282,12 +6284,16 @@ function buildBillHTML(o){
     var mQuotas=(DB.quotas||[]).filter(function(q){return q.mid===o.mid&&q.remain>=0});
     if(mQuotas.length){
       h+='<div style="border-top:1px dashed #000;margin:3px 0"></div>';
-      mQuotas.forEach(function(q){h+='<div style="font-size:11px;text-align:center;font-weight:700">📦 '+q.pkgName+' คงเหลือ '+q.remain+'/'+q.total+'</div>'});
+      h+='<div style="font-size:12px;text-align:center;font-weight:700;margin-bottom:1px">📦 แจ้งจำนวนแพ็กเกจคงเหลือ</div>';
+      mQuotas.forEach(function(q){h+='<div style="font-size:11px;text-align:center;font-weight:700">'+(q.pkgType||q.pkgName)+' คงเหลือ '+q.remain+'/'+q.total+'</div>'});
     }
   }
   // ── Promo / Note ──
   if(o.promo) h+='<div style="font-size:11px;font-weight:700">🎁 โปร: '+o.promo+'</div>';
-  if(o.note) h+='<div style="font-size:11px;font-weight:700;padding:2px 4px;border:1px solid #000;margin:2px 0">📝 '+o.note+'</div>';
+  if(o.type==='quota'){
+    var _qi=(o.items||[])[0]||{};var _qt=_qi.t||'';
+    h+='<div style="font-size:11px;font-weight:700;padding:3px 6px;border:1px solid #000;margin:2px 0;text-align:center">📝 วันนี้ลูกค้าใช้โควต้า '+_qt+' ในบิลนี้เรียบร้อยแล้ว</div>';
+  }else if(o.note) h+='<div style="font-size:11px;font-weight:700;padding:2px 4px;border:1px solid #000;margin:2px 0">📝 '+o.note+'</div>';
   // ── Footer ──
   h+='<div style="border-top:2px dashed #000;margin:4px 0"></div>';
   h+='<div style="text-align:center;font-size:12px;font-weight:700">'+(bc.footerText||s.billFooter||'ขอบคุณที่ใช้บริการค่ะ 🫧')+'</div>';
@@ -7957,8 +7963,8 @@ function printGarmentTags(oid){
   var h='';var tagLabel=totalQty+' ป้าย';
   if(o.type==='quota'){
     // ── ออเดอร์ใช้โควต้า → ป้ายสรุป 1 ใบ (กันยาวเกินเวลาลูกค้าใช้เยอะ) ──
-    var cats={};(o.items||[]).forEach(function(it){var k=(it.c||it.t||'รายการ');cats[k]=(cats[k]||0)+(it.qty||1)});
-    var lines=Object.keys(cats).map(function(k){return k+' × '+cats[k]}).join(' · ');
+    var cats={};(o.items||[]).forEach(function(it){var k='ใช้โควต้า '+(it.t||it.c||'');cats[k]=(cats[k]||0)+(it.qty||1)});
+    var lines=Object.keys(cats).map(function(k){return k+' x '+cats[k]+' ชิ้น'}).join(' · ');
     h='<div style="border:2px dashed #000;padding:10px 14px;margin:6px 0;page-break-inside:avoid;width:'+(tc.width||70)+'mm;font-family:Tahoma,Arial,sans-serif">'+
       '<div style="display:flex;justify-content:space-between;align-items:center">'+
       '<div style="font-size:'+(tc.idSize||18)+'px;font-weight:900;color:#000">'+o.id+'</div>'+
