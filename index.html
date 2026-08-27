@@ -3498,7 +3498,7 @@ function renderMembersPage(c){
       memFilterChip('full','✅ สมาชิกเต็มตัว ('+fullCnt+')')+
       memFilterChip('lead','🟢 LINE Friend — ยังไม่เป็นสมาชิก ('+leadCnt+')')+'</div>'+
     '<div class="grid g2" style="margin-bottom:12px"><div class="search-box"><input id="memPageSearch" placeholder="ค้นหาสมาชิก..." oninput="filterMembersPage()"></div>'+
-    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="syncLineFriends(false)">🔄 ดึง LINE Friend</button> <button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
+    '<div><button class="btn btn-pr" onclick="openNewMemberModal()">➕ เพิ่มสมาชิก</button> <button class="btn btn-gn" onclick="syncLineFriends(false).then(function(){if(curPage===\'members\')renderPage(\'members\')})">🔄 ดึง LINE Friend</button> <button class="btn btn-out" onclick="openLineDiag()">🔍 ตรวจระบบ LINE</button><button class="btn btn-out" onclick="copyRegisterLink()">📎 ลิงก์สมัคร</button> <button class="btn btn-out" onclick="showRegQR()">🔲 QR สมัคร</button> <button class="btn btn-out" onclick="exportMembers()">📤 Export</button> <button class="btn btn-am" onclick="triggerImport(\'members\')">📥 Import</button><input type="file" id="importFile_members" accept=".csv" style="display:none" onchange="importMembersCSV(this)"> <button class="btn btn-out" onclick="downloadPriceTemplate(\'members\')">📋 Template</button> <button class="btn btn-out" onclick="if(fixDuplicateMemberIds(false)){renderPage(\'members\')}">🔧 ซ่อม ID ซ้ำ</button></div></div>'+
     (window._memFilter==='lead'?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">💡 LINE Friend = ทักแชทเข้ามาแล้ว แต่ยังไม่มีเบอร์ (ยังไม่เป็นสมาชิกเต็มตัว) — กดที่รายชื่อ → ✏️ แก้ไข → ใส่เบอร์ แล้วเซฟ จะกลายเป็นสมาชิกเต็มตัวทันที</div>':'')+
     '<div id="memPageList">'+renderMemberTable(memListFiltered())+'</div></div>';
   // ดึง LINE Friend จากชีต line_users อัตโนมัติ (เงียบ) — คนที่ทักไลน์มาแต่ยังไม่เป็นสมาชิก
@@ -3510,6 +3510,7 @@ async function syncLineFriends(silent){
   if(!apiUrl){if(!silent)toast('⚠️ ยังไม่ได้เชื่อม Cloud','err');return 0}
   try{
     if(!silent)toast('🔄 กำลังดึง LINE Friend...','info');
+    try{await jsonpCall('refreshLineNames','')}catch(e){} // ดึงชื่อ LINE ล่าสุดก่อน (webhook ไม่ได้ดึงชื่อแล้ว)
     var data=await jsonpCall('getLineUsers','');
     if(!data||!data.ok||!data.data){if(!silent)toast('❌ ดึงข้อมูลไม่ได้ (ตรวจว่า deploy Apps Script แล้ว)','err');return 0}
     var lus=data.data;var added=0,updated=0,total=0;
@@ -3533,6 +3534,44 @@ async function syncLineFriends(silent){
     }
     return added;
   }catch(e){if(!silent)toast('❌ '+e.message,'err');return 0}
+}
+// ── ตรวจระบบ LINE ทีละขั้น (บอกว่าติดตรงไหน) ──
+async function openLineDiag(){
+  var apiUrl=(typeof getApiUrl==='function')?getApiUrl():'';
+  var h='<div class="modal-overlay show" id="moLineDiag"><div class="modal" style="max-width:540px"><div class="modal-head"><h3>🔍 ตรวจระบบ LINE</h3><button class="modal-close" onclick="document.getElementById(\'moLineDiag\').remove()">&times;</button></div><div class="modal-body" id="ld-body" style="overflow-y:auto"><div style="color:var(--t3)">⏳ กำลังตรวจ...</div></div><div class="modal-foot"><button class="btn btn-out" onclick="document.getElementById(\'moLineDiag\').remove()">ปิด</button><button class="btn btn-gn" onclick="var mo=document.getElementById(\'moLineDiag\');if(mo)mo.remove();syncLineFriends(false).then(function(){if(curPage===\'members\')renderPage(\'members\')})">🔄 ดึงเข้าระบบ</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  var box=$('ld-body');var lines=[];
+  function row(st,txt){var ic=(st===true?'✅':st==='warn'?'⚠️':'❌');return '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--b1)"><span style="font-size:15px">'+ic+'</span><div style="flex:1;font-size:13px;line-height:1.5">'+txt+'</div></div>'}
+  function paint(){box.innerHTML=lines.join('')}
+  // 1) API URL
+  if(!apiUrl){lines.push(row(false,'<b>ยังไม่ได้เชื่อม Cloud (API URL)</b><br>ไปที่ ตั้งค่า → การเชื่อมต่อ ใส่ URL ของ Apps Script (ลงท้าย <code>/exec</code>) ก่อน'));paint();return}
+  lines.push(row(true,'เชื่อม Cloud แล้ว <span style="font-size:11px;color:var(--t3)">('+apiUrl.slice(0,42)+'…)</span>'));paint();
+  // 2) ping
+  try{
+    var pong=await jsonpCall('ping','');
+    if(pong&&pong.ok){var vv=String(pong.v||'?');lines.push(row(true,'Apps Script ตอบแล้ว — เวอร์ชัน <b>'+vv+'</b>'+(vv.indexOf('v8')<0?' <span style="color:var(--am)">(ยังไม่ใช่ v8 — แนะนำ deploy ใหม่)</span>':'')))}
+    else lines.push(row(false,'Apps Script ไม่ตอบ (ping) — ตรวจว่า Deploy เป็น Web App, Who has access = <b>Anyone</b>'));
+  }catch(e){lines.push(row(false,'ต่อ Apps Script ไม่ได้: '+e.message+'<br>ตรวจ URL ลงท้าย /exec และ Deploy = Anyone'))}
+  paint();
+  // 3) getLineUsers
+  try{
+    var data=await jsonpCall('getLineUsers','');
+    if(!data||!data.ok){lines.push(row(false,'เรียกดูรายชื่อ LINE ไม่สำเร็จ (getLineUsers)'))}
+    else{
+      var lus=(data.data||[]);var valid=lus.filter(function(l){return validUid(l.userId||l.uid||'')});
+      if(!valid.length){
+        lines.push(row(false,'<b>ชีต line_users ว่าง</b> — Apps Script ยังไม่ได้รับข้อมูลว่ามีคนทักเข้ามา<br><b>สาเหตุ = Webhook LINE ยังไม่ได้ต่อเข้า Apps Script</b><br>👉 LINE Developers → Messaging API → <b>Webhook URL</b> = ใส่ URL <code>/exec</code> ของร้าน → กด Verify → เปิด <b>Use webhook: ON</b><br>👉 ปิด "Auto-reply / Greeting" ใน LINE OA แล้วให้ลูกค้า <b>ทักข้อความใหม่อีกครั้ง</b> (การกดเพิ่มเพื่อนเฉยๆ บางทีไม่ส่ง event)'));
+      }else{
+        var names=valid.slice(0,8).map(function(l){return (l.displayName||l.name||'(ไม่มีชื่อ)')}).join(', ');
+        lines.push(row(true,'พบคนทักไลน์เข้ามา <b>'+valid.length+'</b> คน: '+names+(valid.length>8?' …':'')));
+        var linked=valid.filter(function(l){var u=l.userId||l.uid;return (DB.members||[]).some(function(m){return m.lineUserId===u})}).length;
+        var newLeads=valid.length-linked;
+        if(newLeads>0)lines.push(row('warn','มี <b>'+newLeads+'</b> คนที่ยังไม่ได้ดึงเข้าระบบ → กดปุ่ม <b>"🔄 ดึงเข้าระบบ"</b> ด้านล่าง แล้วจะขึ้นในแท็บ LINE Friend'));
+        else lines.push(row(true,'ทุกคนถูกดึงเข้าระบบ/จับคู่แล้ว ('+linked+' คน)'));
+      }
+    }
+  }catch(e){lines.push(row(false,'getLineUsers error: '+e.message))}
+  paint();
 }
 function memFilterChip(f,label){return '<div class="filter-chip'+(window._memFilter===f?' act':'')+'" onclick="setMemFilter(\''+f+'\')">'+label+'</div>'}
 function setMemFilter(f){window._memFilter=f;renderPage('members')}
