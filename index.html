@@ -2445,7 +2445,7 @@ function saveBuyPackage(){
   const quota={id:genId('QTA'),mid:m.id,pkgName:pkg.type+' '+pkg.qty+' ชิ้น',pkgType:pkg.type,total:pkg.qty,used:0,remain:pkg.qty,buyDate:fmtDate(),exp:expStr};
   if(!DB.quotas) DB.quotas=[];
   DB.quotas.push(quota);
-  const order={id:genId('PKB'),type:'pkg_buy',mid:m.id,mname:m.name,mphone:m.phone,status:'เสร็จสิ้น',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'Package',t:pkg.type,o:pkg.qty+' ชิ้น',qty:1,p:pkg.price,k:pkg.cost,ce:'Package',te:pkg.type,oe:pkg.qty+' pcs'}],extras:[],disc:disc,net:netPrice,cost:pkg.cost,payHist:[{round:1,method:method,amt:netPrice,date:payDateStr,by:curUser.nick}],isPaid:true,pts:pts4(netPrice),promo:promoName,note:'',pickupDate:'',createdAt:fmtDT(),by:curUser.nick};
+  const order={id:genId('PKB'),type:'pkg_buy',mid:m.id,mname:m.name,mphone:m.phone,status:'เสร็จสิ้น',delivery:'pickup',delCost:0,deliveryAddr:'',items:[{c:'Package',t:pkg.type,o:pkg.qty+' ชิ้น',qty:1,p:pkg.price,k:pkg.cost,ce:'Package',te:(pkg.typeEn||pkg.type),oe:pkg.qty+' pcs'}],extras:[],disc:disc,net:netPrice,cost:pkg.cost,payHist:[{round:1,method:method,amt:netPrice,date:payDateStr,by:curUser.nick}],isPaid:true,pts:pts4(netPrice),promo:promoName,note:'',pickupDate:'',createdAt:fmtDT(),by:curUser.nick};
   DB.orders.push(order);
   m.spend=(m.spend||0)+pkg.price;m.pts=(m.pts||0)+order.pts;
   saveDB();logAction('CREATE_ORDER',order.id+' Package '+pkg.type);
@@ -3023,8 +3023,10 @@ function venderItemSummary(o){
   if(o.type==='pkg_buy'){
     var nm=((o.items||[])[0]||{});return '<span style="color:var(--t3)">ซื้อแพ็กเกจ '+(nm.t||nm.type||nm.c||'')+(nm.o?' '+nm.o:'')+' (ไม่มีผ้าส่งซัก)</span>';
   }
+  var isQ=(o.type==='quota');
   var rows=venderOrderRows(o);
   var parts=rows.map(function(r){
+    if(isQ){ return (r.type||'')+(r.defPcs?' x'+r.defPcs:''); }   // โควต้า: แสดงแค่ประเภท + จำนวน เช่น ซักมือ/ตาก/รีด x6
     var q=r.defKg?(r.defKg+'กก.'):(r.defPcs>1?'x'+r.defPcs:'');
     return (r.detail||r.type||'')+(q?' '+q:'');
   }).filter(function(x){return x.trim()!==''});
@@ -6233,10 +6235,22 @@ function buildBillHTML(o){
     var catEn=catItem&&catItem.ce?catItem.ce:'';
     h+='<div style="font-weight:700;font-size:12px;margin:'+(ci>0?'4':'1')+'px 0 1px;text-decoration:underline">'+cat+(catEn?' / '+catEn:'')+'</div>';
     cats[cat].forEach(function(it){
-      var name=it.t+(it.o?' · '+it.o:'');
+      var isQuota=(o.type==='quota'||it.c==='ใช้โควต้า');
+      // โควต้า: แสดงแค่ชื่อประเภท (ไม่ซ้ำกับชื่อแพ็กเกจ)
+      var name=isQuota?(it.t||''):(it.t+(it.o?' · '+it.o:''));
       h+='<div style="display:flex;font-size:12px;font-weight:700;padding:1px 0"><span style="width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span><span style="width:15%;text-align:center">'+it.qty+'</span><span style="width:30%;text-align:right">'+thb(it.p*it.qty)+'</span></div>';
-      var en=(it.te||'')+(it.oe?' '+it.oe:'');
-      if(en) h+='<div style="font-size:9px;color:#555;padding-left:4px">'+en+'</div>';
+      var en='';
+      if(isQuota){
+        en='';   // โควต้าไม่ต้องมีบรรทัดอังกฤษซ้ำ
+      }else if(o.type==='pkg_buy'||it.c==='Package'){
+        // ซื้อแพ็กเกจ: หาชื่ออังกฤษจากตารางราคา (typeEn) ถ้ามี
+        var pk=(typeof PKGS!=='undefined')?PKGS.find(function(p){return p.type===it.t}):null;
+        var teEn=(pk&&pk.typeEn)?pk.typeEn:((it.te&&it.te!==it.t)?it.te:'');
+        en=teEn+(it.oe?' '+it.oe:'');
+      }else{
+        en=(it.te||'')+(it.oe?' '+it.oe:'');
+      }
+      if(en&&en.trim()) h+='<div style="font-size:9px;color:#555;padding-left:4px">'+en.trim()+'</div>';
     });
   });
   // ── Extras ──
@@ -6370,8 +6384,8 @@ function renderLineTemplates(){
       '<div class="form-group" style="margin:0"><label class="form-label" style="font-size:11px">🇬🇧 English</label><textarea id="lt-'+key+'-en" rows="5" style="font-size:12px">'+ge(key)+'</textarea></div>'+
       '</div></div>';
   };
-  return '<div class="card"><div class="card-title">📱 เทมเพลตข้อความแจ้งเตือน LINE</div>'+
-    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">แก้ไขข้อความทุกแบบที่ส่งหาลูกค้าได้ที่นี่ · ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
+  return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div class="card-title" style="margin:0">📱 เทมเพลตข้อความแจ้งเตือน LINE</div><button class="btn btn-out" style="padding:4px 12px;font-size:12px;min-height:0;height:auto" onclick="showLineFlexCatalog()">👁️ ดูรูปแบบ Flex ทั้งหมด</button></div>'+
+    '<p style="font-size:12px;color:var(--t3);margin:8px 0 12px">แก้ไขข้อความทุกแบบที่ส่งหาลูกค้าได้ที่นี่ · ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
     '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">💬 <b>ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)</b> = ข้อความที่ลูกค้าใหม่ได้รับทันทีที่ทักแชทเข้ามา (ยังไม่ต้องเป็นสมาชิก/ยังไม่ได้แต้ม) — ต่างจาก "ต้อนรับสมาชิกใหม่" ที่ส่งตอนสมัครเป็นสมาชิกเต็มตัว<br><span style="color:var(--gn)">✅ แก้ไขแล้วกด "บันทึก" มีผลทันที ไม่ต้อง Deploy Apps Script ใหม่ (ระบบอ่านข้อความจากตั้งค่าที่ซิงค์ขึ้น Cloud)</span></div>'+
     row('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก / ยังไม่เป็นสมาชิก)','leadGreet')+
     row('🎉','ต้อนรับสมาชิกใหม่ (ตอนสมัครเป็นสมาชิกเต็มตัว)','welcome')+
@@ -6398,6 +6412,131 @@ function saveLineTemplates(){
   };
   saveDB();pushSettingsNow(); // push settings ขึ้น Cloud ทันที + ล็อกกัน Cloud ทับ
   toast('บันทึก LINE Templates สำเร็จ ✅ (☁️ sync แล้ว)');
+}
+
+// ═══ LINE FLEX CATALOG — ดูรูปแบบข้อความ Flex ทุกอันในระบบ ═══
+// แปลง Flex bubble JSON → HTML ตัวอย่าง (จำลองการแสดงผลบน LINE)
+var FLEX_SZ={xxs:10,xs:12,sm:13,md:15,lg:18,xl:21,xxl:26};
+function flexEsc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function flexNodeToHtml(n){
+  if(!n) return '';
+  if(n.type==='separator'){var mgS=FLEX_SZ[n.margin]?FLEX_SZ[n.margin]:6;return '<div style="border-top:1px solid #e6e6e6;margin-top:'+mgS+'px"></div>';}
+  if(n.type==='image'){var url=n.originalContentUrl||n.url||'';return '<div style="text-align:center;margin-top:6px">'+(url?'<img src="'+attrEsc(url)+'" style="max-width:100%;max-height:150px;border-radius:6px">':'<div style="background:#f0f0f0;color:#999;padding:20px;border-radius:6px;font-size:11px">[รูปภาพ / QR]</div>')+'</div>';}
+  if(n.type==='text'){
+    var sz=FLEX_SZ[n.size||'md']||15;var w=(n.weight==='bold')?'700':'400';
+    var col=n.color||'#111111';var al=n.align==='end'?'right':(n.align==='center'?'center':'left');
+    var fl=n.flex!==undefined?('flex:'+n.flex+';min-width:0;'):'';
+    return '<div style="'+fl+'font-size:'+sz+'px;font-weight:'+w+';color:'+col+';text-align:'+al+';white-space:pre-wrap;word-break:break-word;line-height:1.35">'+flexEsc(n.text||'')+'</div>';
+  }
+  if(n.type==='box'){
+    var isH=(n.layout==='horizontal');
+    var mg=FLEX_SZ[n.margin]?('margin-top:'+FLEX_SZ[n.margin]+'px;'):'';
+    var pad=n.paddingAll?('padding:'+n.paddingAll+';'):'';
+    var bg=n.backgroundColor?('background:'+n.backgroundColor+';'):'';
+    var flx=n.flex!==undefined?('flex:'+n.flex+';min-width:0;'):'';
+    var inner=(n.contents||[]).map(flexNodeToHtml).join('');
+    return '<div style="display:flex;flex-direction:'+(isH?'row':'column')+';'+(isH?'gap:4px;align-items:center;':'')+mg+pad+bg+flx+'border-radius:'+(n.backgroundColor?'0':'0')+'">'+inner+'</div>';
+  }
+  return '';
+}
+function flexBubbleToHtml(bubble){
+  if(!bubble) return '';
+  var parts='';
+  if(bubble.header) parts+='<div>'+flexNodeToHtml(bubble.header)+'</div>';
+  if(bubble.hero) parts+=flexNodeToHtml(bubble.hero);
+  if(bubble.body) parts+='<div style="padding:2px 0">'+flexNodeToHtml(bubble.body)+'</div>';
+  if(bubble.footer) parts+='<div style="border-top:1px solid #f0f0f0">'+flexNodeToHtml(bubble.footer)+'</div>';
+  return '<div style="width:280px;max-width:100%;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.18);border:1px solid #eee">'+parts+'</div>';
+}
+// สร้างข้อมูลตัวอย่างสำหรับพรีวิว (ไม่กระทบข้อมูลจริง)
+function flexSampleData(){
+  var s=getShopSettings();
+  var o={id:'LDR-0001',mname:'คุณตัวอย่าง ใจดี',mphone:'0812345678',status:'กำลังซัก',type:'laundry',
+    createdAt:fmtDT(),net:350,disc:0,delCost:0,pickupDate:todayStr(),quotaId:'',
+    items:[{c:'ซัก อบ รีด',ce:'Wash & Iron',t:'เสื้อเชิ้ต',te:'Shirt',o:'',oe:'',qty:3,p:50},
+           {c:'ซักแห้ง',ce:'Dry Clean',t:'เสื้อสูท',te:'Blazer',o:'ตัวสั้น',oe:'Short',qty:1,p:120}],
+    extras:[],payHist:[]};
+  return {s:s,o:o};
+}
+function showLineFlexCatalog(){
+  var d=flexSampleData();var s=d.s,o=d.o;
+  var rem=350;
+  var chatBubble=function(html){return '<div style="background:#8CB4D2;padding:14px;border-radius:12px;display:flex;justify-content:center">'+html+'</div>';};
+  var section=function(icon,title,trigger,alt,inner){
+    return '<div class="card" style="box-shadow:none;background:var(--bg);margin-bottom:14px">'+
+      '<div style="font-weight:700;font-size:14px;margin-bottom:2px">'+icon+' '+title+'</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:2px">🔔 ส่งเมื่อ: '+trigger+'</div>'+
+      (alt?'<div style="font-size:11px;color:var(--t3);margin-bottom:8px">📄 altText: <code style="font-size:10px">'+flexEsc(alt)+'</code></div>':'<div style="margin-bottom:8px"></div>')+
+      inner+'</div>';
+  };
+  // ── ข้อความอัตโนมัติ (Text templates) ──
+  var mSample={name:'คุณตัวอย่าง ใจดี',lineName:'ใจดี',id:'SKN-0001',level:'Silver',pts:120,phone:'0812345678',lang:'th'};
+  var tplRow=function(icon,label,key,vars){
+    var txt=fillLineTpl(mSample,key,vars);
+    return section(icon,label+' (ข้อความ Text)','ระบบส่งอัตโนมัติ','',
+      '<div style="background:#8CB4D2;padding:14px;border-radius:12px"><div style="background:#fff;border-radius:12px;padding:10px 12px;max-width:88%;font-size:13px;white-space:pre-wrap;line-height:1.45;box-shadow:0 1px 4px rgba(0,0,0,.12)">'+flexEsc(txt)+'</div></div>');
+  };
+  var textSec=
+    tplRow('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)','leadGreet',{name:mSample.name,shop:s.shopName})+
+    tplRow('🎉','ต้อนรับสมาชิกใหม่','welcome',{name:mSample.name,shop:s.shopName,id:mSample.id,level:mSample.level,pts:mSample.pts})+
+    tplRow('📋','แจ้งสถานะออเดอร์','statusUpdate',{name:mSample.name,shop:s.shopName,id:o.id,status:o.status})+
+    tplRow('💰','เรียกเก็บเงิน','billCollect',{name:mSample.name,shop:s.shopName,id:o.id,amount:thb(rem)})+
+    tplRow('✅','ผ้าพร้อมส่ง','ready',{name:mSample.name,shop:s.shopName,id:o.id});
+
+  // ── Flex bubbles ──
+  // 1) QR ชำระเงิน
+  var flexQr={type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[{type:'text',text:'📋 ส่งบิลเรียกเก็บเงิน',color:'#ffffff',weight:'bold'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
+      {type:'text',text:'💳 QR ชำระเงิน',weight:'bold',size:'md',color:'#006F98'},
+      {type:'text',text:o.id+' | '+o.mname,size:'sm',color:'#333333',margin:'sm'},
+      {type:'text',text:'ยอดค้าง: '+thb(rem),size:'md',weight:'bold',color:'#DC2626',margin:'sm'}]},
+    footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'สแกน QR ด้านล่างเพื่อชำระเงิน',size:'xxs',color:'#aaaaaa',align:'center'}]}};
+  // 2) บิล/ใบเสร็จ Flex
+  var itemEls=[];
+  itemEls.push({type:'text',text:'▸ ซัก อบ รีด / Wash & Iron',size:'xxs',color:'#006F98',weight:'bold',margin:'sm'});
+  itemEls.push({type:'box',layout:'horizontal',margin:'xs',contents:[{type:'text',text:'  เสื้อเชิ้ต',size:'xxs',color:'#555555',flex:5},{type:'text',text:'x3',size:'xxs',color:'#888888',flex:1,align:'center'},{type:'text',text:thb(150),size:'xxs',color:'#111111',flex:2,align:'end'}]});
+  itemEls.push({type:'text',text:'  Shirt',size:'xxs',color:'#aaaaaa'});
+  var billBody=[
+    {type:'box',layout:'horizontal',contents:[{type:'text',text:o.id,weight:'bold',size:'sm',color:'#006F98',flex:3},{type:'text',text:formatBillDate(o.createdAt),size:'xxs',color:'#999999',flex:3,align:'end'}]},
+    {type:'text',text:o.mname,size:'sm',color:'#333333',margin:'xs'},
+    {type:'text',text:o.status,size:'xxs',color:'#D97706',weight:'bold'},
+    {type:'separator',margin:'md'}
+  ].concat(itemEls).concat([{type:'separator',margin:'md'},
+    {type:'box',layout:'horizontal',margin:'sm',contents:[{type:'text',text:'ยอดสุทธิ Total',weight:'bold',size:'md',flex:4},{type:'text',text:thb(o.net),weight:'bold',size:'md',color:'#006F98',flex:2,align:'end'}]},
+    {type:'text',text:'❌ ค้างชำระ '+thb(rem)+' Unpaid',size:'xs',color:'#DC2626',weight:'bold',margin:'sm'}]);
+  var flexBill={type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#006F98',paddingAll:'12px',contents:[{type:'text',text:'📋 ใบแจ้งยอดค้างชำระ',color:'#ffffff',weight:'bold',size:'lg'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:billBody},
+    footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'},{type:'text',text:fmtPhone(s.phone)+(s.lineOA?' LINE:'+s.lineOA:''),size:'xxs',color:'#bbbbbb',align:'center'}]}};
+  // 3) แจ้งสถานะออเดอร์ Flex
+  var flexStatus={type:'bubble',
+    header:{type:'box',layout:'vertical',backgroundColor:'#D97706',paddingAll:'12px',contents:[{type:'text',text:'📋 '+o.status,color:'#ffffff',weight:'bold',size:'lg'}]},
+    body:{type:'box',layout:'vertical',paddingAll:'12px',contents:[
+      {type:'text',text:o.id+' | '+o.mname,size:'sm',color:'#333333'},
+      {type:'separator',margin:'md'},
+      {type:'text',text:o.status,weight:'bold',size:'lg',color:'#D97706',margin:'md'},
+      {type:'box',layout:'horizontal',margin:'sm',contents:[{type:'text',text:'ยอด / Total',size:'xs',color:'#888888',flex:3},{type:'text',text:thb(o.net),size:'sm',weight:'bold',flex:2,align:'end'}]},
+      {type:'text',text:'❌ ค้างชำระ '+thb(rem),size:'xs',color:'#DC2626',weight:'bold',margin:'sm'},
+      {type:'text',text:'📅 นัดรับ '+fmtISO(o.pickupDate),size:'xs',color:'#888888',margin:'sm'}]},
+    footer:{type:'box',layout:'vertical',paddingAll:'8px',contents:[{type:'text',text:'ขอบคุณที่ใช้บริการค่ะ Thank you.',size:'xxs',color:'#aaaaaa',align:'center'}]}};
+
+  var flexSec=
+    section('💳','QR ชำระเงิน (Flex)','กดปุ่ม "📲 ส่ง QR ชำระ" ที่บิล','QR ชำระเงิน '+thb(rem),chatBubble(flexBubbleToHtml(flexQr))+'<div style="font-size:10px;color:var(--t3);text-align:center;margin-top:4px">+ ตามด้วยรูป QR (จากตั้งค่า)</div>')+
+    section('🧾','บิล / ใบแจ้งยอด (Flex)','กดปุ่ม "📄 ส่ง PDF LINE" / เรียกเก็บเงิน','[ชื่อร้าน] [เลขบิล] [ยอด]',chatBubble(flexBubbleToHtml(flexBill)))+
+    section('📋','แจ้งสถานะออเดอร์ (Flex)','เปลี่ยนสถานะออเดอร์ แล้วเลือกแจ้ง LINE','[เลขบิล] [สถานะ]',chatBubble(flexBubbleToHtml(flexStatus)));
+
+  var body='<div class="modal-head"><h3>📱 รูปแบบข้อความ LINE ทั้งหมด</h3><button class="modal-close" onclick="closeMo(\'moFlexCat\')">&times;</button></div>'+
+    '<div class="modal-body" style="max-height:75vh;overflow:auto">'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:12px">ตัวอย่างข้อความทุกแบบที่ระบบส่งให้ลูกค้าผ่าน LINE (ใช้ข้อมูลตัวอย่าง) — ข้อความแบบ Text แก้ไขได้ที่แท็บ LINE ด้านบน · แบบ Flex เป็นรูปแบบตายตัวของระบบ</div>'+
+    '<div style="font-weight:700;font-size:13px;color:var(--pr);margin:6px 0">✏️ ข้อความอัตโนมัติ (แก้ไขได้)</div>'+textSec+
+    '<div style="font-weight:700;font-size:13px;color:var(--pr);margin:14px 0 6px">🎴 การ์ด Flex (รูปแบบระบบ)</div>'+flexSec+
+    '</div>'+
+    '<div class="modal-foot"><button class="btn btn-out" onclick="closeMo(\'moFlexCat\')">ปิด</button></div>';
+  var ov=$('moFlexCat');
+  if(!ov){ov=document.createElement('div');ov.className='modal-overlay';ov.id='moFlexCat';ov.innerHTML='<div class="modal" id="moFlexCatIn" style="max-width:560px"></div>';document.body.appendChild(ov);}
+  $('moFlexCatIn').innerHTML=body;
+  openMo('moFlexCat');
 }
 
 // ═══ MISSING FUNCTIONS — UTILITY ═══
