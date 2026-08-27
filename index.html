@@ -619,7 +619,6 @@ var STATUS_EN={'รับผ้ารอส่งซัก':'Received – awaiti
 function statusEn(st){st=String(st||'');if(STATUS_EN[st])return STATUS_EN[st];if(st.indexOf('รับผ้า')>=0)return 'Received';if(st.indexOf('ซัก')>=0)return 'Washing';if(st.indexOf('พร้อม')>=0)return 'Ready';if(st.indexOf('จัดส่ง')>=0)return 'Out for delivery';if(st.indexOf('เสร็จ')>=0||st.indexOf('ปิด')>=0)return 'Completed';return st}
 // ── เทมเพลตข้อความ LINE ค่าเริ่มต้น (ไทย/อังกฤษ) ──
 var LINE_TPL_DEF={
-  leadGreet:{th:'สวัสดีค่ะ {name} 🫧\n\nขอบคุณที่ทักมาหา {shop} นะคะ 💙\nทางร้านบันทึกข้อมูลเบื้องต้นของคุณไว้ให้แล้วค่ะ 📝\n\nหากต้องการสมัครสมาชิกเต็มตัว เพื่อรับแต้มสะสมและสิทธิพิเศษ รบกวนแจ้ง "ชื่อ + เบอร์โทร" กลับมาในแชทนี้ หรือแจ้งที่ร้านได้เลยนะคะ\n\nมีอะไรให้ดูแลเรื่องซักรีด ทักมาได้ตลอดเลยค่ะ 🧺✨',en:'Hi {name} 🫧\n\nThank you for contacting {shop} 💙\nWe have saved your basic info 📝\n\nTo become a full member (earn points & perks), please reply with your "name + phone number", or let our staff know.\n\nFeel free to message us anytime for laundry service 🧺✨'},
   welcome:{th:'สวัสดีค่ะ {name} 🫧\n\nยินดีต้อนรับสู่ {shop}\nสมัครสมาชิกสำเร็จแล้ว ✅\n\nรหัสสมาชิก: {id}\nระดับ: {level}\nแต้มต้อนรับ: {pts} แต้ม 🎉\n\nขอบคุณที่ใช้บริการค่ะ 💙',en:'Hi {name} 🫧\n\nWelcome to {shop}!\nYour membership is confirmed ✅\n\nMember ID: {id}\nTier: {level}\nWelcome points: {pts} 🎉\n\nThank you 💙'},
   statusUpdate:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nออเดอร์ {id} สถานะ: {status}\nขอบคุณค่ะ 💙',en:'Hi {name} 🫧\n{shop}\nOrder {id} — Status: {status}\nThank you 💙'},
   billCollect:{th:'สวัสดีค่ะ {name} 🫧\nร้าน {shop}\nเลขออเดอร์: {id}\nยอดค้างชำระ: {amount}\nกรุณาชำระเงินด้วยนะคะ 🙏',en:'Hi {name} 🫧\n{shop}\nOrder: {id}\nOutstanding balance: {amount}\nPlease complete your payment 🙏'},
@@ -6386,8 +6385,7 @@ function renderLineTemplates(){
   };
   return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div class="card-title" style="margin:0">📱 เทมเพลตข้อความแจ้งเตือน LINE</div><button class="btn btn-out" style="padding:4px 12px;font-size:12px;min-height:0;height:auto" onclick="showLineFlexCatalog()">👁️ ดูรูปแบบ Flex ทั้งหมด</button></div>'+
     '<p style="font-size:12px;color:var(--t3);margin:8px 0 12px">แก้ไขข้อความทุกแบบที่ส่งหาลูกค้าได้ที่นี่ · ตัวแปร: {name} {shop} {id} {amount} {status} {date} {phone} {level} {pts} — ระบบเลือกภาษาให้อัตโนมัติตาม "ภาษา" ของลูกค้าแต่ละคน (ตั้งได้ในหน้าแก้ไขสมาชิก)</p>'+
-    '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">💬 <b>ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)</b> = ข้อความที่ลูกค้าใหม่ได้รับทันทีที่ทักแชทเข้ามา (ยังไม่ต้องเป็นสมาชิก/ยังไม่ได้แต้ม) — ต่างจาก "ต้อนรับสมาชิกใหม่" ที่ส่งตอนสมัครเป็นสมาชิกเต็มตัว<br><span style="color:var(--gn)">✅ แก้ไขแล้วกด "บันทึก" มีผลทันที ไม่ต้อง Deploy Apps Script ใหม่ (ระบบอ่านข้อความจากตั้งค่าที่ซิงค์ขึ้น Cloud)</span></div>'+
-    row('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก / ยังไม่เป็นสมาชิก)','leadGreet')+
+    '<div style="padding:8px 10px;background:var(--prl);border-radius:8px;font-size:12px;margin-bottom:10px">ℹ️ ลูกค้าที่ทักแชทเข้ามาครั้งแรก <b>จะไม่ได้รับข้อความตอบกลับอัตโนมัติ</b> — ระบบแค่บันทึกไว้ในรายชื่อ LINE Friend เท่านั้น ข้อความต้อนรับจะส่งก็ต่อเมื่อสมัครเป็นสมาชิกเต็มตัวแล้ว<br><span style="color:var(--gn)">✅ แก้ไขแล้วกด "บันทึก" มีผลทันที ไม่ต้อง Deploy Apps Script ใหม่ (ระบบอ่านข้อความจากตั้งค่าที่ซิงค์ขึ้น Cloud)</span></div>'+
     row('🎉','ต้อนรับสมาชิกใหม่ (ตอนสมัครเป็นสมาชิกเต็มตัว)','welcome')+
     row('📋','แจ้งสถานะออเดอร์','statusUpdate')+
     row('💰','เรียกเก็บเงิน','billCollect')+
@@ -6404,7 +6402,6 @@ function resetLineTpl(key){
 function saveLineTemplates(){
   var s=getShopSettings();
   s.lineTemplates={
-    leadGreet:$('lt-leadGreet')?$('lt-leadGreet').value:'',leadGreetEn:$('lt-leadGreet-en')?$('lt-leadGreet-en').value:'',
     welcome:$('lt-welcome')?$('lt-welcome').value:'',welcomeEn:$('lt-welcome-en')?$('lt-welcome-en').value:'',
     statusUpdate:$('lt-statusUpdate')?$('lt-statusUpdate').value:'',statusUpdateEn:$('lt-statusUpdate-en')?$('lt-statusUpdate-en').value:'',
     billCollect:$('lt-billCollect')?$('lt-billCollect').value:'',billCollectEn:$('lt-billCollect-en')?$('lt-billCollect-en').value:'',
@@ -6477,7 +6474,6 @@ function showLineFlexCatalog(){
       '<div style="background:#8CB4D2;padding:14px;border-radius:12px"><div style="background:#fff;border-radius:12px;padding:10px 12px;max-width:88%;font-size:13px;white-space:pre-wrap;line-height:1.45;box-shadow:0 1px 4px rgba(0,0,0,.12)">'+flexEsc(txt)+'</div></div>');
   };
   var textSec=
-    tplRow('💬','ตอบกลับอัตโนมัติ (ลูกค้าทักครั้งแรก)','leadGreet',{name:mSample.name,shop:s.shopName})+
     tplRow('🎉','ต้อนรับสมาชิกใหม่','welcome',{name:mSample.name,shop:s.shopName,id:mSample.id,level:mSample.level,pts:mSample.pts})+
     tplRow('📋','แจ้งสถานะออเดอร์','statusUpdate',{name:mSample.name,shop:s.shopName,id:o.id,status:o.status})+
     tplRow('💰','เรียกเก็บเงิน','billCollect',{name:mSample.name,shop:s.shopName,id:o.id,amount:thb(rem)})+
