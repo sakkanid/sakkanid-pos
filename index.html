@@ -743,12 +743,30 @@ function openMo(id){
   },50);
 }
 function closeMo(id){$(id).classList.remove('show')}
-function saveDB(){localStorage.setItem('sj_db',JSON.stringify(DB))}
+function saveDB(){localStorage.setItem('sj_db',JSON.stringify(DB));savePrices();}
 function loadDB(){
   const raw=localStorage.getItem('sj_db');
   if(raw){try{DB=JSON.parse(raw);return}catch(e){}}
   DB={orders:[],members:[],quotas:[],promos:[],shopSettings:{},orderSeq:0,memberSeq:0,quotaSeq:0,auditLog:[]};
   seedDemo();
+}
+// ═══ เก็บตารางราคาลงเครื่อง (localStorage) — กันราคาเก่ากระพริบตอนเปิดโปรแกรมก่อน sync ═══
+// CAT/PKGS/BED_SETS/CLN_SVCS ไม่ได้อยู่ใน DB จึงต้องเซฟแยก แล้วโหลดกลับตอนบูตก่อนรอ Cloud
+function savePrices(){
+  try{localStorage.setItem('sj_prices',JSON.stringify({v:1,CAT:CAT,BED_SETS:BED_SETS,CLN_SVCS:CLN_SVCS,PKGS:PKGS}));}catch(e){}
+}
+function loadPrices(){
+  try{
+    var raw=localStorage.getItem('sj_prices');if(!raw)return;
+    var d=JSON.parse(raw);if(!d)return;
+    if(d.CAT&&d.CAT.length){
+      CAT.length=0;d.CAT.forEach(function(it){CAT.push(it)});
+      if(typeof CATS_UNIQUE!=='undefined'){CATS_UNIQUE.length=0;[...new Set(CAT.map(function(x){return x.c}))].forEach(function(c){CATS_UNIQUE.push(c)});}
+    }
+    if(d.BED_SETS&&d.BED_SETS.length){BED_SETS.length=0;d.BED_SETS.forEach(function(it){BED_SETS.push(it)});}
+    if(d.CLN_SVCS&&d.CLN_SVCS.length){CLN_SVCS.length=0;d.CLN_SVCS.forEach(function(it){CLN_SVCS.push(it)});}
+    if(d.PKGS&&d.PKGS.length){PKGS.length=0;d.PKGS.forEach(function(it){PKGS.push(it)});}
+  }catch(e){}
 }
 function getShopSettings(){
   if(!DB.shopSettings) DB.shopSettings={};
@@ -8479,7 +8497,7 @@ async function syncTestConnection(){
 }
 
 // ═══ BOOTSTRAP ═══
-loadDB();initDarkMode();
+loadDB();loadPrices();initDarkMode();
 if(location.search.includes('page=register')||location.search.includes('r=1')){
   document.body.style.overflow='auto';document.body.style.height='auto';
   renderPublicRegister();
