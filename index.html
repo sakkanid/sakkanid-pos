@@ -998,6 +998,33 @@ function doLogout(){
   curUser=null;initLockScreen();
 }
 
+// ═══ SYNC GATE — บล็อกจอตอนเปิดจน sync ข้อมูลล่าสุดเสร็จ (กันพนักงานกดทำรายการก่อนข้อมูลมาครบ) ═══
+function showSyncGate(onSkip){
+  hideSyncGate();
+  var st=document.getElementById('sgStyle');
+  if(!st){st=document.createElement('style');st.id='sgStyle';st.innerHTML='@keyframes sgspin{to{transform:rotate(360deg)}}';document.head.appendChild(st);}
+  var ov=document.createElement('div');ov.id='syncGate';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#004E6B,#1ABBEF);display:flex;align-items:center;justify-content:center;font-family:Tahoma,Arial,sans-serif';
+  ov.innerHTML='<div style="text-align:center;color:#fff;padding:24px;max-width:340px">'+
+    '<div style="width:56px;height:56px;border:5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;margin:0 auto 18px;animation:sgspin .8s linear infinite"></div>'+
+    '<div style="font-size:20px;font-weight:700">กำลังซิงค์ข้อมูลล่าสุด...</div>'+
+    '<div style="font-size:13px;opacity:.9;margin-top:8px;line-height:1.6">กรุณารอสักครู่ก่อนเริ่มทำรายการ<br>เพื่อให้ราคา · ออเดอร์ · สมาชิก เป็นข้อมูลล่าสุด</div>'+
+    '<button id="sgSkip" style="display:none;margin-top:22px;background:#fff;color:#006F98;border:none;padding:11px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px">เข้าใช้งานเลย →</button>'+
+    '<div id="sgHint" style="display:none;font-size:11px;opacity:.7;margin-top:10px">หากช้าผิดปกติ อาจเป็นที่สัญญาณเน็ต</div>'+
+    '</div>';
+  document.body.appendChild(ov);
+  // โชว์ปุ่มข้ามหลัง 3.5 วิ เผื่อคนที่รู้ว่าไม่มีการแก้จากเครื่องอื่น
+  window._sgSkipTimer=setTimeout(function(){
+    var b=document.getElementById('sgSkip'),hn=document.getElementById('sgHint');
+    if(b){b.style.display='inline-block';b.onclick=function(){if(typeof onSkip==='function')onSkip()}}
+    if(hn)hn.style.display='block';
+  },3500);
+}
+function hideSyncGate(){
+  if(window._sgSkipTimer){clearTimeout(window._sgSkipTimer);window._sgSkipTimer=null;}
+  var el=document.getElementById('syncGate');if(el)el.remove();
+}
+
 // ═══ APP INIT ═══
 function initApp(){
   $('lockScreen').style.display='none';$('app').style.display='block';
@@ -1011,10 +1038,14 @@ function initApp(){
     // ลบ ?setup= จาก URL เพื่อความปลอดภัย
     history.replaceState(null,'',location.pathname);
   }
-  // Initial sync from cloud
+  // Initial sync from cloud — บล็อกจอจน sync เสร็จ (กันกดทำรายการก่อนข้อมูลล่าสุดมาถึง)
   if(getApiUrl()){
-    toast('🔄 กำลังดึงข้อมูลจาก Cloud...','info');
-    syncPullAll().then(function(){normalizeMemberIds(true);fixDuplicateMemberIds(true);renderPage(curPage);updBadges();toast('✅ เชื่อมต่อสำเร็จ — ข้อมูลพร้อมใช้งาน')}).catch(function(){toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
+    var _gateDone=false;
+    var _finishGate=function(){if(_gateDone)return;_gateDone=true;if(window._gateTimeout){clearTimeout(window._gateTimeout);window._gateTimeout=null;}hideSyncGate();};
+    showSyncGate(function(){_finishGate();toast('⚡ เข้าใช้งานก่อน — ข้อมูลจะซิงค์ต่อเบื้องหลัง','warn');});
+    // timeout กันค้าง: ถ้า 10 วิยังไม่เสร็จ (เน็ตช้า/หลุด) ปลดล็อกให้ทำงานต่อ พร้อมเตือน
+    window._gateTimeout=setTimeout(function(){if(!_gateDone){_finishGate();toast('⚠️ ซิงค์ช้ากว่าปกติ — เข้าใช้งานได้ แต่ข้อมูลอาจยังไม่ล่าสุด กรุณากด 🔄 อีกครั้ง','warn')}},10000);
+    syncPullAll().then(function(){normalizeMemberIds(true);fixDuplicateMemberIds(true);renderPage(curPage);updBadges();_finishGate();toast('✅ ข้อมูลล่าสุดพร้อมใช้งาน')}).catch(function(){_finishGate();toast('⚠️ ไม่สามารถเชื่อมต่อ Cloud — ใช้ข้อมูล offline','warn')});
     startAutoPull();
   }
   startDailyReportSchedule();
