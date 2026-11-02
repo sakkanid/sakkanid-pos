@@ -5015,7 +5015,7 @@ function renderSettingsShop(s){
     '<div class="form-group"><label class="form-label">LINE OA</label><input id="st-line" value="'+(s.lineOA||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ที่อยู่</label><input id="st-addr" value="'+(s.address||'')+'"></div>'+
     '<div class="form-group"><label class="form-label">ข้อความท้ายบิล</label><input id="st-footer" value="'+(s.billFooter||'')+'"></div>'+
-    '<div class="form-group"><label class="form-label">🖼️ โลโก้ร้าน</label><input type="file" id="st-logo" accept="image/*" onchange="uploadShopLogo(event)"><div id="logoPreview" style="margin-top:6px">'+(s.logo?'<img src="'+s.logo+'" style="height:50px;border-radius:6px">':'')+'</div></div>'+
+    '<div class="form-group"><label class="form-label">🖼️ โลโก้ร้าน</label><input type="file" id="st-logo" accept="image/*" onchange="uploadShopLogo(event)"><div id="logoPreview" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+(s.logo?'<img src="'+s.logo+'" style="height:50px;border-radius:6px"><button type="button" class="btn btn-rd btn-sm" onclick="deleteShopLogo()">🗑️ ลบโลโก้</button>':'<span style="font-size:12px;color:var(--t3)">ยังไม่มีโลโก้ — ระบบจะใช้ชื่อร้านแทน</span>')+'</div></div>'+
     '<button class="btn btn-pr" onclick="saveSettings()">💾 บันทึก</button></div>'+
     '<div class="card"><div class="card-title">🔒 ความปลอดภัย</div>'+
     '<div class="form-group"><label class="form-label">Auto-lock หน้าจอ (นาที) — 0 = ปิด</label><input id="st-autolock" type="number" value="'+(s.autoLockMin||0)+'" min="0" step="5"></div>'+
@@ -5630,10 +5630,20 @@ function uploadShopLogo(e){
   if(file.size>512000){toast('ไฟล์ใหญ่เกิน 500KB','err');return}
   const reader=new FileReader();
   reader.onload=function(ev){
-    const s=getShopSettings();s.logo=ev.target.result;saveDB();
-    $('logoPreview').innerHTML='<img src="'+ev.target.result+'" style="height:50px;border-radius:6px">';
+    const s=getShopSettings();s.logo=ev.target.result;saveDB();pushSettingsNow();
+    $('logoPreview').innerHTML='<img src="'+ev.target.result+'" style="height:50px;border-radius:6px"><button type="button" class="btn btn-rd btn-sm" onclick="deleteShopLogo()">🗑️ ลบโลโก้</button>';
+    logAction('CHANGE_SETTINGS','เปลี่ยนโลโก้ร้าน');
     toast('อัพโหลดโลโก้สำเร็จ ✅');
   };reader.readAsDataURL(file);
+}
+// ลบโลโก้ร้านออก — ใช้ชื่อร้านแทน (ซิงค์ขึ้น Cloud ทันที กันโลโก้เก่าถูกดึงกลับ)
+function deleteShopLogo(){
+  if(!confirm('ลบโลโก้ร้านออก? ระบบจะแสดงชื่อร้านแทนในหน้า login / บิล / เอกสาร'))return;
+  const s=getShopSettings();s.logo='';saveDB();pushSettingsNow();
+  var pv=$('logoPreview');if(pv)pv.innerHTML='<span style="font-size:12px;color:var(--t3)">ยังไม่มีโลโก้ — ระบบจะใช้ชื่อร้านแทน</span>';
+  var inp=$('st-logo');if(inp)inp.value='';
+  logAction('CHANGE_SETTINGS','ลบโลโก้ร้าน');
+  toast('ลบโลโก้แล้ว ✅ (☁️ sync แล้ว)');
 }
 
 // ═══ AUTO-LOCK ═══
@@ -7821,7 +7831,9 @@ async function syncPushAll(silent){
     if(sheets[name].length){
       try{
         var url=apiUrl+'?action=replaceAll&sheet='+name;
-        await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({rows:sheets[name]})});
+        // timeout กัน fetch ค้าง (เน็ตช้า/หลุด) — ไม่งั้น sync จะค้าง "กำลังซิงค์..." ตลอด
+        var _ac=new AbortController();var _to=setTimeout(function(){_ac.abort()},15000);
+        try{await fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({rows:sheets[name]}),signal:_ac.signal})}finally{clearTimeout(_to)}
         success++;
       }catch(e){console.error('Push '+name+' failed:',e)}
     }
@@ -7850,6 +7862,7 @@ async function backfillLineNamesFromCloud(){
 // ── Pull all data from Sheets ──
 async function syncPullAll(){
   toast('📥 กำลังดึงข้อมูลจาก Cloud...','info');
+  syncStatus='syncing';updSyncUI();
   try{
     var result=await jsonpCall('getFullDB','');
     if(result.ok&&result.data){
@@ -7892,14 +7905,16 @@ async function syncPullAll(){
     }
     saveDB();
     backfillLineNamesFromCloud(); // เติมชื่อ LINE ให้สมาชิกที่มี UID แต่ยังไม่มีชื่อ
+    syncStatus='success';lastSyncTime=new Date();updSyncUI();
     toast('✅ ดึงข้อมูลจาก Cloud สำเร็จ!');
     logAction('SYNC_PULL','Pull all data from Google Sheets');
     renderPage(curPage);
   }else{
+    syncStatus='error';updSyncUI();
     toast('❌ ดึงข้อมูลล้มเหลว: '+(result.error||''),'err');
   }
   return result;
-  }catch(err){toast('❌ ดึงข้อมูลล้มเหลว: '+err.message,'err');return{ok:false}}
+  }catch(err){syncStatus='error';updSyncUI();toast('❌ ดึงข้อมูลล้มเหลว: '+err.message,'err');return{ok:false}}
 }
 
 // ── Fix order data types from Sheets ──
@@ -8382,14 +8397,16 @@ let autoPullInterval=null;
 function startAutoPull(){
   if(autoPullInterval) clearInterval(autoPullInterval);
   autoPullInterval=setInterval(function(){
-    if(!getApiUrl()||!curUser||syncStatus==='syncing') return;
+    if(!getApiUrl()||!curUser) return;
+    if(syncStatus==='syncing'&&(Date.now()-(window._syncingSince||0))<25000) return; // ค้างนานเกิน 25 วิ = ถือว่าหลุด ให้ดึงต่อได้
     syncPullSilent();
   },30000);
 }
 // ── ดึงข้อมูลสดทันทีเมื่อกลับมาที่หน้าจอ (สลับแอป/แท็บ/ปลุกเครื่อง) — ให้รู้สึกเหมือน login แล้วสดเสมอ ──
 var _lastFocusPull=0;
 function pullOnFocus(){
-  if(!getApiUrl()||!curUser||syncStatus==='syncing') return;
+  if(!getApiUrl()||!curUser) return;
+  if(syncStatus==='syncing'&&(Date.now()-(window._syncingSince||0))<25000) return;
   var now=Date.now();
   if(now-_lastFocusPull<8000) return; // กันยิงถี่เกิน
   _lastFocusPull=now;
@@ -8484,6 +8501,8 @@ async function syncPullSilent(){
 
 // ── Sync UI indicator ──
 function updSyncUI(){
+  // จดเวลาที่เริ่ม syncing เพื่อกัน deadlock (ถ้าค้างนานเกินไป ให้ auto-pull ทำงานต่อได้)
+  if(syncStatus==='syncing'){if(!window._syncingSince)window._syncingSince=Date.now();}else{window._syncingSince=0;}
   var el=$('syncIndicator');
   if(!el) return;
   var icons={idle:'☁️',syncing:'🔄',success:'✅',error:'⚠️'};
